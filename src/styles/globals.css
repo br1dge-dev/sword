@@ -1,0 +1,173 @@
+/**
+ * Global CSS Styles
+ * 
+ * This file contains global styles and Tailwind CSS directives.
+ * It's imported in the root layout component.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg-primary: #0a0a2a;
+  --color-bg-secondary: #0f0f35;
+  --color-neon-green: #00ffaa;
+  --color-neon-pink: #ff00ff;
+  --color-neon-red: #ff3366;
+  --color-neon-blue: #00ffff;
+  --color-text-primary: #00ffaa;
+  --color-skeleton: #9900ff;
+  --color-color-skeleton: #9900ff; /* Dupliziert für Fehlerkorrektur */
+  /* Grifter-Classic Farben */
+  --grifter-green: #00FCA6;
+  --grifter-pink: #FF3EC8;
+  --grifter-blue: #3EE6FF;
+  --grifter-yellow: #F8E16C;
+  --grifter-dark: #181A1B;
+}
+
+@layer base {
+  body {
+    @apply font-mono antialiased;
+    background-color: var(--color-bg-primary);
+    color: var(--color-neon-green);
+    overflow: hidden;
+  }
+  
+  /* Ensure the app fills the viewport properly */
+  html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+}
+
+@layer components {
+  .ascii-container {
+    @apply whitespace-pre font-mono leading-none;
+    text-rendering: geometricPrecision;
+  }
+  
+  /* Retro CRT effects */
+  .crt-effect {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  /* Scanlines overlay - verstärkte Version */
+  .scanlines-subtle::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.15),
+      rgba(0, 0, 0, 0.15) 2px,
+      transparent 2px,
+      transparent 4px
+    );
+    pointer-events: none;
+    z-index: 10;
+  }
+  
+  /* CRT screen curvature - verstärkte Version */
+  .crt-curve-subtle {
+    border-radius: 20px;
+    box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.5);
+    position: relative;
+  }
+  
+  .crt-curve-subtle::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 0%,
+      rgba(0, 0, 0, 0.2) 80%,
+      rgba(0, 0, 0, 0.4) 100%
+    );
+    pointer-events: none;
+    z-index: 9;
+    border-radius: 20px;
+  }
+  
+  /* Chromatic aberration effect */
+  .chromatic-aberration {
+    position: relative;
+    color: transparent;
+    text-shadow: 
+      -1px 0 1px rgba(255, 0, 255, 0.7),
+      1px 0 1px rgba(0, 255, 170, 0.7);
+  }
+  
+  /* Glow effect for text */
+  .text-glow {
+    text-shadow: 0 0 5px currentColor;
+  }
+
+  /* Neon text effects */
+  .text-neon-green {
+    color: var(--color-neon-green);
+    text-shadow: 0 0 5px var(--color-neon-green), 0 0 10px var(--color-neon-green);
+  }
+
+  .text-neon-pink {
+    color: var(--color-neon-pink);
+    text-shadow: 0 0 5px var(--color-neon-pink), 0 0 10px var(--color-neon-pink);
+  }
+
+  .text-neon-blue {
+    color: var(--color-neon-blue);
+    text-shadow: 0 0 5px var(--color-neon-blue), 0 0 10px var(--color-neon-blue);
+  }
+
+  .text-neon-red {
+    color: var(--color-neon-red);
+    text-shadow: 0 0 5px var(--color-neon-red), 0 0 10px var(--color-neon-red);
+  }
+}
+
+/* Custom viewport sizes */
+@layer utilities {
+  .xs\:text-\[0\.5rem\] {
+    font-size: 0.5rem;
+  }
+  
+  @media (min-width: 480px) {
+    .xs\:text-\[0\.5rem\] {
+      font-size: 0.5rem;
+    }
+  }
+}
+
+/* Custom cursor styling */
+* {
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Custom scrollbar - hidden for cleaner look */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+* {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+} 

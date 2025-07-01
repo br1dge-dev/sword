@@ -1,0 +1,180 @@
+"use client";
+
+/**
+ * AsciiTitle Component
+ * 
+ * This component renders the main title of the application with ASCII art styling
+ * and cyberpunk visual effects.
+ */
+import React, { useEffect, useState } from 'react';
+
+// Title text in ASCII art style
+const titleArt = `
+  ██████╗ ██████╗ ██╗███████╗████████╗██████╗ ██╗      █████╗ ██████╗ ███████╗
+ ██╔════╝ ██╔══██╗██║██╔════╝╚══██╔══╝██╔══██╗██║     ██╔══██╗██╔══██╗██╔════╝
+ ██║  ███╗██████╔╝██║█████╗     ██║   ██████╔╝██║     ███████║██║  ██║█████╗  
+ ██║   ██║██╔══██╗██║██╔══╝     ██║   ██╔══██╗██║     ██╔══██║██║  ██║██╔══╝  
+ ╚██████╔╝██║  ██║██║██║        ██║   ██████╔╝███████╗██║  ██║██████╔╝███████╗
+  ╚═════╝ ╚═╝  ╚═╝╚═╝╚═╝        ╚═╝   ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═════╝ ╚══════╝
+`;
+
+// Glitch-Symbole
+const glitchSymbols = ['░', '▒', '▓', '|', '/', '\\', '0', '1', '*', '>', '<', '×', '•', '¤', '§', '¶'];
+const accentColors = [
+  'var(--grifter-pink)',
+  'var(--grifter-green)',
+  'var(--grifter-blue)',
+  'var(--grifter-yellow)'
+];
+
+export default function AsciiTitle() {
+  const [glitchMap, setGlitchMap] = useState<{[key: number]: {[key: number]: {char: string, color: string}}}>(() => ({}));
+  const [flash, setFlash] = useState<{y: number, x: number, color: string} | null>(null); // Einzelner Flash
+  const [wideGlitch, setWideGlitch] = useState<{y: number, x: number, len: number, color: string} | null>(null); // Breiter Glitch
+  const lines = titleArt.split('\n');
+  const width = Math.max(...lines.map(l => l.length));
+  const height = lines.length;
+
+  // Animation: Glitch-Symbole und selektiver pinker Flash
+  useEffect(() => {
+    let frame = 0;
+    let raf: number;
+    function animate() {
+      frame++;
+      // Glitch-Symbole: alle 14 Frames (ca. 230ms)
+      if (frame % 14 === 0) {
+        const newGlitchMap: {[key: number]: {[key: number]: {char: string, color: string}}} = {};
+        // 1-2 Glitches pro Frame, zufällige Akzentfarbe
+        for (let i = 0; i < (Math.random() > 0.7 ? 2 : 1); i++) {
+          const y = Math.floor(Math.random() * height);
+          const x = Math.floor(Math.random() * width);
+          const color = accentColors[Math.floor(Math.random() * accentColors.length)];
+          if (!newGlitchMap[y]) newGlitchMap[y] = {};
+          newGlitchMap[y][x] = { char: glitchSymbols[Math.floor(Math.random() * glitchSymbols.length)], color };
+        }
+        setGlitchMap(newGlitchMap);
+      }
+      // Pinker/akzentfarbener Flash: alle 36 Frames (ca. 600ms)
+      if (frame % 36 === 0) {
+        if (Math.random() > 0.7) {
+          const y = Math.floor(Math.random() * height);
+          const line = lines[y];
+          let x = Math.floor(Math.random() * width);
+          let tries = 0;
+          while (line[x] === ' ' && tries < 10) {
+            x = Math.floor(Math.random() * width);
+            tries++;
+          }
+          const color = accentColors[Math.floor(Math.random() * accentColors.length)];
+          setFlash({ y, x, color });
+        } else {
+          setFlash(null);
+        }
+      }
+      // Breiter Glitch: alle 90 Frames (ca. 1,5s), selten, 2-4 Zeichen, zufällige Akzentfarbe
+      if (frame % 90 === 0) {
+        if (Math.random() > 0.8) {
+          const y = Math.floor(Math.random() * height);
+          const len = 2 + Math.floor(Math.random() * 3); // 2-4 Zeichen
+          let x = Math.floor(Math.random() * (width - len));
+          const color = accentColors[Math.floor(Math.random() * accentColors.length)];
+          setWideGlitch({ y, x, len, color });
+        } else {
+          setWideGlitch(null);
+        }
+      }
+      raf = window.requestAnimationFrame(animate);
+    }
+    raf = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(raf);
+  }, [height, width, lines]);
+
+  return (
+    <div className="w-full flex justify-center items-start pt-6 pb-2 select-none" style={{ minHeight: 'auto' }}>
+      <div
+        className="mx-auto"
+        style={{
+          background: 'linear-gradient(180deg, var(--grifter-green), var(--grifter-blue), var(--grifter-green))',
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          color: 'transparent',
+          textShadow: '0 0 2px var(--grifter-green), 0 0 4px var(--grifter-pink)',
+          filter: 'contrast(1.7) brightness(1.3)',
+          fontWeight: 'bold',
+          position: 'relative',
+          left: 0,
+          transform: 'translateX(0)',
+          width: 'auto',
+          display: 'inline-block',
+          fontFamily: 'monospace',
+          whiteSpace: 'pre',
+          letterSpacing: 0,
+          textAlign: 'center',
+          transformOrigin: 'center center',
+          willChange: 'transform',
+          margin: '0 auto',
+        }}
+      >
+        <pre
+          className="text-base sm:text-lg md:text-xl lg:text-2xl h-auto"
+          style={{
+            lineHeight: '1',
+            maxWidth: '100%',
+            background: 'none',
+            color: 'inherit',
+            textShadow: 'inherit',
+            fontWeight: 'bold',
+            fontFamily: 'monospace',
+            whiteSpace: 'pre',
+            letterSpacing: 0,
+            textAlign: 'center',
+            margin: 0,
+            padding: 0,
+            userSelect: 'none',
+          }}
+        >
+          {lines.map((line, y) => (
+            <span key={y} style={{ display: 'block', position: 'relative' }}>
+              {Array.from(line).map((char, x) => {
+                // Breiter Glitch (Rechteck/Balken)
+                if (wideGlitch && wideGlitch.y === y && x >= wideGlitch.x && x < wideGlitch.x + wideGlitch.len && char !== ' ') {
+                  return (
+                    <span key={x} style={{
+                      color: wideGlitch.color,
+                      filter: 'brightness(2.2)',
+                      textShadow: `0 0 8px ${wideGlitch.color}, 0 0 16px ${wideGlitch.color}`,
+                      fontWeight: 'bold',
+                      borderRadius: '2px',
+                      background: 'rgba(0,0,0,0.08)',
+                      padding: '0 1px',
+                      transition: 'all 0.1s',
+                    }}>{char}</span>
+                  );
+                }
+                // Einzelner Flash
+                if (flash && flash.y === y && flash.x === x && char !== ' ') {
+                  return (
+                    <span key={x} style={{
+                      color: flash.color,
+                      filter: 'brightness(2.2)',
+                      textShadow: `0 0 8px ${flash.color}, 0 0 16px ${flash.color}`,
+                      fontWeight: 'bold',
+                      transition: 'all 0.1s',
+                    }}>{char}</span>
+                  );
+                }
+                // Glitch-Symbol
+                if (glitchMap[y]?.[x]) {
+                  return (
+                    <span key={x} style={{ color: glitchMap[y][x].color, filter: 'brightness(1.3)' }}>{glitchMap[y][x].char}</span>
+                  );
+                }
+                return <span key={x}>{char}</span>;
+              })}
+            </span>
+          ))}
+        </pre>
+      </div>
+    </div>
+  );
+} 
