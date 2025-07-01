@@ -22,48 +22,48 @@ interface AsciiSwordProps {
 // Jede Zeile hat exakt die gleiche Länge, um Verschiebungen zu verhindern
 const swordLevels = {
   1: `
-       /█\\     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-     __▓█▓__   
-    /███████\\  
-       |█|     
-       |█|     
-       |█|     
-        V      
+      /██\\      
+      |██|      
+      |██|      
+      |██|      
+      |██|      
+      |██|      
+      |██|      
+      |██|      
+      |██|      
+      |██|      
+      |██|      
+      |██|      
+      |██|      
+      |██|      
+    __▓██▓__    
+   /███████\\   
+      |██|      
+      |██|      
+      |██|      
+       VV       
   `,
   2: `
-      /███\\    
-      |███|    
-      |███|    
-      |███|    
-     /|███|\\   
-     \\|███|/   
-      |███|    
-      |███|    
-      |███|    
-      |███|    
-      |███|    
-      |███|    
-     /|███|\\   
-     \\|███|/   
-   __▓████▓__  
-  /█████████\\ 
-  \\▓███████▓/ 
-     \\|█|/    
-      |█|     
-       V      
+     /████\\     
+     |████|     
+     |████|     
+     |████|     
+    /|████|\\    
+    \\|████|/    
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+    /|████|\\    
+    \\|████|/    
+  __▓██████▓__  
+ /██████████\\ 
+ \\▓████████▓/ 
+    \\|██|/     
+     |██|      
+      VV       
   `,
   // More levels can be added as the sword evolves
 };
@@ -72,28 +72,33 @@ const swordLevels = {
 const highlightPositions = {
   1: [
     { x: 7, y: 1 },  // Tip of sword
+    { x: 8, y: 1 },  // Tip of sword right
     { x: 7, y: 14 }, // Handle top
+    { x: 8, y: 14 }, // Handle top right
     { x: 4, y: 15 }, // Left guard
-    { x: 10, y: 15 }, // Right guard
+    { x: 11, y: 15 }, // Right guard
     { x: 7, y: 19 }, // Bottom point
+    { x: 8, y: 19 }, // Bottom point right
   ],
   2: [
     { x: 6, y: 1 },  // Tip of sword left
-    { x: 7, y: 1 },  // Tip of sword middle
-    { x: 8, y: 1 },  // Tip of sword right
+    { x: 7, y: 1 },  // Tip of sword middle left
+    { x: 8, y: 1 },  // Tip of sword middle right
+    { x: 9, y: 1 },  // Tip of sword right
     { x: 5, y: 5 },  // Left edge
-    { x: 9, y: 5 },  // Right edge
+    { x: 10, y: 5 }, // Right edge
     { x: 5, y: 6 },  // Left edge
-    { x: 9, y: 6 },  // Right edge
+    { x: 10, y: 6 }, // Right edge
     { x: 5, y: 13 }, // Left edge
-    { x: 9, y: 13 }, // Right edge
+    { x: 10, y: 13 }, // Right edge
     { x: 5, y: 14 }, // Left edge
-    { x: 9, y: 14 }, // Right edge
+    { x: 10, y: 14 }, // Right edge
     { x: 3, y: 15 }, // Left guard
-    { x: 11, y: 15 }, // Right guard
+    { x: 12, y: 15 }, // Right guard
     { x: 3, y: 16 }, // Left guard
-    { x: 11, y: 16 }, // Right guard
-    { x: 7, y: 19 }, // Bottom point
+    { x: 12, y: 16 }, // Right guard
+    { x: 7, y: 19 }, // Bottom point left
+    { x: 8, y: 19 }, // Bottom point right
   ]
 };
 
@@ -229,7 +234,8 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       
       for (let i = 0; i < numElements; i++) {
         // Random position on or near the sword
-        const x = Math.floor(Math.random() * 15) + 2;
+        // Angepasste X-Koordinaten für breiteres Schwert
+        const x = Math.floor(Math.random() * 16) + 2;
         const y = Math.floor(Math.random() * 18) + 1;
         
         // Random data pattern
@@ -281,7 +287,8 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       char === '\\' || 
       char === '_' || 
       char === 'V' ||
-      char === '|' && (x === 6 || x === 8) ||  // Side edges
+      // Angepasste Seitenkanten für breiteres Schwert
+      char === '|' && (x === 6 || x === 9 || x === 7 || x === 8) ||  // Side edges
       char === '█' ||  // Hauptkörper des Schwertes
       char === '▓' ||  // Griff des Schwertes
       y === 1 || y === 19;  // Top and bottom
