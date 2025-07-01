@@ -15,8 +15,10 @@ export default function HomePage() {
         <AsciiTitle />
       </div>
       
-      <div className="flex-grow flex items-center justify-center w-full my-2">
-        <AsciiSword level={1} />
+      <div className="flex-grow flex items-center justify-center w-full my-2 relative">
+        <div className="w-full max-w-md h-full flex items-center justify-center">
+          <AsciiSword level={1} />
+        </div>
       </div>
 
       {/* Seitliche Buttons */}

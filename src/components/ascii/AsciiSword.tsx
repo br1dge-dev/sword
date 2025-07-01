@@ -303,7 +303,8 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
           userSelect: 'none',
           WebkitUserSelect: 'none',
           MozUserSelect: 'none',
-          msUserSelect: 'none'
+          msUserSelect: 'none',
+          position: 'relative'
         }}
       >
         <motion.pre
@@ -319,12 +320,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
           style={{ 
             lineHeight: '1', 
             maxWidth: '100%',
-            background: currentLevel === 2
-              ? 'linear-gradient(180deg, var(--grifter-blue), var(--grifter-green), var(--grifter-blue))'
-              : 'linear-gradient(180deg, var(--grifter-green), var(--grifter-blue), var(--grifter-green))',
-            WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
-            color: 'transparent',
+            color: currentLevel === 2 ? 'var(--grifter-blue)' : 'var(--grifter-green)',
             textShadow: currentLevel === 2
               ? '0 0 3px var(--grifter-blue), 0 0 6px var(--grifter-pink)'
               : '0 0 2px var(--grifter-green), 0 0 4px var(--grifter-pink)',
@@ -345,6 +341,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
             willChange: 'transform',
             margin: '0 auto',
             userSelect: 'none',
+            backgroundColor: 'transparent'
           }}
         >
           {swordLines.map((line, lineIndex) => (
@@ -430,7 +427,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
                   <span 
                     key={charIndex} 
                     style={{ 
-                      color: colorInfo ? colorInfo.color : 'inherit',
+                      color: colorInfo ? colorInfo.color : (char === ' ' ? 'transparent' : 'inherit'),
                       transition: 'color 0.3s ease',
                       fontWeight: 'bold',
                       userSelect: 'none',
