@@ -6,6 +6,7 @@
  */
 import AsciiSword from '@/components/ascii/AsciiSword';
 import AsciiTitle from '@/components/ascii/AsciiTitle';
+import SideButtons from '@/components/ui/SideButtons';
 
 export default function HomePage() {
   return (
@@ -17,6 +18,9 @@ export default function HomePage() {
       <div className="flex-grow flex items-center justify-center w-full my-2">
         <AsciiSword level={1} />
       </div>
+
+      {/* Seitliche Buttons */}
+      <SideButtons />
     </main>
   );
 } 
