@@ -8,6 +8,7 @@
 import React from 'react';
 import GlitchButton from './GlitchButton';
 import { useFlashStore } from '@/store/flashStore';
+import { usePowerUpStore } from '@/store/powerUpStore';
 
 interface SideButtonsProps {
   className?: string;
@@ -15,6 +16,7 @@ interface SideButtonsProps {
 
 export default function SideButtons({ className = '' }: SideButtonsProps) {
   const { startFlash } = useFlashStore();
+  const { startPowerUp } = usePowerUpStore();
   
   return (
     <>
@@ -28,7 +30,7 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
         <GlitchButton 
           text="free-power-up" 
           variant="free"
-          onClick={() => console.log('free-power-up clicked')}
+          onClick={() => startPowerUp()}
         />
       </div>
       

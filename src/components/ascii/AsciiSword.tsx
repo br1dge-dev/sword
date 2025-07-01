@@ -11,6 +11,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { usePowerUpStore } from '@/store/powerUpStore';
 
 interface AsciiSwordProps {
   level?: number;
@@ -42,17 +43,59 @@ const swordLevels = {
        |█|     
         V      
   `,
+  2: `
+      /███\\    
+      |███|    
+      |███|    
+      |███|    
+     /|███|\\   
+     \\|███|/   
+      |███|    
+      |███|    
+      |███|    
+      |███|    
+      |███|    
+      |███|    
+     /|███|\\   
+     \\|███|/   
+   __▓████▓__  
+  /█████████\\ 
+  \\▓███████▓/ 
+     \\|█|/    
+      |█|     
+       V      
+  `,
   // More levels can be added as the sword evolves
 };
 
 // Highlight positions for the sword (x, y coordinates)
-const highlightPositions = [
-  { x: 7, y: 1 },  // Tip of sword
-  { x: 7, y: 14 }, // Handle top
-  { x: 4, y: 15 }, // Left guard
-  { x: 10, y: 15 }, // Right guard
-  { x: 7, y: 19 }, // Bottom point
-];
+const highlightPositions = {
+  1: [
+    { x: 7, y: 1 },  // Tip of sword
+    { x: 7, y: 14 }, // Handle top
+    { x: 4, y: 15 }, // Left guard
+    { x: 10, y: 15 }, // Right guard
+    { x: 7, y: 19 }, // Bottom point
+  ],
+  2: [
+    { x: 6, y: 1 },  // Tip of sword left
+    { x: 7, y: 1 },  // Tip of sword middle
+    { x: 8, y: 1 },  // Tip of sword right
+    { x: 5, y: 5 },  // Left edge
+    { x: 9, y: 5 },  // Right edge
+    { x: 5, y: 6 },  // Left edge
+    { x: 9, y: 6 },  // Right edge
+    { x: 5, y: 13 }, // Left edge
+    { x: 9, y: 13 }, // Right edge
+    { x: 5, y: 14 }, // Left edge
+    { x: 9, y: 14 }, // Right edge
+    { x: 3, y: 15 }, // Left guard
+    { x: 11, y: 15 }, // Right guard
+    { x: 3, y: 16 }, // Left guard
+    { x: 11, y: 16 }, // Right guard
+    { x: 7, y: 19 }, // Bottom point
+  ]
+};
 
 // Colors for the sword highlights - updated mit Grifter-Classic
 const highlightColors = [
@@ -70,7 +113,38 @@ const dataPatterns = [
   '⚠', '⚡', '⟁', '⟰', '⟱'
 ];
 
+// Level 2 hat mehr Datenpatterns
+const dataPatterns2 = [
+  ...dataPatterns,
+  '⚙', '⟲', '⟳', '⧉', '⧭',
+  '⧫', '⬢', '⬡', '⬣', '⬥',
+  '⬦', '⬧', '⬨', '⬩', '⬪',
+  '⬫', '⬬', '⬭', '⬮', '⬯',
+  '◈', '◇', '◆', '◊', '○',
+  '◌', '◍', '◎', '●', '◐',
+  '◑', '◒', '◓', '◔', '◕',
+  '◖', '◗', '◘', '◙', '◚',
+  '◛', '◜', '◝', '◞', '◟',
+  '◠', '◡', '◢', '◣', '◤',
+  '◥', '◦', '◧', '◨', '◩',
+  '◪', '◫', '◬', '◭', '◮',
+  '◯', '◰', '◱', '◲', '◳',
+  '◴', '◵', '◶', '◷', '◸',
+  '◹', '◺', '◻', '◼', '◽',
+  '◾', '◿', '★', '☆', '☀',
+  '☁', '☂', '☃', '☄', '☇',
+  '☈', '☉', '☊', '☋', '☌',
+  '☍', '☎', '☏', '☐', '☑',
+  '☒', '☓', '☔', '☕', '☖',
+  '☗', '☘', '☙', '☚', '☛',
+  '☜', '☝', '☞', '☟', '☠',
+  '☡', '☢', '☣', '☤', '☥',
+  '☦', '☧', '☨', '☩', '☪',
+  '☫', '☬', '☭', '☮', '☯'
+];
+
 export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
+  const { isPoweredUp } = usePowerUpStore();
   const [isGlowing, setIsGlowing] = useState(false);
   const [coloredChars, setColoredChars] = useState<Array<{
     x: number;
@@ -86,9 +160,12 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
   }>>([]);
   const swordRef = useRef<HTMLPreElement>(null);
   
+  // Bestimme das aktuelle Level basierend auf dem PowerUp-Status
+  const currentLevel = isPoweredUp ? 2 : level;
+  
   // Create flowing color effect through the sword
   useEffect(() => {
-    const swordLines = swordLevels[level as keyof typeof swordLevels].split('\n');
+    const swordLines = swordLevels[currentLevel as keyof typeof swordLevels].split('\n');
     
     // Find all characters that can be colored (non-space characters)
     const allChars: Array<{x: number, y: number, char: string}> = [];
@@ -105,7 +182,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
     let currentIndex = 0;
     const flowInterval = setInterval(() => {
       // Define a path through the sword (we'll use a simple top-to-bottom approach)
-      const pathLength = 12; // Mehr Zeichen auf einmal färben
+      const pathLength = currentLevel === 2 ? 18 : 12; // Level 2 hat mehr farbige Zeichen gleichzeitig
       const newColoredChars = [];
       
       // Select a color for this flow
@@ -125,26 +202,30 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       currentIndex = (currentIndex + 3) % allChars.length;
       
       setColoredChars(newColoredChars);
-    }, 120); // Etwas schneller
+    }, currentLevel === 2 ? 90 : 120); // Level 2 ist schneller
     
     return () => clearInterval(flowInterval);
-  }, [level]);
+  }, [currentLevel]);
   
   // Create dynamic pulsing effect for the sword edges
   useEffect(() => {
     const pulseInterval = setInterval(() => {
       setPulseEffect(prev => (prev + 1) % 100);
-    }, 40); // Schnelleres Pulsieren
+    }, currentLevel === 2 ? 30 : 40); // Level 2 pulsiert schneller
     
     return () => clearInterval(pulseInterval);
-  }, []);
+  }, [currentLevel]);
   
   // Create cyberpunk data overlay effect
   useEffect(() => {
     // Generate random data patterns that appear and disappear
     const generateDataOverlay = () => {
       const newOverlay = [];
-      const numElements = Math.floor(Math.random() * 7) + 2; // 2-8 Elemente (mehr als zuvor)
+      const numElements = currentLevel === 2 
+        ? Math.floor(Math.random() * 10) + 5 // 5-14 Elemente für Level 2
+        : Math.floor(Math.random() * 7) + 2; // 2-8 Elemente für Level 1
+      
+      const patterns = currentLevel === 2 ? dataPatterns2 : dataPatterns;
       
       for (let i = 0; i < numElements; i++) {
         // Random position on or near the sword
@@ -152,7 +233,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
         const y = Math.floor(Math.random() * 18) + 1;
         
         // Random data pattern
-        const pattern = dataPatterns[Math.floor(Math.random() * dataPatterns.length)];
+        const pattern = patterns[Math.floor(Math.random() * patterns.length)];
         
         newOverlay.push({
           x,
@@ -166,26 +247,29 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
     };
     
     // Update data overlay periodically
-    const dataInterval = setInterval(generateDataOverlay, 600); // Etwas schneller
+    const dataInterval = setInterval(generateDataOverlay, currentLevel === 2 ? 400 : 600); // Level 2 aktualisiert schneller
     
     return () => clearInterval(dataInterval);
-  }, []);
+  }, [currentLevel]);
   
   // Simulate block finalization with a pulsing glow effect
   useEffect(() => {
     const interval = setInterval(() => {
       setIsGlowing(true);
       setTimeout(() => setIsGlowing(false), 1000);
-    }, 5000);
+    }, currentLevel === 2 ? 3000 : 5000); // Level 2 glüht öfter
     
     return () => clearInterval(interval);
-  }, []);
+  }, [currentLevel]);
 
   // Get the appropriate sword ASCII art based on level
-  const swordArt = swordLevels[level as keyof typeof swordLevels] || swordLevels[1];
+  const swordArt = swordLevels[currentLevel as keyof typeof swordLevels] || swordLevels[1];
   
   // Convert sword art to an array of lines for rendering
   const swordLines = swordArt.split('\n');
+
+  // Get the appropriate highlight positions based on level
+  const currentHighlightPositions = highlightPositions[currentLevel as keyof typeof highlightPositions] || highlightPositions[1];
 
   // Calculate edge detection for the sword
   const getEdgeIntensity = (x: number, y: number, char: string): number => {
@@ -202,7 +286,11 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       char === '▓' ||  // Griff des Schwertes
       y === 1 || y === 19;  // Top and bottom
       
-    return isEdge ? 0.9 + (Math.sin(pulseEffect * 0.1) + 1) * 0.3 : 0;
+    // Level 2 hat stärkere Kanten
+    const baseIntensity = currentLevel === 2 ? 1.2 : 0.9;
+    const pulseMultiplier = currentLevel === 2 ? 0.4 : 0.3;
+    
+    return isEdge ? baseIntensity + (Math.sin(pulseEffect * 0.1) + 1) * pulseMultiplier : 0;
   };
 
   return (
@@ -222,18 +310,27 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
           ref={swordRef}
           className="text-base sm:text-lg md:text-xl lg:text-2xl h-auto"
           animate={{
-            filter: isGlowing ? 'brightness(2.0)' : 'brightness(1.5)',
+            filter: isGlowing 
+              ? `brightness(${currentLevel === 2 ? 2.5 : 2.0})` 
+              : `brightness(${currentLevel === 2 ? 1.8 : 1.5})`,
+            scale: isGlowing && currentLevel === 2 ? 1.03 : 1,
           }}
           transition={{ duration: 0.5 }}
           style={{ 
             lineHeight: '1', 
             maxWidth: '100%',
-            background: 'linear-gradient(180deg, var(--grifter-green), var(--grifter-blue), var(--grifter-green))',
+            background: currentLevel === 2
+              ? 'linear-gradient(180deg, var(--grifter-blue), var(--grifter-green), var(--grifter-blue))'
+              : 'linear-gradient(180deg, var(--grifter-green), var(--grifter-blue), var(--grifter-green))',
             WebkitBackgroundClip: 'text',
             backgroundClip: 'text',
             color: 'transparent',
-            textShadow: '0 0 2px var(--grifter-green), 0 0 4px var(--grifter-pink)',
-            filter: 'contrast(1.7) brightness(1.3)',
+            textShadow: currentLevel === 2
+              ? '0 0 3px var(--grifter-blue), 0 0 6px var(--grifter-pink)'
+              : '0 0 2px var(--grifter-green), 0 0 4px var(--grifter-pink)',
+            filter: currentLevel === 2
+              ? 'contrast(2.0) brightness(1.5)'
+              : 'contrast(1.7) brightness(1.3)',
             position: 'relative',
             left: 0,
             transform: 'translateX(0)',
@@ -271,7 +368,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
                 const edgeIntensity = getEdgeIntensity(charIndex, lineIndex, char);
                 
                 // Check if this is a special position (like tip, guard, etc)
-                const isSpecialPosition = highlightPositions.some(
+                const isSpecialPosition = currentHighlightPositions.some(
                   pos => pos.x === charIndex && pos.y === lineIndex
                 );
                 
@@ -284,8 +381,10 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
                     <span 
                       key={charIndex} 
                       style={{ 
-                        color: 'var(--grifter-blue)',
-                        textShadow: '0 0 3px var(--grifter-blue), 0 0 6px var(--grifter-blue)',
+                        color: currentLevel === 2 ? 'var(--grifter-pink)' : 'var(--grifter-blue)',
+                        textShadow: currentLevel === 2
+                          ? '0 0 4px var(--grifter-pink), 0 0 8px var(--grifter-blue)'
+                          : '0 0 3px var(--grifter-blue), 0 0 6px var(--grifter-blue)',
                         opacity: dataOverlayInfo.opacity,
                         position: 'relative',
                         zIndex: 3,
@@ -305,14 +404,14 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
                 if ((edgeIntensity > 0 || isSpecialPosition) && char !== ' ') {
                   const highlightColor = isSpecialPosition 
                     ? highlightColors[Math.floor(Math.random() * highlightColors.length)]
-                    : 'var(--grifter-green)';
+                    : currentLevel === 2 ? 'var(--grifter-blue)' : 'var(--grifter-green)';
                   
                   return (
                     <span 
                       key={charIndex} 
                       style={{ 
                         color: colorInfo ? colorInfo.color : highlightColor,
-                        textShadow: `0 0 ${2 + edgeIntensity * 4}px ${highlightColor}`,
+                        textShadow: `0 0 ${2 + edgeIntensity * (currentLevel === 2 ? 5 : 4)}px ${highlightColor}`,
                         position: 'relative',
                         zIndex: 2,
                         fontWeight: 'bold',
