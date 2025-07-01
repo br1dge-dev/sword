@@ -7,12 +7,15 @@
  */
 import React from 'react';
 import GlitchButton from './GlitchButton';
+import { useFlashStore } from '@/store/flashStore';
 
 interface SideButtonsProps {
   className?: string;
 }
 
 export default function SideButtons({ className = '' }: SideButtonsProps) {
+  const { startFlash } = useFlashStore();
+  
   return (
     <>
       {/* Linke Buttons */}
@@ -20,7 +23,7 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
         <GlitchButton 
           text="free-flash" 
           variant="free"
-          onClick={() => console.log('free-flash clicked')}
+          onClick={() => startFlash()}
         />
         <GlitchButton 
           text="free-power-up" 
