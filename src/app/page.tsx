@@ -7,8 +7,12 @@
 import AsciiSword from '@/components/ascii/AsciiSword';
 import AsciiTitle from '@/components/ascii/AsciiTitle';
 import SideButtons from '@/components/ui/SideButtons';
+import { usePowerUpStore } from '@/store/powerUpStore';
 
 export default function HomePage() {
+  // Die Basis-Level-Einstellung (wird durch PowerUp überschrieben)
+  const baseSwordLevel = 1;
+  
   return (
     <main className="flex min-h-screen flex-col items-center justify-between py-2 px-4 overflow-hidden">
       <div className="w-full flex-none pt-2">
@@ -17,7 +21,7 @@ export default function HomePage() {
       
       <div className="flex-grow flex items-center justify-center w-full my-2 relative">
         <div className="w-full max-w-md h-full flex items-center justify-center">
-          <AsciiSword level={1} />
+          <AsciiSword level={baseSwordLevel} />
         </div>
       </div>
 

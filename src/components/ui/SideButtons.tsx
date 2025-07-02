@@ -16,7 +16,14 @@ interface SideButtonsProps {
 
 export default function SideButtons({ className = '' }: SideButtonsProps) {
   const { startFlash } = useFlashStore();
-  const { startPowerUp } = usePowerUpStore();
+  const { currentLevel, startPowerUp } = usePowerUpStore();
+  
+  // Bestimme den Text für den Power-Up-Button basierend auf dem aktuellen Level
+  const getPowerUpText = () => {
+    if (currentLevel === 1) return "free-power-up";
+    if (currentLevel === 2) return "lvl-2-active";
+    return "lvl-3-active";
+  };
   
   return (
     <>
@@ -28,7 +35,7 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
           onClick={() => startFlash()}
         />
         <GlitchButton 
-          text="free-power-up" 
+          text={getPowerUpText()} 
           variant="free"
           onClick={() => startPowerUp()}
         />
