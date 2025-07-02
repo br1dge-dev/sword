@@ -8,6 +8,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
+import { motion } from 'framer-motion';
 
 // Title text in ASCII art style
 const titleArt = `
@@ -109,96 +110,73 @@ export default function AsciiTitle() {
     }
   };
 
+  // Berechne den Skalierungsfaktor basierend auf der Viewport-Breite
+  const getScaleFactor = () => {
+    return typeof window !== 'undefined' ? 
+      Math.min(Math.max(window.innerWidth / 1500, 0.7), 1) : 0.7;
+  };
+
   const scale = getScaleBasedOnLevel();
   const topPosition = getPositionBasedOnLevel();
 
   return (
-    <div className="w-full flex justify-center items-start pt-6 pb-2 select-none" style={{ minHeight: 'auto' }}>
-      <div
-        className="mx-auto transition-all duration-300"
+    <div className="w-full flex justify-center items-center py-8">
+      <motion.pre
+        className="text-base sm:text-lg md:text-xl lg:text-2xl"
         style={{
-          background: 'linear-gradient(180deg, var(--grifter-green), var(--grifter-blue), var(--grifter-green))',
-          WebkitBackgroundClip: 'text',
-          backgroundClip: 'text',
-          color: 'transparent',
-          textShadow: '0 0 2px var(--grifter-green), 0 0 4px var(--grifter-pink)',
-          filter: 'contrast(1.7) brightness(1.3)',
-          fontWeight: 'bold',
-          position: 'relative',
-          left: 0,
-          top: topPosition,
-          transform: `scale(${scale})`,
-          width: 'auto',
-          display: 'inline-block',
           fontFamily: 'monospace',
-          whiteSpace: 'pre',
-          letterSpacing: 0,
+          lineHeight: '1',
+          color: 'var(--grifter-blue)',
+          textShadow: '0 0 5px var(--grifter-blue), 0 0 10px var(--grifter-pink)',
+          filter: 'contrast(1.2) brightness(1.1)',
+          transform: `scale(${getScaleFactor()})`,
+          transformOrigin: 'center center',
           textAlign: 'center',
-          transformOrigin: 'center top',
-          willChange: 'transform',
-          margin: '0 auto',
+          whiteSpace: 'pre',
+          userSelect: 'none'
         }}
       >
-        <pre
-          className="text-base sm:text-lg md:text-xl lg:text-2xl h-auto"
-          style={{
-            lineHeight: '1',
-            maxWidth: '100%',
-            background: 'none',
-            color: 'inherit',
-            textShadow: 'inherit',
-            fontWeight: 'bold',
-            fontFamily: 'monospace',
-            whiteSpace: 'pre',
-            letterSpacing: 0,
-            textAlign: 'center',
-            margin: 0,
-            padding: 0,
-            userSelect: 'none',
-          }}
-        >
-          {lines.map((line, y) => (
-            <span key={y} style={{ display: 'block', position: 'relative' }}>
-              {Array.from(line).map((char, x) => {
-                // Breiter Glitch (Rechteck/Balken)
-                if (wideGlitch && wideGlitch.y === y && x >= wideGlitch.x && x < wideGlitch.x + wideGlitch.len && char !== ' ') {
-                  return (
-                    <span key={x} style={{
-                      color: wideGlitch.color,
-                      filter: 'brightness(2.2)',
-                      textShadow: `0 0 8px ${wideGlitch.color}, 0 0 16px ${wideGlitch.color}`,
-                      fontWeight: 'bold',
-                      borderRadius: '2px',
-                      background: 'rgba(0,0,0,0.08)',
-                      padding: '0 1px',
-                      transition: 'all 0.1s',
-                    }}>{char}</span>
-                  );
-                }
-                // Einzelner Flash
-                if (flash && flash.y === y && flash.x === x && char !== ' ') {
-                  return (
-                    <span key={x} style={{
-                      color: flash.color,
-                      filter: 'brightness(2.2)',
-                      textShadow: `0 0 8px ${flash.color}, 0 0 16px ${flash.color}`,
-                      fontWeight: 'bold',
-                      transition: 'all 0.1s',
-                    }}>{char}</span>
-                  );
-                }
-                // Glitch-Symbol
-                if (glitchMap[y]?.[x]) {
-                  return (
-                    <span key={x} style={{ color: glitchMap[y][x].color, filter: 'brightness(1.3)' }}>{glitchMap[y][x].char}</span>
-                  );
-                }
-                return <span key={x}>{char}</span>;
-              })}
-            </span>
-          ))}
-        </pre>
-      </div>
+        {lines.map((line, y) => (
+          <span key={y} style={{ display: 'block', position: 'relative' }}>
+            {Array.from(line).map((char, x) => {
+              // Breiter Glitch (Rechteck/Balken)
+              if (wideGlitch && wideGlitch.y === y && x >= wideGlitch.x && x < wideGlitch.x + wideGlitch.len && char !== ' ') {
+                return (
+                  <span key={x} style={{
+                    color: wideGlitch.color,
+                    filter: 'brightness(2.2)',
+                    textShadow: `0 0 8px ${wideGlitch.color}, 0 0 16px ${wideGlitch.color}`,
+                    fontWeight: 'bold',
+                    borderRadius: '2px',
+                    background: 'rgba(0,0,0,0.08)',
+                    padding: '0 1px',
+                    transition: 'all 0.1s',
+                  }}>{char}</span>
+                );
+              }
+              // Einzelner Flash
+              if (flash && flash.y === y && flash.x === x && char !== ' ') {
+                return (
+                  <span key={x} style={{
+                    color: flash.color,
+                    filter: 'brightness(2.2)',
+                    textShadow: `0 0 8px ${flash.color}, 0 0 16px ${flash.color}`,
+                    fontWeight: 'bold',
+                    transition: 'all 0.1s',
+                  }}>{char}</span>
+                );
+              }
+              // Glitch-Symbol
+              if (glitchMap[y]?.[x]) {
+                return (
+                  <span key={x} style={{ color: glitchMap[y][x].color, filter: 'brightness(1.3)' }}>{glitchMap[y][x].char}</span>
+                );
+              }
+              return <span key={x}>{char}</span>;
+            })}
+          </span>
+        ))}
+      </motion.pre>
     </div>
   );
 } 

@@ -371,11 +371,15 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
 
   // Berechne die Skalierungsfaktoren für die verschiedenen Level
   const getScaleFactor = () => {
+    // Basis-Skalierungsfaktor abhängig von der Viewport-Breite
+    const baseScale = typeof window !== 'undefined' ? 
+      Math.min(Math.max(window.innerWidth / 1500, 0.7), 1) : 0.7;
+    
     switch(currentLevel) {
-      case 1: return 0.9;  // Level 1: 10% kleiner
-      case 2: return 0.95; // Level 2: 5% kleiner
-      case 3: return 1.1;  // Level 3: 10% größer
-      default: return 1;
+      case 1: return baseScale * 0.9;  // Level 1: 10% kleiner als Basis
+      case 2: return baseScale * 0.95; // Level 2: 5% kleiner als Basis
+      case 3: return baseScale * 1.1;  // Level 3: 10% größer als Basis
+      default: return baseScale;
     }
   };
 
