@@ -387,144 +387,222 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
   const getChargeEffects = () => {
     if (chargeLevel <= 1) return null;
     
-    // Dezentere Vibrationseffekte entlang der Klinge
-    const getKlingenVibration = () => {
-      const vibrationElements = [];
+    // ASCII-Zeichen für elektrostatische Effekte, nach Intensität sortiert
+    const staticChars = [
+      ['·', ':', '·', '·'],                             // Level 1 - subtil
+      ['·', ':', '·', ':', '\'', '.', ','],             // Level 2 - leicht
+      ['·', ':', '\'', '.', ',', '`', '"', '-'],        // Level 3 - mittel
+      ['·', ':', '\'', '.', ',', '`', '"', '-', '~'],   // Level 4 - stark
+      ['·', ':', '\'', '.', ',', '`', '"', '-', '~', '*', '+', '=', '×'] // Level 5 - intensiv
+    ];
+    
+    // Funken-Zeichen für höhere Levels
+    const sparkChars = ['*', '+', '×', '✦', '✧', '✶', '✷', '✸', '⚡'];
+    
+    // Elektrostatische Aufladung entlang der Klinge
+    const renderStaticLayer = () => {
+      const staticElements = [];
+      const currentLevelChars = staticChars[Math.min(chargeLevel - 1, staticChars.length - 1)];
+      
+      // Bestimme Klingenlänge und -breite basierend auf dem Level
       const klingenLänge = 
         currentLevel === 3 ? 14 : 
-        currentLevel === 2 ? 12 : 
-        10;
+        currentLevel === 2 ? 14 : 
+        14;
       
-      // Anzahl der Vibrationseffekte basierend auf dem Charge-Level
-      const vibrationCount = Math.min(chargeLevel * 2, klingenLänge);
+      const klingenBreite = 
+        currentLevel === 3 ? 5 : 
+        currentLevel === 2 ? 4 : 
+        3;
       
-      // Verteile die Vibrationseffekte über die Länge der Klinge
-      for (let i = 0; i < vibrationCount; i++) {
-        // Position auf der Klinge (von oben nach unten)
-        const yPos = 1 + Math.floor(i * (klingenLänge / vibrationCount));
+      // Anzahl der statischen Elemente basierend auf dem Charge-Level
+      const staticCount = Math.max(5, chargeLevel * 8);
+      
+      // Erzeuge statische Elemente entlang der Klinge
+      for (let i = 0; i < staticCount; i++) {
+        // Position entlang der Klinge (von oben nach unten)
+        const yPos = Math.floor(Math.random() * klingenLänge);
         
-        // Vibrationseffekt links oder rechts der Klinge
-        const isLeft = Math.random() > 0.5;
-        const xOffset = 
-          currentLevel === 3 ? (isLeft ? -1 : 5) : 
-          currentLevel === 2 ? (isLeft ? -1 : 4) : 
-          (isLeft ? -1 : 3);
+        // Position seitlich der Klinge (abhängig von der Breite)
+        const xOffset = Math.floor(Math.random() * klingenBreite) - Math.floor(klingenBreite / 2);
         
-        // Vibrationszeichen basierend auf dem Charge-Level
-        const vibrationChars = ['(', ')', '·', ':', '|', '/', '\\'];
-        const vibrationChar = vibrationChars[Math.floor(Math.random() * (Math.min(chargeLevel, vibrationChars.length)))];
+        // Zentriere die X-Position basierend auf dem Level
+        const xCenter = 
+          currentLevel === 3 ? 7 : 
+          currentLevel === 2 ? 7.5 : 
+          7;
         
-        // Intensität basierend auf dem Charge-Level
-        const intensity = 0.4 + (chargeLevel * 0.1);
+        const xPos = xCenter + xOffset;
         
-        vibrationElements.push(
+        // Wähle ein zufälliges statisches Zeichen
+        const staticChar = currentLevelChars[Math.floor(Math.random() * currentLevelChars.length)];
+        
+        // Berechne Opazität und Animation basierend auf Charge-Level
+        const opacity = 0.5 + (Math.random() * 0.5);
+        const animationDuration = Math.max(0.2, 1 - (chargeLevel * 0.15)) + (Math.random() * 0.3);
+        const animationDelay = Math.random() * 0.5;
+        
+        staticElements.push(
           <div
-            key={`vibration-${i}`}
+            key={`static-${i}`}
             style={{
               position: 'absolute',
-              left: `calc(50% + ${xOffset * 0.6}ch)`,
-              top: `calc(50% - 10ch + ${yPos}em)`,
+              left: `calc(50% + ${(xPos - 7) * 0.6}ch)`,
+              top: `calc(50% - ${10 - yPos}ch)`,
               color: highlightColors[Math.floor(Math.random() * highlightColors.length)],
-              textShadow: `0 0 ${chargeLevel}px var(--grifter-pink)`,
-              opacity: Math.random() * 0.3 + intensity,
-              fontSize: `${0.8 + (chargeLevel * 0.05)}em`,
-              transform: `rotate(${isLeft ? -90 : 90}deg)`,
-              animation: `vibrate ${0.5 + Math.random() * 0.5}s infinite alternate`,
-              zIndex: 5,
-              pointerEvents: 'none'
+              opacity: opacity,
+              fontSize: '1em',
+              fontFamily: 'monospace',
+              animation: `staticFlicker ${animationDuration}s infinite alternate ${animationDelay}s`,
+              zIndex: 4,
+              pointerEvents: 'none',
+              textShadow: `0 0 ${chargeLevel}px var(--grifter-blue)`,
             }}
           >
-            {vibrationChar}
+            {staticChar}
           </div>
         );
       }
       
-      return vibrationElements;
+      return staticElements;
     };
     
-    // Subtile Energieeffekte am Griff
-    const getGriffEffekte = () => {
+    // Funken, die vom Schwert stieben (nur bei höheren Charge-Levels)
+    const renderSparks = () => {
       if (chargeLevel < 3) return null;
       
-      const griffEffekte = [];
-      const numEffekte = chargeLevel - 2;
+      const sparks = [];
+      const sparkCount = (chargeLevel - 2) * 3; // Mehr Funken bei höherem Level
       
-      for (let i = 0; i < numEffekte; i++) {
-        const isLeft = Math.random() > 0.5;
-        const xOffset = 
-          currentLevel === 3 ? (isLeft ? -2 : 6) : 
-          currentLevel === 2 ? (isLeft ? -2 : 5) : 
-          (isLeft ? -2 : 4);
+      for (let i = 0; i < sparkCount; i++) {
+        // Bestimme, ob der Funke vom Knauf oder der Klinge ausgeht
+        const isHilt = Math.random() > 0.7;
         
-        griffEffekte.push(
+        // Position des Funkens
+        let yPos, xPos;
+        
+        if (isHilt) {
+          // Funke vom Knauf
+          yPos = 15 + Math.floor(Math.random() * 3);
+          xPos = 7 + (Math.random() * 2 - 1);
+        } else {
+          // Funke von der Klinge
+          yPos = Math.floor(Math.random() * 14);
+          
+          // X-Position abhängig vom Level (Klingenbreite)
+          const xOffset = 
+            currentLevel === 3 ? (Math.random() > 0.5 ? 1.5 : -1.5) : 
+            currentLevel === 2 ? (Math.random() > 0.5 ? 1 : -1) : 
+            (Math.random() > 0.5 ? 0.7 : -0.7);
+          
+          xPos = 7 + xOffset;
+        }
+        
+        // Bewegungsrichtung und -geschwindigkeit
+        const direction = Math.random() * Math.PI * 2; // Zufällige Richtung
+        const distance = 1 + Math.random() * (chargeLevel - 2); // Größere Distanz bei höherem Level
+        
+        // Zufälliges Funken-Zeichen
+        const sparkChar = sparkChars[Math.floor(Math.random() * sparkChars.length)];
+        
+        // Animation basierend auf Charge-Level
+        const animationDuration = Math.max(0.3, 1 - (chargeLevel * 0.1)) + (Math.random() * 0.5);
+        
+        sparks.push(
           <div
-            key={`griff-${i}`}
+            key={`spark-${i}`}
             style={{
               position: 'absolute',
-              left: `calc(50% + ${xOffset * 0.6}ch)`,
-              top: `calc(50% + ${3 + Math.random()}em)`,
-              color: highlightColors[Math.floor(Math.random() * highlightColors.length)],
-              textShadow: `0 0 ${chargeLevel - 2}px var(--grifter-blue)`,
-              opacity: 0.6 + (Math.random() * 0.4),
-              fontSize: `${0.7 + (chargeLevel * 0.03)}em`,
-              animation: `pulse ${0.8 + Math.random() * 0.7}s infinite alternate`,
-              zIndex: 6,
-              pointerEvents: 'none'
+              left: `calc(50% + ${(xPos - 7) * 0.6}ch)`,
+              top: `calc(50% - ${10 - yPos}ch)`,
+              color: chargeLevel >= 5 ? 'var(--grifter-yellow)' : 'var(--grifter-pink)',
+              opacity: 0.8 + (Math.random() * 0.2),
+              fontSize: `${0.8 + (Math.random() * 0.3)}em`,
+              fontFamily: 'monospace',
+              animation: `sparkFly${Math.floor(Math.random() * 3) + 1} ${animationDuration}s infinite`,
+              zIndex: 5,
+              pointerEvents: 'none',
+              textShadow: `0 0 ${chargeLevel}px var(--grifter-pink)`,
+              transform: `translate(${Math.cos(direction) * distance}ch, ${Math.sin(direction) * distance}em)`,
             }}
           >
-            {chargeLevel >= 4 ? '✦' : '·'}
+            {sparkChar}
           </div>
         );
       }
       
-      return griffEffekte;
+      return sparks;
     };
     
-    // Energieaura an der Spitze (nur bei höheren Charge-Levels)
-    const getSpitzenAura = () => {
+    // Elektrische Entladungen zwischen verschiedenen Teilen des Schwertes (nur bei Level 4+)
+    const renderDischarges = () => {
       if (chargeLevel < 4) return null;
       
-      const spitzenEffekte = [];
-      const numEffekte = chargeLevel - 3;
+      const discharges = [];
+      const dischargeCount = (chargeLevel - 3) * 2;
       
-      for (let i = 0; i < numEffekte; i++) {
-        const angle = (Math.PI * 2 * i) / numEffekte;
-        const distance = 1 + Math.random() * 0.5;
+      // Mögliche Entladungspunkte (x, y Koordinaten)
+      const dischargePoints = [
+        // Klingenspitze
+        { x: 7, y: 1 },
+        // Klingenmitte
+        { x: 7, y: 7 },
+        // Knauf
+        { x: 7, y: 15 },
+        // Griff
+        { x: 7, y: 17 }
+      ];
+      
+      for (let i = 0; i < dischargeCount; i++) {
+        // Wähle zwei zufällige Punkte für die Entladung
+        const pointIndex1 = Math.floor(Math.random() * dischargePoints.length);
+        let pointIndex2 = Math.floor(Math.random() * dischargePoints.length);
         
-        // Berechne Position
-        const x = Math.cos(angle) * distance;
-        const y = Math.sin(angle) * distance - 10; // Position an der Spitze
+        // Stelle sicher, dass wir zwei verschiedene Punkte haben
+        while (pointIndex2 === pointIndex1) {
+          pointIndex2 = Math.floor(Math.random() * dischargePoints.length);
+        }
         
-        spitzenEffekte.push(
+        const point1 = dischargePoints[pointIndex1];
+        const point2 = dischargePoints[pointIndex2];
+        
+        // Berechne die Mitte zwischen den beiden Punkten für die Entladung
+        const midX = (point1.x + point2.x) / 2 + (Math.random() * 2 - 1);
+        const midY = (point1.y + point2.y) / 2 + (Math.random() * 2 - 1);
+        
+        // Entladungszeichen
+        const dischargeChar = Math.random() > 0.5 ? '/' : '\\';
+        
+        discharges.push(
           <div
-            key={`spitze-${i}`}
+            key={`discharge-${i}`}
             style={{
               position: 'absolute',
-              left: `calc(50% + ${x}ch)`,
-              top: `calc(50% + ${y}em)`,
-              color: highlightColors[Math.floor(Math.random() * highlightColors.length)],
-              textShadow: `0 0 ${chargeLevel - 2}px var(--grifter-yellow)`,
-              opacity: 0.7 + (Math.random() * 0.3),
-              fontSize: `${0.6 + (chargeLevel * 0.04)}em`,
-              transform: `rotate(${Math.random() * 360}deg)`,
-              animation: `pulse ${0.6 + Math.random() * 0.4}s infinite alternate`,
-              zIndex: 7,
-              pointerEvents: 'none'
+              left: `calc(50% + ${(midX - 7) * 0.6}ch)`,
+              top: `calc(50% - ${10 - midY}ch)`,
+              color: 'var(--grifter-yellow)',
+              opacity: 0.6 + (Math.random() * 0.4),
+              fontSize: '1em',
+              fontFamily: 'monospace',
+              animation: `dischargePulse ${0.2 + Math.random() * 0.3}s infinite alternate`,
+              zIndex: 6,
+              pointerEvents: 'none',
+              textShadow: `0 0 ${chargeLevel}px var(--grifter-yellow)`,
             }}
           >
-            {chargeLevel >= 5 ? '✧' : '·'}
+            {dischargeChar}
           </div>
         );
       }
       
-      return spitzenEffekte;
+      return discharges;
     };
     
     return (
       <>
-        {getKlingenVibration()}
-        {getGriffEffekte()}
-        {getSpitzenAura()}
+        {renderStaticLayer()}
+        {renderSparks()}
+        {renderDischarges()}
       </>
     );
   };
@@ -557,11 +635,11 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
               currentLevel === 2 ? 'var(--grifter-green)' : 
               'var(--grifter-green)',
             textShadow: 
-              currentLevel === 3 ? '0 0 4px var(--grifter-blue), 0 0 8px var(--grifter-pink)' : // Stärkerer Schatten für Dragon Slayer
+              currentLevel === 3 ? '0 0 4px var(--grifter-blue), 0 0 8px var(--grifter-pink)' : 
               currentLevel === 2 ? '0 0 3px var(--grifter-green), 0 0 5px var(--grifter-blue)' :
               '0 0 2px var(--grifter-green), 0 0 4px var(--grifter-pink)',
             filter: 
-              currentLevel === 3 ? 'contrast(2.2) brightness(1.6)' : // Stärkerer Kontrast für Dragon Slayer
+              currentLevel === 3 ? 'contrast(2.2) brightness(1.6)' : 
               currentLevel === 2 ? 'contrast(1.8) brightness(1.4)' :
               'contrast(1.7) brightness(1.3)',
             position: 'relative',
@@ -699,12 +777,29 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
           100% { opacity: 1.0; transform: scale(1.2) rotate(360deg); }
         }
         
-        @keyframes vibrate {
-          0% { transform: translateX(-1px) rotate(${Math.random() > 0.5 ? -90 : 90}deg); }
-          25% { transform: translateX(0px) rotate(${Math.random() > 0.5 ? -90 : 90}deg); }
-          50% { transform: translateX(1px) rotate(${Math.random() > 0.5 ? -90 : 90}deg); }
-          75% { transform: translateX(0px) rotate(${Math.random() > 0.5 ? -90 : 90}deg); }
-          100% { transform: translateX(-1px) rotate(${Math.random() > 0.5 ? -90 : 90}deg); }
+        @keyframes staticFlicker {
+          0% { opacity: 0.2; transform: translateX(-1px); }
+          100% { opacity: 0.8; transform: translateX(1px); }
+        }
+        
+        @keyframes sparkFly1 {
+          0% { opacity: 0.9; transform: translate(0, 0) scale(1); }
+          100% { opacity: 0; transform: translate(var(--x, 2ch), var(--y, -1em)) scale(0.5); }
+        }
+        
+        @keyframes sparkFly2 {
+          0% { opacity: 0.9; transform: translate(0, 0) scale(1); }
+          100% { opacity: 0; transform: translate(var(--x, -2ch), var(--y, 1em)) scale(0.5); }
+        }
+        
+        @keyframes sparkFly3 {
+          0% { opacity: 0.9; transform: translate(0, 0) scale(1); }
+          100% { opacity: 0; transform: translate(var(--x, 1ch), var(--y, 1em)) scale(0.5); }
+        }
+        
+        @keyframes dischargePulse {
+          0% { opacity: 0.3; transform: scale(0.9); }
+          100% { opacity: 1.0; transform: scale(1.1); }
         }
       `}</style>
     </div>
