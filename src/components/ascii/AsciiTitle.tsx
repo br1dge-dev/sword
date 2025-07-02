@@ -7,6 +7,7 @@
  * and cyberpunk visual effects.
  */
 import React, { useEffect, useState } from 'react';
+import { usePowerUpStore } from '@/store/powerUpStore';
 
 // Title text in ASCII art style
 const titleArt = `
@@ -28,6 +29,7 @@ const accentColors = [
 ];
 
 export default function AsciiTitle() {
+  const { currentLevel } = usePowerUpStore();
   const [glitchMap, setGlitchMap] = useState<{[key: number]: {[key: number]: {char: string, color: string}}}>(() => ({}));
   const [flash, setFlash] = useState<{y: number, x: number, color: string} | null>(null); // Einzelner Flash
   const [wideGlitch, setWideGlitch] = useState<{y: number, x: number, len: number, color: string} | null>(null); // Breiter Glitch
@@ -89,10 +91,31 @@ export default function AsciiTitle() {
     return () => window.cancelAnimationFrame(raf);
   }, [height, width, lines]);
 
+  // Berechne die Skalierung basierend auf dem aktuellen Level
+  const getScaleBasedOnLevel = () => {
+    switch(currentLevel) {
+      case 3: return 0.85; // 15% kleiner für Level 3
+      case 2: return 0.92; // 8% kleiner für Level 2
+      default: return 1.0; // Normale Größe für Level 1
+    }
+  };
+
+  // Berechne die vertikale Position basierend auf dem aktuellen Level
+  const getPositionBasedOnLevel = () => {
+    switch(currentLevel) {
+      case 3: return '-0.5rem'; // Leicht nach oben für Level 3
+      case 2: return '-0.25rem'; // Minimal nach oben für Level 2
+      default: return '0'; // Normale Position für Level 1
+    }
+  };
+
+  const scale = getScaleBasedOnLevel();
+  const topPosition = getPositionBasedOnLevel();
+
   return (
     <div className="w-full flex justify-center items-start pt-6 pb-2 select-none" style={{ minHeight: 'auto' }}>
       <div
-        className="mx-auto"
+        className="mx-auto transition-all duration-300"
         style={{
           background: 'linear-gradient(180deg, var(--grifter-green), var(--grifter-blue), var(--grifter-green))',
           WebkitBackgroundClip: 'text',
@@ -103,14 +126,15 @@ export default function AsciiTitle() {
           fontWeight: 'bold',
           position: 'relative',
           left: 0,
-          transform: 'translateX(0)',
+          top: topPosition,
+          transform: `scale(${scale})`,
           width: 'auto',
           display: 'inline-block',
           fontFamily: 'monospace',
           whiteSpace: 'pre',
           letterSpacing: 0,
           textAlign: 'center',
-          transformOrigin: 'center center',
+          transformOrigin: 'center top',
           willChange: 'transform',
           margin: '0 auto',
         }}
