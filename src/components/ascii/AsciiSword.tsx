@@ -386,6 +386,16 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
     return isEdge ? baseIntensity + (Math.sin(pulseEffect * 0.1) + 1) * pulseMultiplier : 0;
   };
 
+  // Berechne die Skalierungsfaktoren für die verschiedenen Level
+  const getScaleFactor = () => {
+    switch(currentLevel) {
+      case 1: return 0.9;  // Level 1: 10% kleiner
+      case 2: return 0.95; // Level 2: 5% kleiner
+      case 3: return 1.1;  // Level 3: 10% größer
+      default: return 1;
+    }
+  };
+
   return (
     <div className="w-full h-full flex items-center justify-center overflow-hidden select-none">
       <div 
@@ -403,21 +413,6 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
         <motion.pre
           ref={swordRef}
           className="text-base sm:text-lg md:text-xl lg:text-2xl h-auto"
-          animate={{
-            filter: isGlowing 
-              ? `brightness(${
-                  currentLevel === 3 ? 2.7 : // Stärkeres Glühen für Dragon Slayer
-                  currentLevel === 2 ? 2.2 : 
-                  2.0
-                })` 
-              : `brightness(${
-                  currentLevel === 3 ? 1.9 : // Stärkere Grundhelligkeit für Dragon Slayer
-                  currentLevel === 2 ? 1.6 : 
-                  1.5
-                })`,
-            scale: isGlowing && currentLevel > 1 ? 1 + (currentLevel * 0.01) : 1,
-          }}
-          transition={{ duration: 0.5 }}
           style={{ 
             lineHeight: '1', 
             maxWidth: '100%',
@@ -435,7 +430,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
               'contrast(1.7) brightness(1.3)',
             position: 'relative',
             left: 0,
-            transform: 'translateX(0)',
+            transform: `scale(${getScaleFactor()})`,
             width: 'auto',
             display: 'inline-block',
             fontWeight: 'bold',
