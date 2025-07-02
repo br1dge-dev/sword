@@ -66,28 +66,26 @@ const swordLevels = {
        VV       
   `,
   3: `
-      /▓▓\\      
-     /████\\     
-     |████|     
-     |████|     
-     |████|     
-     |████|     
-     |████|     
-     |████|     
-     |████|     
-     |████|     
-     |████|     
-     |████|     
-     |████|     
-     |████|     
-     |████|     
-    /█████\\    
-   /███████\\   
-   \\███████/   
-    \\▓█▓▓▓/    
-     |███|     
-     |███|     
-      ▓▓▓      
+      /███\\     
+     /█████\\    
+     |█████|    
+     |█████|    
+     |█████|    
+     |█████|    
+     |█████|    
+     |█████|    
+     |█████|    
+     |█████|    
+     |█████|    
+     |█████|    
+     |█████|    
+     |█████|    
+     _▓███▓_    
+    /███████\\   
+      |███|     
+      |███|     
+      |███|     
+       VVV      
   `,
 };
 
@@ -112,27 +110,14 @@ const highlightPositions = {
   ],
   3: [
     { x: 6, y: 1 },  // Tip of sword left
-    { x: 7, y: 1 },  // Tip of sword middle left
-    { x: 8, y: 1 },  // Tip of sword middle right
-    { x: 9, y: 1 },  // Tip of sword right
-    { x: 5, y: 2 },  // Upper blade left
-    { x: 10, y: 2 }, // Upper blade right
-    { x: 5, y: 3 },  // Upper blade left
-    { x: 10, y: 3 }, // Upper blade right
-    { x: 5, y: 16 }, // Lower blade left
-    { x: 10, y: 16 }, // Lower blade right
-    { x: 4, y: 17 }, // Guard left
-    { x: 11, y: 17 }, // Guard right
-    { x: 3, y: 18 }, // Guard bottom left
-    { x: 12, y: 18 }, // Guard bottom right
-    { x: 4, y: 19 }, // Hilt top left
-    { x: 11, y: 19 }, // Hilt top right
-    { x: 5, y: 20 }, // Hilt middle left
-    { x: 10, y: 20 }, // Hilt middle right
-    { x: 6, y: 21 }, // Hilt bottom left
-    { x: 9, y: 21 }, // Hilt bottom right
-    { x: 7, y: 22 }, // Pommel
-    { x: 8, y: 22 }, // Pommel
+    { x: 7, y: 1 },  // Tip of sword middle
+    { x: 8, y: 1 },  // Tip of sword right
+    { x: 6, y: 14 }, // Handle top left
+    { x: 7, y: 14 }, // Handle top middle
+    { x: 8, y: 14 }, // Handle top right
+    { x: 5, y: 15 }, // Left guard
+    { x: 9, y: 15 }, // Right guard
+    { x: 7, y: 19 }, // Bottom point
   ]
 };
 
@@ -188,7 +173,7 @@ const dataPatterns3 = [
 ];
 
 export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
-  const { currentLevel } = usePowerUpStore();
+  const { currentLevel, chargeLevel } = usePowerUpStore();
   const [isGlowing, setIsGlowing] = useState(false);
   const [coloredChars, setColoredChars] = useState<Array<{
     x: number;
@@ -294,7 +279,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
         const x = Math.floor(Math.random() * (currentLevel === 3 ? 16 : 15)) + 2;
         
         // Angepasste Y-Koordinaten für längeres Schwert
-        const maxY = currentLevel === 3 ? 22 : 18;
+        const maxY = currentLevel === 3 ? 20 : 18;
         const y = Math.floor(Math.random() * maxY) + 1;
         
         // Random data pattern
@@ -357,18 +342,16 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       char === 'V' ||
       char === '█' ||  // Hauptkörper des Schwertes
       char === '▓' ||  // Griff des Schwertes
-      y === 1 || (currentLevel === 3 ? y === 22 : y === 19);  // Top and bottom
+      y === 1;  // Top
     
     // Angepasste Seitenkanten je nach Level
     if (char === '|') {
       if (currentLevel === 3) {
-        isEdge = (x === 5 || x === 10) || // Klingen-Kanten
-                 (x === 6 || x === 9) ||  // Innere Kanten
-                 (x === 7 || x === 8);    // Zentrale Kanten
+        isEdge = x === 6 || x === 8; // Kanten des 3-Tile-Schwertes
       } else if (currentLevel === 2) {
-        isEdge = x === 6 || x === 7 || x === 8 || x === 9;
+        isEdge = x === 6 || x === 9; // Kanten des 2-Tile-Schwertes
       } else {
-        isEdge = x === 7;
+        isEdge = x === 7; // Kante des 1-Tile-Schwertes
       }
     }
       
@@ -396,6 +379,152 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
     }
   };
 
+  // Generiere Charge-Effekte basierend auf dem aktuellen Charge-Level
+  const getChargeEffects = () => {
+    if (chargeLevel <= 1) return null;
+    
+    // Dezentere Vibrationseffekte entlang der Klinge
+    const getKlingenVibration = () => {
+      const vibrationElements = [];
+      const klingenLänge = 
+        currentLevel === 3 ? 14 : 
+        currentLevel === 2 ? 12 : 
+        10;
+      
+      // Anzahl der Vibrationseffekte basierend auf dem Charge-Level
+      const vibrationCount = Math.min(chargeLevel * 2, klingenLänge);
+      
+      // Verteile die Vibrationseffekte über die Länge der Klinge
+      for (let i = 0; i < vibrationCount; i++) {
+        // Position auf der Klinge (von oben nach unten)
+        const yPos = 1 + Math.floor(i * (klingenLänge / vibrationCount));
+        
+        // Vibrationseffekt links oder rechts der Klinge
+        const isLeft = Math.random() > 0.5;
+        const xOffset = 
+          currentLevel === 3 ? (isLeft ? -1 : 5) : 
+          currentLevel === 2 ? (isLeft ? -1 : 4) : 
+          (isLeft ? -1 : 3);
+        
+        // Vibrationszeichen basierend auf dem Charge-Level
+        const vibrationChars = ['(', ')', '·', ':', '|', '/', '\\'];
+        const vibrationChar = vibrationChars[Math.floor(Math.random() * (Math.min(chargeLevel, vibrationChars.length)))];
+        
+        // Intensität basierend auf dem Charge-Level
+        const intensity = 0.4 + (chargeLevel * 0.1);
+        
+        vibrationElements.push(
+          <div
+            key={`vibration-${i}`}
+            style={{
+              position: 'absolute',
+              left: `calc(50% + ${xOffset * 0.6}ch)`,
+              top: `calc(50% - 10ch + ${yPos}em)`,
+              color: highlightColors[Math.floor(Math.random() * highlightColors.length)],
+              textShadow: `0 0 ${chargeLevel}px var(--grifter-pink)`,
+              opacity: Math.random() * 0.3 + intensity,
+              fontSize: `${0.8 + (chargeLevel * 0.05)}em`,
+              transform: `rotate(${isLeft ? -90 : 90}deg)`,
+              animation: `vibrate ${0.5 + Math.random() * 0.5}s infinite alternate`,
+              zIndex: 5,
+              pointerEvents: 'none'
+            }}
+          >
+            {vibrationChar}
+          </div>
+        );
+      }
+      
+      return vibrationElements;
+    };
+    
+    // Subtile Energieeffekte am Griff
+    const getGriffEffekte = () => {
+      if (chargeLevel < 3) return null;
+      
+      const griffEffekte = [];
+      const numEffekte = chargeLevel - 2;
+      
+      for (let i = 0; i < numEffekte; i++) {
+        const isLeft = Math.random() > 0.5;
+        const xOffset = 
+          currentLevel === 3 ? (isLeft ? -2 : 6) : 
+          currentLevel === 2 ? (isLeft ? -2 : 5) : 
+          (isLeft ? -2 : 4);
+        
+        griffEffekte.push(
+          <div
+            key={`griff-${i}`}
+            style={{
+              position: 'absolute',
+              left: `calc(50% + ${xOffset * 0.6}ch)`,
+              top: `calc(50% + ${3 + Math.random()}em)`,
+              color: highlightColors[Math.floor(Math.random() * highlightColors.length)],
+              textShadow: `0 0 ${chargeLevel - 2}px var(--grifter-blue)`,
+              opacity: 0.6 + (Math.random() * 0.4),
+              fontSize: `${0.7 + (chargeLevel * 0.03)}em`,
+              animation: `pulse ${0.8 + Math.random() * 0.7}s infinite alternate`,
+              zIndex: 6,
+              pointerEvents: 'none'
+            }}
+          >
+            {chargeLevel >= 4 ? '✦' : '·'}
+          </div>
+        );
+      }
+      
+      return griffEffekte;
+    };
+    
+    // Energieaura an der Spitze (nur bei höheren Charge-Levels)
+    const getSpitzenAura = () => {
+      if (chargeLevel < 4) return null;
+      
+      const spitzenEffekte = [];
+      const numEffekte = chargeLevel - 3;
+      
+      for (let i = 0; i < numEffekte; i++) {
+        const angle = (Math.PI * 2 * i) / numEffekte;
+        const distance = 1 + Math.random() * 0.5;
+        
+        // Berechne Position
+        const x = Math.cos(angle) * distance;
+        const y = Math.sin(angle) * distance - 10; // Position an der Spitze
+        
+        spitzenEffekte.push(
+          <div
+            key={`spitze-${i}`}
+            style={{
+              position: 'absolute',
+              left: `calc(50% + ${x}ch)`,
+              top: `calc(50% + ${y}em)`,
+              color: highlightColors[Math.floor(Math.random() * highlightColors.length)],
+              textShadow: `0 0 ${chargeLevel - 2}px var(--grifter-yellow)`,
+              opacity: 0.7 + (Math.random() * 0.3),
+              fontSize: `${0.6 + (chargeLevel * 0.04)}em`,
+              transform: `rotate(${Math.random() * 360}deg)`,
+              animation: `pulse ${0.6 + Math.random() * 0.4}s infinite alternate`,
+              zIndex: 7,
+              pointerEvents: 'none'
+            }}
+          >
+            {chargeLevel >= 5 ? '✧' : '·'}
+          </div>
+        );
+      }
+      
+      return spitzenEffekte;
+    };
+    
+    return (
+      <>
+        {getKlingenVibration()}
+        {getGriffEffekte()}
+        {getSpitzenAura()}
+      </>
+    );
+  };
+
   return (
     <div className="w-full h-full flex items-center justify-center overflow-hidden select-none">
       <div 
@@ -410,6 +539,9 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
           position: 'relative'
         }}
       >
+        {/* Charge-Effekte */}
+        {getChargeEffects()}
+        
         <motion.pre
           ref={swordRef}
           className="text-base sm:text-lg md:text-xl lg:text-2xl h-auto"
@@ -555,6 +687,22 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
           ))}
         </motion.pre>
       </div>
+      
+      {/* CSS für Charge-Effekte */}
+      <style jsx global>{`
+        @keyframes pulse {
+          0% { opacity: 0.3; transform: scale(0.8) rotate(0deg); }
+          100% { opacity: 1.0; transform: scale(1.2) rotate(360deg); }
+        }
+        
+        @keyframes vibrate {
+          0% { transform: translateX(-1px) rotate(${Math.random() > 0.5 ? -90 : 90}deg); }
+          25% { transform: translateX(0px) rotate(${Math.random() > 0.5 ? -90 : 90}deg); }
+          50% { transform: translateX(1px) rotate(${Math.random() > 0.5 ? -90 : 90}deg); }
+          75% { transform: translateX(0px) rotate(${Math.random() > 0.5 ? -90 : 90}deg); }
+          100% { transform: translateX(-1px) rotate(${Math.random() > 0.5 ? -90 : 90}deg); }
+        }
+      `}</style>
     </div>
   );
 } 

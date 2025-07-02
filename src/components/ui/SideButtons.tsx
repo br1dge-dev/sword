@@ -16,13 +16,16 @@ interface SideButtonsProps {
 
 export default function SideButtons({ className = '' }: SideButtonsProps) {
   const { startFlash } = useFlashStore();
-  const { currentLevel, startPowerUp } = usePowerUpStore();
+  const { currentLevel, startPowerUp, chargeLevel, increaseChargeLevel } = usePowerUpStore();
   
   // Bestimme den Text für den Power-Up-Button basierend auf dem aktuellen Level
   const getPowerUpText = () => {
-    if (currentLevel === 1) return "free-power-up";
-    if (currentLevel === 2) return "lvl-2-active";
-    return "lvl-3-active";
+    return `sword-lvl-${currentLevel}`;
+  };
+  
+  // Bestimme den Text für den Charge-Button basierend auf dem aktuellen Charge-Level
+  const getChargeText = () => {
+    return `charge-lvl-${chargeLevel}`;
   };
   
   return (
@@ -44,9 +47,9 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
       {/* Rechte Buttons */}
       <div className={`fixed right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-10 ${className}`}>
         <GlitchButton 
-          text="paid-lvl" 
+          text={getChargeText()} 
           variant="paid"
-          onClick={() => console.log('paid-lvl clicked')}
+          onClick={() => increaseChargeLevel()}
         />
         <GlitchButton 
           text="paid-invert" 
