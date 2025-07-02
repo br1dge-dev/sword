@@ -69,23 +69,25 @@ const swordLevels = {
       /▓▓\\      
      /████\\     
      |████|     
-    /██████\\    
-    |██████|    
-    |██████|    
-    |██████|    
-    |██████|    
-    |██████|    
-    |██████|    
-    |██████|    
-    |██████|    
-    |██████|    
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+     |████|     
+    /█████\\    
    /███████\\   
-  /█████████\\  
-  ███████████  
-  \\█████████/  
-   \\▓███▓▓▓/   
-     |██|      
-     \\▓▓/      
+   \\███████/   
+    \\▓█▓▓▓/    
+     |███|     
+     |███|     
+      ▓▓▓      
   `,
 };
 
@@ -115,22 +117,22 @@ const highlightPositions = {
     { x: 9, y: 1 },  // Tip of sword right
     { x: 5, y: 2 },  // Upper blade left
     { x: 10, y: 2 }, // Upper blade right
-    { x: 4, y: 3 },  // Upper blade left
-    { x: 11, y: 3 }, // Upper blade right
-    { x: 4, y: 4 },  // Middle blade left
-    { x: 11, y: 4 }, // Middle blade right
-    { x: 3, y: 14 }, // Lower blade left
-    { x: 12, y: 14 }, // Lower blade right
-    { x: 2, y: 15 }, // Guard left
-    { x: 13, y: 15 }, // Guard right
-    { x: 2, y: 16 }, // Guard bottom left
-    { x: 13, y: 16 }, // Guard bottom right
-    { x: 3, y: 17 }, // Hilt top left
-    { x: 12, y: 17 }, // Hilt top right
-    { x: 5, y: 18 }, // Hilt middle
-    { x: 10, y: 18 }, // Hilt middle
-    { x: 5, y: 19 }, // Hilt bottom left
-    { x: 10, y: 19 }, // Hilt bottom right
+    { x: 5, y: 3 },  // Upper blade left
+    { x: 10, y: 3 }, // Upper blade right
+    { x: 5, y: 16 }, // Lower blade left
+    { x: 10, y: 16 }, // Lower blade right
+    { x: 4, y: 17 }, // Guard left
+    { x: 11, y: 17 }, // Guard right
+    { x: 3, y: 18 }, // Guard bottom left
+    { x: 12, y: 18 }, // Guard bottom right
+    { x: 4, y: 19 }, // Hilt top left
+    { x: 11, y: 19 }, // Hilt top right
+    { x: 5, y: 20 }, // Hilt middle left
+    { x: 10, y: 20 }, // Hilt middle right
+    { x: 6, y: 21 }, // Hilt bottom left
+    { x: 9, y: 21 }, // Hilt bottom right
+    { x: 7, y: 22 }, // Pommel
+    { x: 8, y: 22 }, // Pommel
   ]
 };
 
@@ -276,7 +278,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       
       // Anzahl der Elemente je nach Level
       const numElements = 
-        currentLevel === 3 ? Math.floor(Math.random() * 12) + 6 : // 6-17 Elemente für Level 3 (mehr für Dragon Slayer)
+        currentLevel === 3 ? Math.floor(Math.random() * 14) + 7 : // 7-20 Elemente für längeres Level 3
         currentLevel === 2 ? Math.floor(Math.random() * 8) + 3 : // 3-10 Elemente für Level 2
         Math.floor(Math.random() * 5) + 2; // 2-6 Elemente für Level 1
       
@@ -289,8 +291,11 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       for (let i = 0; i < numElements; i++) {
         // Random position on or near the sword
         // Angepasste X-Koordinaten je nach Schwertbreite
-        const x = Math.floor(Math.random() * (currentLevel === 3 ? 18 : 15)) + 2;
-        const y = Math.floor(Math.random() * 18) + 1;
+        const x = Math.floor(Math.random() * (currentLevel === 3 ? 16 : 15)) + 2;
+        
+        // Angepasste Y-Koordinaten für längeres Schwert
+        const maxY = currentLevel === 3 ? 22 : 18;
+        const y = Math.floor(Math.random() * maxY) + 1;
         
         // Random data pattern
         const pattern = patterns[Math.floor(Math.random() * patterns.length)];
@@ -352,12 +357,14 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       char === 'V' ||
       char === '█' ||  // Hauptkörper des Schwertes
       char === '▓' ||  // Griff des Schwertes
-      y === 1 || y === 19;  // Top and bottom
+      y === 1 || (currentLevel === 3 ? y === 22 : y === 19);  // Top and bottom
     
     // Angepasste Seitenkanten je nach Level
     if (char === '|') {
       if (currentLevel === 3) {
-        isEdge = x === 3 || x === 4 || x === 11 || x === 12;
+        isEdge = (x === 5 || x === 10) || // Klingen-Kanten
+                 (x === 6 || x === 9) ||  // Innere Kanten
+                 (x === 7 || x === 8);    // Zentrale Kanten
       } else if (currentLevel === 2) {
         isEdge = x === 6 || x === 7 || x === 8 || x === 9;
       } else {
