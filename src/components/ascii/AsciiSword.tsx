@@ -9,799 +9,882 @@
  * @param {number} props.level - The level of the sword (affects appearance)
  * @returns {JSX.Element} The rendered ASCII sword
  */
-import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
 
 interface AsciiSwordProps {
   level?: number;
 }
 
-// ASCII art for different sword levels with a more cyber/crypto-style look
-// Dickere Zeichen für das Schwert - Alle Zeilen mit gleicher Länge für stabile Positionierung
-// Jede Zeile hat exakt die gleiche Länge, um Verschiebungen zu verhindern
+// ASCII art für verschiedene Schwert-Level
 const swordLevels = {
   1: `
-       /█\\     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-       |█|     
-     __▓█▓__   
-    /███████\\  
-       |█|     
-       |█|     
-       |█|     
-        V      
-  `,
+      /\\
+      /█\\
+      |█|
+      |█|
+      |█|
+      |█|
+      |█|
+      |█|
+    __▓█▓__
+   /███████\\
+      |█|
+      |█|
+      |█|
+      V
+`,
   2: `
-      /██\\      
-      |██|      
-      |██|      
-      |██|      
-      |██|      
-      |██|      
-      |██|      
-      |██|      
-      |██|      
-      |██|      
-      |██|      
-      |██|      
-      |██|      
-      |██|      
-    __▓██▓__    
-   /███████\\   
-      |██|      
-      |██|      
-      |██|      
-       VV       
-  `,
+     /\\
+    /██\\
+    |██|
+    |██|
+    |██|
+    |██|
+    |██|
+    |██|
+    |██|
+   _▓██▓_
+  /████████\\
+    |██|
+    |██|
+    |██|
+    VV
+`,
   3: `
-      /███\\     
-     /█████\\    
-     |█████|    
-     |█████|    
-     |█████|    
-     |█████|    
-     |█████|    
-     |█████|    
-     |█████|    
-     |█████|    
-     |█████|    
-     |█████|    
-     |█████|    
-     |█████|    
-     _▓███▓_    
-    /███████\\   
-      |███|     
-      |███|     
-      |███|     
-       VVV      
-  `,
+      /\\
+     /█\\
+    /███\\
+    |███|
+    |███|
+    |███|
+    |███|
+    |███|
+    |███|
+    |███|
+    |███|
+    |███|
+   _▓███▓_
+  /███████\\
+     |█|
+     |█|
+     |█|
+     |█|
+    /_V_\\
+`
 };
 
-// Highlight positions for the sword (x, y coordinates)
-const highlightPositions = {
-  1: [
-    { x: 7, y: 1 },  // Tip of sword
-    { x: 7, y: 14 }, // Handle top
-    { x: 4, y: 15 }, // Left guard
-    { x: 10, y: 15 }, // Right guard
-    { x: 7, y: 19 }, // Bottom point
-  ],
-  2: [
-    { x: 7, y: 1 },  // Tip of sword
-    { x: 8, y: 1 },  // Tip of sword right
-    { x: 7, y: 14 }, // Handle top
-    { x: 8, y: 14 }, // Handle top right
-    { x: 4, y: 15 }, // Left guard
-    { x: 11, y: 15 }, // Right guard
-    { x: 7, y: 19 }, // Bottom point
-    { x: 8, y: 19 }, // Bottom point right
-  ],
-  3: [
-    { x: 6, y: 1 },  // Tip of sword left
-    { x: 7, y: 1 },  // Tip of sword middle
-    { x: 8, y: 1 },  // Tip of sword right
-    { x: 6, y: 14 }, // Handle top left
-    { x: 7, y: 14 }, // Handle top middle
-    { x: 8, y: 14 }, // Handle top right
-    { x: 5, y: 15 }, // Left guard
-    { x: 9, y: 15 }, // Right guard
-    { x: 7, y: 19 }, // Bottom point
-  ]
+// Dünne Linien-Zeichen für verschiedene Level
+const edgeChars = {
+  1: ['/', '\\', '|', 'V', '_'],
+  2: ['/', '\\', '|', 'V', '_', '/', '\\', '|', 'V', '_'],
+  3: ['/', '\\', '|', 'V', '_', '/', '\\', '|', 'V', '_', '╱', '╲', '┃', '┏', '┓', '┗', '┛']
 };
 
-// Colors for the sword highlights - updated mit Grifter-Classic
-const highlightColors = [
-  'var(--grifter-green)', // Hauptgrün
-  'var(--grifter-pink)', // Pink
-  'var(--grifter-blue)', // Blau
-  'var(--grifter-yellow)', // Gelb
+// Glitch-Varianten für dünne Linien
+const edgeGlitchChars = {
+  1: ['/', '\\', '|', 'V', '_', '╱', '╲', '│'],
+  2: ['/', '\\', '|', 'V', '_', '╱', '╲', '│', '┃', '┏', '┓', '┗', '┛', '╭', '╮', '╯', '╰'],
+  3: ['/', '\\', '|', 'V', '_', '╱', '╲', '│', '┃', '┏', '┓', '┗', '┛', '╭', '╮', '╯', '╰', '⌜', '⌝', '⌞', '⌟', '◢', '◣', '◤', '◥']
+};
+
+// Vibrations-Intensität für verschiedene Level
+const vibrationIntensity = {
+  1: 0.2,  // Leichte Vibration
+  2: 0.5,  // Mittlere Vibration
+  3: 0.8   // Starke Vibration
+};
+
+// Glitch-Häufigkeit für verschiedene Level
+const glitchFrequency = {
+  1: 0.1,  // 10% Chance für Glitch
+  2: 0.25, // 25% Chance für Glitch
+  3: 0.4   // 40% Chance für Glitch
+};
+
+// Farbeffekt-Häufigkeit für verschiedene Level
+const colorEffectFrequency = {
+  1: 0.05, // 5% Chance für Farbeffekte
+  2: 0.15, // 15% Chance für Farbeffekte
+  3: 0.3   // 30% Chance für Farbeffekte
+};
+
+// Höhlen/Fels Hintergrund-Muster
+const caveBgPatterns = [
+  '░░▒▒░░▒▓▓▒░░▒▒░░',
+  '▒░░▒▒▓▒▒░░▓▒▒▒░',
+  '░▒▒░▒▒▓▒░▒▒░▒▓░',
+  '▒▒▓▒░▒░░▒▓▓▒░▒▒',
+  '░▒▓▓▒░░▒▒░░▓▒░░',
+  '▒░░▒▓▒▒░▒▓▒░░▒▒',
+  '░▒▒░░▓▓▒░░▒▒▓▒░',
+  '▒▓▒░▒▒░░▒▓▒░░▒▒',
+  '░░▒▓▓▒░░▒▒▓▓▒░░',
+  '▒▒░░▒▓▒▒░░▒▓▒▒░',
+  '░▓▒▒░░▒▓▓▒░░▒▓░',
+  '▒░▒▓▒░░▒▒▓▓▒░▒▒',
+  '░░▒▓▓▒░░▒▒▓▓▒░░',
+  '▒░░▒▓▓▒░░▒▓▓▒░▒',
+  '░▒▒░░▒▓▒▒░░▒▒░░',
 ];
 
-// Cyberpunk data patterns that occasionally appear on the sword
-const dataPatterns = [
-  '01', '10', '00', '11',
-  'FF', 'A0', 'D3', 'E7',
-  '※', '⟨⟩', '⌘', '⌥', '⎔',
-  '⚠', '⚡', '⟁', '⟰', '⟱'
+// Unorthodoxe Farbpalette
+const baseColors = [
+  '#00FCA6', // Cyber-Grün (Basis)
+  '#FF3EC8', // Neon-Pink
+  '#3EE6FF', // Elektrisches Blau
+  '#F8E16C', // Acid-Gelb
+  '#9D00FF', // Lila
+  '#FF5722', // Brennendes Orange
+  '#00FF66', // Radioaktives Grün
+  '#FF00A0', // Hot Pink
+  '#7DF9FF', // Elektrisches Cyan
+  '#CCFF00'  // Giftig Grün-Gelb
 ];
 
-// Level 2 hat mehr Datenpatterns
-const dataPatterns2 = [
-  ...dataPatterns,
-  '⚙', '⟲', '⟳', '⧉', '⧭',
+// Noch ungewöhnlichere Akzentfarben
+const accentColors = [
+  '#FC2F9E', // Magenta-Pink
+  '#09FBD3', // Türkis
+  '#FE53BB', // Hot Pink
+  '#F5D300', // Leuchtendes Gelb
+  '#7122FA', // Elektrisches Lila
+  '#08F7FE', // Cyan
+  '#00FFFF', // Aqua
+  '#FF2281', // Neon-Rosa
+  '#FF8B8B', // Koralle
+  '#93FFD8', // Mintgrün
+  '#CEFF00', // Limette
+  '#A6A6FF', // Lavendel
+  '#FF9E7A', // Pfirsich
+  '#08F7FE', // Elektrisches Blau
+  '#09FBD3', // Türkis
+  '#FE53BB', // Magenta
+  '#F5D300'  // Gelb
 ];
 
-// Level 3 hat noch mehr Datenpatterns
-const dataPatterns3 = [
-  ...dataPatterns2,
-  '⧫', '⬢', '⬡', '⬣', '⬥',
-  '⬦', '⬧', '⬨', '⬩', '⬪',
-  '⬫', '⬬', '⬭', '⬮', '⬯',
-  '◈', '◇', '◆', '◊', '○',
-  '◌', '◍', '◎', '●', '◐',
-  '◑', '◒', '◓', '◔', '◕',
-  '◖', '◗', '◘', '◙', '◚',
-  '◛', '◜', '◝', '◞', '◟',
-  '◠', '◡', '◢', '◣', '◤',
-  '◥', '◦', '◧', '◨', '◩',
-  '◪', '◫', '◬', '◭', '◮',
-  '◯', '◰', '◱', '◲', '◳',
-  '◴', '◵', '◶', '◷', '◸',
-  '◹', '◺', '◻', '◼', '◽',
-  '◾', '◿', '★', '☆', '☀',
-  '☁', '☂', '☃', '☄', '☇',
-  '☈', '☉', '☊', '☋', '☌',
-  '☍', '☎', '☏', '☐', '☑',
-  '☒', '☓', '☔', '☕', '☖',
-  '☗', '☘', '☙', '☚', '☛',
-  '☜', '☝', '☞', '☟', '☠',
-  '☡', '☢', '☣', '☤', '☥',
-  '☦', '☧', '☨', '☩', '☪',
-  '☫', '☬', '☭', '☮', '☯'
-];
+// Glitch-Symbole für DOS-Style Glitches
+const glitchSymbols = ['░', '▒', '▓', '█', '▄', '▀', '■', '□', '▪', '▫', '▬', '▲', '▼', '◄', '►', '◊', '○', '●', '◘', '◙', '☼', '♦', '♣', '♠', '♥', '╬', '╫', '╪', '╩', '╦', '╣', '╠', '╚', '╔', '╗', '╝', '║', '╢', '╟', '╧', '╨', '╤', '╥', '╙', '╘', '╒', '╓', '╫', '╪', '┌', '┐', '└', '┘', '├', '┤', '┬', '┴', '┼'];
+
+// Hilfsfunktion: ASCII-Art zentrieren mit verbesserter Konsistenz
+function centerAsciiArt(art: string): string[] {
+  const lines = art.trim().split('\n');
+  
+  // Finde die maximale Breite aller Zeilen
+  const maxWidth = Math.max(...lines.map(line => line.length));
+  
+  // Finde die tatsächliche Breite des Schwerts (ohne Leerzeichen am Ende)
+  const actualWidths = lines.map(line => {
+    // Entferne Leerzeichen am Ende
+    const trimmedLine = line.trimEnd();
+    // Zähle führende Leerzeichen
+    const leadingSpaces = line.length - line.trimStart().length;
+    return {
+      content: trimmedLine,
+      leadingSpaces,
+      contentWidth: trimmedLine.length
+    };
+  });
+  
+  // Berechne die Mitte des Schwerts basierend auf den Zeilen mit tatsächlichem Inhalt
+  const contentLines = actualWidths.filter(l => l.contentWidth > 0);
+  
+  // Finde die Mitte des Schwerts (basierend auf der breitesten Zeile)
+  const widestLine = contentLines.reduce((max, line) => 
+    line.contentWidth > max.contentWidth ? line : max, 
+    { contentWidth: 0, leadingSpaces: 0, content: '' }
+  );
+  
+  const swordCenter = widestLine.leadingSpaces + Math.floor(widestLine.contentWidth / 2);
+  
+  // Fixierte Breite für konsistente Darstellung
+  const fixedWidth = Math.max(maxWidth, 20); 
+  const targetCenter = Math.floor(fixedWidth / 2);
+  
+  // Zentriere jede Zeile basierend auf der berechneten Mitte
+  return lines.map(line => {
+    if (line.trim() === '') return ' '.repeat(fixedWidth);
+    
+    const trimmedLine = line.trimEnd();
+    const leadingSpaces = line.length - line.trimStart().length;
+    const lineContentWidth = trimmedLine.length - leadingSpaces;
+    
+    // Berechne die Mitte dieser Zeile
+    const lineCenter = leadingSpaces + Math.floor(lineContentWidth / 2);
+    
+    // Berechne die benötigte Verschiebung, um die Mitte dieser Zeile mit der Schwertmitte auszurichten
+    const shift = targetCenter - lineCenter;
+    
+    // Wende die Verschiebung an
+    const centeredLine = ' '.repeat(Math.max(0, leadingSpaces + shift)) + line.trim();
+    
+    // Fülle auf die fixierte Breite auf
+    const padding = fixedWidth - centeredLine.length;
+    return centeredLine + ' '.repeat(Math.max(0, padding));
+  });
+}
+
+// Hilfsfunktion: Generiert Cluster von zusammenhängenden Positionen
+function generateCluster(x: number, y: number, size: number, maxWidth: number, maxHeight: number): Array<{x: number, y: number}> {
+  const cluster: Array<{x: number, y: number}> = [{x, y}];
+  
+  // Füge benachbarte Positionen hinzu, bis die gewünschte Größe erreicht ist
+  for (let i = 1; i < size; i++) {
+    // Wähle eine zufällige Position aus dem bestehenden Cluster
+    const basePos = cluster[Math.floor(Math.random() * cluster.length)];
+    
+    // Versuche eine benachbarte Position zu finden
+    const directions = [
+      {dx: 1, dy: 0},  // rechts
+      {dx: -1, dy: 0}, // links
+      {dx: 0, dy: 1},  // unten
+      {dx: 0, dy: -1}  // oben
+    ];
+    
+    // Mische die Richtungen für zufälligere Cluster
+    directions.sort(() => Math.random() - 0.5);
+    
+    let added = false;
+    for (const dir of directions) {
+      const newX = basePos.x + dir.dx;
+      const newY = basePos.y + dir.dy;
+      
+      // Prüfe, ob die neue Position gültig ist und nicht bereits im Cluster
+      if (
+        newX >= 0 && newX < maxWidth &&
+        newY >= 0 && newY < maxHeight &&
+        !cluster.some(pos => pos.x === newX && pos.y === newY)
+      ) {
+        cluster.push({x: newX, y: newY});
+        added = true;
+        break;
+      }
+    }
+    
+    // Wenn keine neue Position hinzugefügt werden konnte, breche ab
+    if (!added) break;
+  }
+  
+  return cluster;
+}
+
+// Hilfsfunktion: Generiert einen felsigen Höhlen-Hintergrund
+function generateCaveBackground(width: number, height: number): string[][] {
+  const background: string[][] = [];
+  
+  // Initialisiere den Hintergrund mit leeren Zeichen
+  for (let y = 0; y < height; y++) {
+    background[y] = [];
+    for (let x = 0; x < width; x++) {
+      // Verwende die Muster aus caveBgPatterns, aber mit zufälliger Variation
+      const patternY = y % caveBgPatterns.length;
+      const patternX = x % caveBgPatterns[patternY].length;
+      
+      // Füge etwas Zufälligkeit hinzu
+      if (Math.random() < 0.7) {
+        background[y][x] = caveBgPatterns[patternY][patternX];
+      } else {
+        // Zufälliges Felszeichen
+        const rockChars = ['░', '▒', '▓', '╱', '╲', '╳', '╭', '╮', '╯', '╰'];
+        background[y][x] = rockChars[Math.floor(Math.random() * rockChars.length)];
+      }
+    }
+  }
+  
+  // Füge einige größere Felsformationen hinzu
+  const numFormations = Math.floor((width * height) / 100) + 3;
+  
+  for (let i = 0; i < numFormations; i++) {
+    const formationX = Math.floor(Math.random() * width);
+    const formationY = Math.floor(Math.random() * height);
+    const formationSize = Math.floor(Math.random() * 8) + 3; // 3-10 Zeichen große Formationen
+    
+    const formation = generateCluster(formationX, formationY, formationSize, width, height);
+    
+    formation.forEach(pos => {
+      if (pos.y < height && pos.x < width) {
+        // Dichter Fels für Formationen
+        background[pos.y][pos.x] = '▓';
+      }
+    });
+  }
+  
+  // Füge einige Stalaktiten/Stalagmiten hinzu
+  const numStalactites = Math.floor(width / 5);
+  
+  for (let i = 0; i < numStalactites; i++) {
+    const stalX = Math.floor(Math.random() * width);
+    const isTop = Math.random() < 0.5;
+    
+    if (isTop) {
+      // Stalaktit von oben
+      const length = Math.floor(Math.random() * 3) + 1;
+      for (let y = 0; y < length; y++) {
+        if (y < height) {
+          background[y][stalX] = '▼';
+        }
+      }
+    } else {
+      // Stalagmit von unten
+      const length = Math.floor(Math.random() * 3) + 1;
+      for (let y = 0; y < length; y++) {
+        const posY = height - 1 - y;
+        if (posY >= 0) {
+          background[posY][stalX] = '▲';
+        }
+      }
+    }
+  }
+  
+  return background;
+}
+
+// Hilfsfunktion: Generiert farbige Äderchen im Gestein
+function generateColoredVeins(width: number, height: number, numVeins: number): Array<{x: number, y: number, color: string}> {
+  const veins: Array<{x: number, y: number, color: string}> = [];
+  
+  for (let i = 0; i < numVeins; i++) {
+    // Wähle einen zufälligen Startpunkt
+    const startX = Math.floor(Math.random() * width);
+    const startY = Math.floor(Math.random() * height);
+    
+    // Wähle eine zufällige Farbe aus accentColors
+    const color = accentColors[Math.floor(Math.random() * accentColors.length)];
+    
+    // Generiere eine Ader (kurze Linie in eine zufällige Richtung)
+    const length = Math.floor(Math.random() * 4) + 2; // 2-5 Zeichen lang
+    const direction = Math.floor(Math.random() * 8); // 8 mögliche Richtungen
+    
+    // Richtungsvektoren: horizontal, vertikal und diagonal
+    const directions = [
+      {dx: 1, dy: 0},   // rechts
+      {dx: 1, dy: 1},   // rechts unten
+      {dx: 0, dy: 1},   // unten
+      {dx: -1, dy: 1},  // links unten
+      {dx: -1, dy: 0},  // links
+      {dx: -1, dy: -1}, // links oben
+      {dx: 0, dy: -1},  // oben
+      {dx: 1, dy: -1}   // rechts oben
+    ];
+    
+    const {dx, dy} = directions[direction];
+    
+    // Zeichne die Ader
+    for (let j = 0; j < length; j++) {
+      const x = startX + (dx * j);
+      const y = startY + (dy * j);
+      
+      // Prüfe, ob die Position innerhalb der Grenzen liegt
+      if (x >= 0 && x < width && y >= 0 && y < height) {
+        veins.push({x, y, color});
+      }
+    }
+  }
+  
+  return veins;
+}
+
+// Hilfsfunktion: Berechnet die Komplementärfarbe zu einer gegebenen Farbe
+function getComplementaryColor(hexColor: string): string {
+  // Konvertiere Hex zu RGB
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+  
+  // Berechne Komplementärfarbe (255 - Wert)
+  const compR = 255 - r;
+  const compG = 255 - g;
+  const compB = 255 - b;
+  
+  // Konvertiere zurück zu Hex
+  return `#${compR.toString(16).padStart(2, '0')}${compG.toString(16).padStart(2, '0')}${compB.toString(16).padStart(2, '0')}`;
+}
+
+// Hilfsfunktion: Erzeugt eine dunklere Version einer Farbe
+function getDarkerColor(hexColor: string, factor: number = 0.08): string {
+  // Konvertiere Hex zu RGB
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+  
+  // Erzeuge eine dunklere Version
+  const darkR = Math.floor(r * factor);
+  const darkG = Math.floor(g * factor);
+  const darkB = Math.floor(b * factor);
+  
+  return `rgb(${darkR}, ${darkG}, ${darkB})`;
+}
+
+// Hilfsfunktion: Erzeugt eine hellere Version einer Farbe
+function getLighterColor(hexColor: string, factor: number = 0.1): string {
+  // Konvertiere Hex zu RGB
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+  
+  // Erzeuge eine hellere Version (addiere einen Prozentsatz zum Originalwert)
+  const lighterR = Math.min(255, Math.floor(r * (1 + factor)));
+  const lighterG = Math.min(255, Math.floor(g * (1 + factor)));
+  const lighterB = Math.min(255, Math.floor(b * (1 + factor)));
+  
+  return `rgb(${lighterR}, ${lighterG}, ${lighterB})`;
+}
+
+// Hilfsfunktion: Prüft, ob ein Zeichen eine dünne Linie ist
+function isEdgeChar(char: string): boolean {
+  return ['/', '\\', '|', 'V', '_', '╱', '╲', '│', '┃', '┏', '┓', '┗', '┛', '╭', '╮', '╯', '╰'].includes(char);
+}
+
+// Hilfsfunktion: Prüft, ob eine Position zum Griff gehört
+function isHandlePosition(x: number, y: number, centeredLines: string[]): boolean {
+  // Identifiziere den Griff-Bereich basierend auf dem Muster
+  const line = centeredLines[y];
+  if (!line) return false;
+  
+  const char = line[x];
+  if (!char) return false;
+  
+  // Suche nach dem Griff-Muster (die letzten 3-5 Zeilen des Schwertes)
+  const totalLines = centeredLines.length;
+  
+  // Griff ist typischerweise in den letzten 30% des Schwertes
+  const handleStartLine = Math.floor(totalLines * 0.7);
+  
+  // Wenn wir im Griff-Bereich sind
+  if (y >= handleStartLine) {
+    // Prüfe auf spezifische Griff-Zeichen (|█|, __▓█▓__, /███████\, etc.)
+    if (char === '█' || char === '▓' || char === '_') {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// Hilfsfunktion: Berechnet eine zufällige Verschiebung basierend auf der Vibrations-Intensität
+function getRandomOffset(intensity: number): {x: number, y: number} {
+  // Maximale Verschiebung basierend auf Intensität (0-2 Pixel)
+  const maxOffset = Math.floor(intensity * 2);
+  
+  // Zufällige Verschiebung in beide Richtungen
+  return {
+    x: Math.floor(Math.random() * (maxOffset * 2 + 1)) - maxOffset,
+    y: Math.floor(Math.random() * (maxOffset * 2 + 1)) - maxOffset
+  };
+}
 
 export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
   const { currentLevel, chargeLevel } = usePowerUpStore();
-  const [isGlowing, setIsGlowing] = useState(false);
-  const [coloredChars, setColoredChars] = useState<Array<{
-    x: number;
-    y: number;
-    color: string;
-  }>>([]);
-  const [pulseEffect, setPulseEffect] = useState<number>(0);
-  const [dataOverlay, setDataOverlay] = useState<Array<{
-    x: number;
-    y: number;
-    char: string;
-    opacity: number;
-  }>>([]);
-  const swordRef = useRef<HTMLPreElement>(null);
+  const [glowIntensity, setGlowIntensity] = useState(0);
+  const [baseColor, setBaseColor] = useState(baseColors[0]);
+  const [bgColor, setBgColor] = useState<string>(getComplementaryColor(baseColors[0]));
+  const [coloredTiles, setColoredTiles] = useState<Array<{x: number, y: number, color: string}>>([]);
+  const [glitchChars, setGlitchChars] = useState<Array<{x: number, y: number, char: string}>>([]);
+  const [caveBackground, setCaveBackground] = useState<string[][]>([]);
+  const [coloredVeins, setColoredVeins] = useState<Array<{x: number, y: number, color: string}>>([]);
+  const [edgeEffects, setEdgeEffects] = useState<Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}>>([]);
   
-  // Create flowing color effect through the sword
+  // Aktives Level (aus PowerUp-Store oder Props)
+  const activeLevel = currentLevel || level;
+  
+  // Schwert-ASCII-Art basierend auf Level
+  const swordArt = swordLevels[activeLevel as keyof typeof swordLevels] || swordLevels[1];
+  const centeredSwordLines = centerAsciiArt(swordArt);
+  
+  // Hintergrund initialisieren
   useEffect(() => {
-    const swordLines = swordLevels[currentLevel as keyof typeof swordLevels].split('\n');
+    // Größe für den Hintergrund bestimmen (deutlich größer für Viewport-Abdeckung)
+    const bgWidth = 120;  // Noch breiter für bessere Viewport-Abdeckung
+    const bgHeight = 80; // Noch höher für bessere Viewport-Abdeckung
     
-    // Find all characters that can be colored (non-space characters)
-    const allChars: Array<{x: number, y: number, char: string}> = [];
-    swordLines.forEach((line, y) => {
-      // Convert string to array safely for TypeScript
+    // Generiere den Höhlenhintergrund
+    setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+    
+    // Generiere farbige Äderchen (sehr sparsam)
+    const numVeins = Math.floor((bgWidth * bgHeight) / 300); // Etwa 32 Adern bei 120x80
+    setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
+    
+    // Hintergrund ab und zu neu generieren
+    const bgInterval = setInterval(() => {
+      if (Math.random() > 0.9) { // 10% Chance
+        setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+        
+        // Neue Äderchen generieren
+        if (Math.random() > 0.7) { // 30% Chance für neue Äderchen
+          setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
+        }
+      }
+    }, 5000); // Alle 5 Sekunden prüfen
+    
+    // Äderchen-Glitch-Effekt
+    const veinsGlitchInterval = setInterval(() => {
+      if (Math.random() > 0.8) { // 20% Chance für Glitch
+        // Generiere neue Äderchen für Glitch-Effekt
+        setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
+        
+        // Nach kurzer Zeit zurücksetzen
+        setTimeout(() => {
+          setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
+        }, 100);
+      }
+    }, 2000); // Alle 2 Sekunden prüfen
+    
+    return () => {
+      clearInterval(bgInterval);
+      clearInterval(veinsGlitchInterval);
+    };
+  }, []);
+  
+  // Effekte
+  useEffect(() => {
+    // Finde alle nicht-leeren Positionen im Schwert
+    const swordPositions: Array<{x: number, y: number}> = [];
+    centeredSwordLines.forEach((line, y) => {
       Array.from(line).forEach((char, x) => {
-        if (char !== ' ' && char !== '\n') {
-          allChars.push({ x, y, char });
+        if (char !== ' ') {
+          swordPositions.push({x, y});
         }
       });
     });
     
-    // Create a flowing animation that colors characters along a path
-    let currentIndex = 0;
-    const flowInterval = setInterval(() => {
-      // Define a path through the sword (we'll use a simple top-to-bottom approach)
-      // Anpassen der Pfadlänge je nach Level
-      const pathLength = 
-        currentLevel === 3 ? 18 : 
-        currentLevel === 2 ? 14 : 
-        12;
+    // Aggressiver Puls-Effekt
+    const glowInterval = setInterval(() => {
+      // Zufällige Intensität zwischen 0.3 und 1.0
+      const randomIntensity = Math.random() * 0.7 + 0.3;
+      setGlowIntensity(randomIntensity);
       
-      const newColoredChars = [];
+      // Gelegentlich Basis-Farbe ändern (selten)
+      if (Math.random() > 0.95) { // 5% Chance
+        const randomColorIndex = Math.floor(Math.random() * baseColors.length);
+        const newBaseColor = baseColors[randomColorIndex];
+        setBaseColor(newBaseColor);
+        
+        // Aktualisiere die Hintergrundfarbe als Komplementärfarbe
+        setBgColor(getComplementaryColor(newBaseColor));
+      }
       
-      // Select a color for this flow
-      const flowColor = highlightColors[Math.floor(Math.random() * highlightColors.length)];
+      // Zufällige Tiles mit Akzentfarben einfärben
+      const newColoredTiles: Array<{x: number, y: number, color: string}> = [];
       
-      // Color characters along the path
-      for (let i = 0; i < pathLength; i++) {
-        const idx = (currentIndex + i) % allChars.length;
-        newColoredChars.push({
-          x: allChars[idx].x,
-          y: allChars[idx].y,
-          color: flowColor
+      // 1-3 Cluster von Tiles einfärben
+      const numClusters = Math.floor(Math.random() * 3) + 1;
+      
+      for (let i = 0; i < numClusters; i++) {
+        // Wähle eine zufällige Position und Clustergröße
+        if (swordPositions.length === 0) continue;
+        
+        const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
+        const basePos = swordPositions[randomPosIndex];
+        
+        // Clustergröße: 1-5 zusammenhängende Tiles
+        const clusterSize = Math.floor(Math.random() * 5) + 1;
+        
+        // Generiere Cluster
+        const cluster = generateCluster(
+          basePos.x, 
+          basePos.y, 
+          clusterSize,
+          20, // maxWidth
+          centeredSwordLines.length // maxHeight
+        );
+        
+        // Wähle eine zufällige Akzentfarbe für dieses Cluster
+        const accentColor = accentColors[Math.floor(Math.random() * accentColors.length)];
+        
+        // Füge alle Positionen im Cluster hinzu
+        cluster.forEach(pos => {
+          // Prüfe, ob an dieser Position tatsächlich ein Schwert-Tile ist
+          if (centeredSwordLines[pos.y] && 
+              centeredSwordLines[pos.y][pos.x] && 
+              centeredSwordLines[pos.y][pos.x] !== ' ') {
+            newColoredTiles.push({
+              x: pos.x,
+              y: pos.y,
+              color: accentColor
+            });
+          }
         });
       }
       
-      // Move to the next starting position
-      currentIndex = (currentIndex + 3) % allChars.length;
-      
-      setColoredChars(newColoredChars);
-    }, 
-      currentLevel === 3 ? 90 : 
-      currentLevel === 2 ? 110 : 
-      120
-    );
+      setColoredTiles(newColoredTiles);
+    }, Math.floor(Math.random() * 100) + 100); // Unrhythmische Intervalle zwischen 100-200ms
     
-    return () => clearInterval(flowInterval);
-  }, [currentLevel]);
-  
-  // Create dynamic pulsing effect for the sword edges
-  useEffect(() => {
-    const pulseInterval = setInterval(() => {
-      setPulseEffect(prev => (prev + 1) % 100);
-    }, 
-      currentLevel === 3 ? 30 : 
-      currentLevel === 2 ? 35 : 
-      40
-    );
-    
-    return () => clearInterval(pulseInterval);
-  }, [currentLevel]);
-  
-  // Create cyberpunk data overlay effect
-  useEffect(() => {
-    // Generate random data patterns that appear and disappear
-    const generateDataOverlay = () => {
-      const newOverlay = [];
-      
-      // Anzahl der Elemente je nach Level
-      const numElements = 
-        currentLevel === 3 ? Math.floor(Math.random() * 14) + 7 : // 7-20 Elemente für längeres Level 3
-        currentLevel === 2 ? Math.floor(Math.random() * 8) + 3 : // 3-10 Elemente für Level 2
-        Math.floor(Math.random() * 5) + 2; // 2-6 Elemente für Level 1
-      
-      // Muster je nach Level
-      const patterns = 
-        currentLevel === 3 ? dataPatterns3 : 
-        currentLevel === 2 ? dataPatterns2 : 
-        dataPatterns;
-      
-      for (let i = 0; i < numElements; i++) {
-        // Random position on or near the sword
-        // Angepasste X-Koordinaten je nach Schwertbreite
-        const x = Math.floor(Math.random() * (currentLevel === 3 ? 16 : 15)) + 2;
+    // DOS-Style Glitch-Effekte
+    const glitchInterval = setInterval(() => {
+      if (Math.random() > 0.5) { // 50% Chance für Glitch
+        const newGlitches: Array<{x: number, y: number, char: string}> = [];
+        // 2-8 Glitches gleichzeitig
+        const numGlitches = Math.floor(Math.random() * 7) + 2;
         
-        // Angepasste Y-Koordinaten für längeres Schwert
-        const maxY = currentLevel === 3 ? 20 : 18;
-        const y = Math.floor(Math.random() * maxY) + 1;
-        
-        // Random data pattern
-        const pattern = patterns[Math.floor(Math.random() * patterns.length)];
-        
-        newOverlay.push({
-          x,
-          y,
-          char: pattern,
-          opacity: Math.random() * 0.7 + 0.3 // 0.3 - 1.0 opacity
-        });
-      }
-      
-      setDataOverlay(newOverlay);
-    };
-    
-    // Update data overlay periodically
-    const dataInterval = setInterval(
-      generateDataOverlay, 
-      currentLevel === 3 ? 350 : // Schneller für Dragon Slayer
-      currentLevel === 2 ? 500 : 
-      600
-    );
-    
-    return () => clearInterval(dataInterval);
-  }, [currentLevel]);
-  
-  // Simulate block finalization with a pulsing glow effect
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsGlowing(true);
-      setTimeout(() => setIsGlowing(false), 1000);
-    }, 
-      currentLevel === 3 ? 3000 : 
-      currentLevel === 2 ? 4000 : 
-      5000
-    );
-    
-    return () => clearInterval(interval);
-  }, [currentLevel]);
-
-  // Get the appropriate sword ASCII art based on level
-  const swordArt = swordLevels[currentLevel as keyof typeof swordLevels] || swordLevels[1];
-  
-  // Convert sword art to an array of lines for rendering
-  const swordLines = swordArt.split('\n');
-
-  // Get the appropriate highlight positions based on level
-  const currentHighlightPositions = highlightPositions[currentLevel as keyof typeof highlightPositions] || highlightPositions[1];
-
-  // Calculate edge detection for the sword
-  const getEdgeIntensity = (x: number, y: number, char: string): number => {
-    if (char === ' ') return 0;
-    
-    // Edges are characters that are likely at the boundary of the sword
-    let isEdge = 
-      char === '/' || 
-      char === '\\' || 
-      char === '_' || 
-      char === 'V' ||
-      char === '█' ||  // Hauptkörper des Schwertes
-      char === '▓' ||  // Griff des Schwertes
-      y === 1;  // Top
-    
-    // Angepasste Seitenkanten je nach Level
-    if (char === '|') {
-      if (currentLevel === 3) {
-        isEdge = x === 6 || x === 8; // Kanten des 3-Tile-Schwertes
-      } else if (currentLevel === 2) {
-        isEdge = x === 6 || x === 9; // Kanten des 2-Tile-Schwertes
-      } else {
-        isEdge = x === 7; // Kante des 1-Tile-Schwertes
-      }
-    }
-      
-    // Intensität je nach Level
-    const baseIntensity = 
-      currentLevel === 3 ? 1.3 : 
-      currentLevel === 2 ? 1.0 : 
-      0.9;
-    
-    const pulseMultiplier = 
-      currentLevel === 3 ? 0.5 : 
-      currentLevel === 2 ? 0.35 : 
-      0.3;
-    
-    return isEdge ? baseIntensity + (Math.sin(pulseEffect * 0.1) + 1) * pulseMultiplier : 0;
-  };
-
-  // Berechne die Skalierungsfaktoren für die verschiedenen Level
-  const getScaleFactor = () => {
-    // Basis-Skalierungsfaktor abhängig von der Viewport-Breite
-    const baseScale = typeof window !== 'undefined' ? 
-      Math.min(Math.max(window.innerWidth / 1500, 0.7), 1) : 0.7;
-    
-    switch(currentLevel) {
-      case 1: return baseScale * 0.9;  // Level 1: 10% kleiner als Basis
-      case 2: return baseScale * 0.95; // Level 2: 5% kleiner als Basis
-      case 3: return baseScale * 1.1;  // Level 3: 10% größer als Basis
-      default: return baseScale;
-    }
-  };
-
-  // Generiere Charge-Effekte basierend auf dem aktuellen Charge-Level
-  const getChargeEffects = () => {
-    if (chargeLevel <= 1) return null;
-    
-    // ASCII-Zeichen für elektrostatische Effekte, nach Intensität sortiert
-    const staticChars = [
-      ['·', ':', '·', '·'],                             // Level 1 - subtil
-      ['·', ':', '·', ':', '\'', '.', ','],             // Level 2 - leicht
-      ['·', ':', '\'', '.', ',', '`', '"', '-'],        // Level 3 - mittel
-      ['·', ':', '\'', '.', ',', '`', '"', '-', '~'],   // Level 4 - stark
-      ['·', ':', '\'', '.', ',', '`', '"', '-', '~', '*', '+', '=', '×'] // Level 5 - intensiv
-    ];
-    
-    // Funken-Zeichen für höhere Levels
-    const sparkChars = ['*', '+', '×', '✦', '✧', '✶', '✷', '✸', '⚡'];
-    
-    // Elektrostatische Aufladung entlang der Klinge
-    const renderStaticLayer = () => {
-      const staticElements = [];
-      const currentLevelChars = staticChars[Math.min(chargeLevel - 1, staticChars.length - 1)];
-      
-      // Bestimme Klingenlänge und -breite basierend auf dem Level
-      const klingenLänge = 
-        currentLevel === 3 ? 14 : 
-        currentLevel === 2 ? 14 : 
-        14;
-      
-      const klingenBreite = 
-        currentLevel === 3 ? 5 : 
-        currentLevel === 2 ? 4 : 
-        3;
-      
-      // Anzahl der statischen Elemente basierend auf dem Charge-Level
-      const staticCount = Math.max(5, chargeLevel * 8);
-      
-      // Erzeuge statische Elemente entlang der Klinge
-      for (let i = 0; i < staticCount; i++) {
-        // Position entlang der Klinge (von oben nach unten)
-        const yPos = Math.floor(Math.random() * klingenLänge);
-        
-        // Position seitlich der Klinge (abhängig von der Breite)
-        const xOffset = Math.floor(Math.random() * klingenBreite) - Math.floor(klingenBreite / 2);
-        
-        // Zentriere die X-Position basierend auf dem Level
-        const xCenter = 
-          currentLevel === 3 ? 7 : 
-          currentLevel === 2 ? 7.5 : 
-          7;
-        
-        const xPos = xCenter + xOffset;
-        
-        // Wähle ein zufälliges statisches Zeichen
-        const staticChar = currentLevelChars[Math.floor(Math.random() * currentLevelChars.length)];
-        
-        // Berechne Opazität und Animation basierend auf Charge-Level
-        const opacity = 0.5 + (Math.random() * 0.5);
-        const animationDuration = Math.max(0.2, 1 - (chargeLevel * 0.15)) + (Math.random() * 0.3);
-        const animationDelay = Math.random() * 0.5;
-        
-        staticElements.push(
-          <div
-            key={`static-${i}`}
-            style={{
-              position: 'absolute',
-              left: `calc(50% + ${(xPos - 7) * 0.6}ch)`,
-              top: `calc(50% - ${10 - yPos}ch)`,
-              color: highlightColors[Math.floor(Math.random() * highlightColors.length)],
-              opacity: opacity,
-              fontSize: '1em',
-              fontFamily: 'monospace',
-              animation: `staticFlicker ${animationDuration}s infinite alternate ${animationDelay}s`,
-              zIndex: 4,
-              pointerEvents: 'none',
-              textShadow: `0 0 ${chargeLevel}px var(--grifter-blue)`,
-            }}
-          >
-            {staticChar}
-          </div>
-        );
-      }
-      
-      return staticElements;
-    };
-    
-    // Funken, die vom Schwert stieben (nur bei höheren Charge-Levels)
-    const renderSparks = () => {
-      if (chargeLevel < 3) return null;
-      
-      const sparks = [];
-      const sparkCount = (chargeLevel - 2) * 3; // Mehr Funken bei höherem Level
-      
-      for (let i = 0; i < sparkCount; i++) {
-        // Bestimme, ob der Funke vom Knauf oder der Klinge ausgeht
-        const isHilt = Math.random() > 0.7;
-        
-        // Position des Funkens
-        let yPos, xPos;
-        
-        if (isHilt) {
-          // Funke vom Knauf
-          yPos = 15 + Math.floor(Math.random() * 3);
-          xPos = 7 + (Math.random() * 2 - 1);
-        } else {
-          // Funke von der Klinge
-          yPos = Math.floor(Math.random() * 14);
+        for (let i = 0; i < numGlitches; i++) {
+          // Wähle eine zufällige Position aus den Schwert-Positionen
+          if (swordPositions.length === 0) continue;
           
-          // X-Position abhängig vom Level (Klingenbreite)
-          const xOffset = 
-            currentLevel === 3 ? (Math.random() > 0.5 ? 1.5 : -1.5) : 
-            currentLevel === 2 ? (Math.random() > 0.5 ? 1 : -1) : 
-            (Math.random() > 0.5 ? 0.7 : -0.7);
+          const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
+          const pos = swordPositions[randomPosIndex];
           
-          xPos = 7 + xOffset;
+          newGlitches.push({
+            x: pos.x,
+            y: pos.y,
+            char: glitchSymbols[Math.floor(Math.random() * glitchSymbols.length)]
+          });
         }
         
-        // Bewegungsrichtung und -geschwindigkeit
-        const direction = Math.random() * Math.PI * 2; // Zufällige Richtung
-        const distance = 1 + Math.random() * (chargeLevel - 2); // Größere Distanz bei höherem Level
+        setGlitchChars(newGlitches);
         
-        // Zufälliges Funken-Zeichen
-        const sparkChar = sparkChars[Math.floor(Math.random() * sparkChars.length)];
-        
-        // Animation basierend auf Charge-Level
-        const animationDuration = Math.max(0.3, 1 - (chargeLevel * 0.1)) + (Math.random() * 0.5);
-        
-        sparks.push(
-          <div
-            key={`spark-${i}`}
-            style={{
-              position: 'absolute',
-              left: `calc(50% + ${(xPos - 7) * 0.6}ch)`,
-              top: `calc(50% - ${10 - yPos}ch)`,
-              color: chargeLevel >= 5 ? 'var(--grifter-yellow)' : 'var(--grifter-pink)',
-              opacity: 0.8 + (Math.random() * 0.2),
-              fontSize: `${0.8 + (Math.random() * 0.3)}em`,
-              fontFamily: 'monospace',
-              animation: `sparkFly${Math.floor(Math.random() * 3) + 1} ${animationDuration}s infinite`,
-              zIndex: 5,
-              pointerEvents: 'none',
-              textShadow: `0 0 ${chargeLevel}px var(--grifter-pink)`,
-              transform: `translate(${Math.cos(direction) * distance}ch, ${Math.sin(direction) * distance}em)`,
-            }}
-          >
-            {sparkChar}
-          </div>
-        );
+        // Glitches nach kurzer Zeit zurücksetzen
+        setTimeout(() => {
+          setGlitchChars([]);
+        }, 80); // Noch kürzere Dauer für aggressiveren Effekt
       }
-      
-      return sparks;
-    };
+    }, Math.floor(Math.random() * 200) + 200); // Unrhythmische Intervalle zwischen 200-400ms
     
-    // Elektrische Entladungen zwischen verschiedenen Teilen des Schwertes (nur bei Level 4+)
-    const renderDischarges = () => {
-      if (chargeLevel < 4) return null;
+    return () => {
+      clearInterval(glowInterval);
+      clearInterval(glitchInterval);
+    };
+  }, [centeredSwordLines]);
+  
+  // Effekte für die dünnen Linien (jetzt basierend auf chargeLevel statt activeLevel)
+  useEffect(() => {
+    // Finde alle dünnen Linien im Schwert, aber nicht im Griff-Bereich
+    const edgePositions: Array<{x: number, y: number, char: string}> = [];
+    centeredSwordLines.forEach((line, y) => {
+      Array.from(line).forEach((char, x) => {
+        if (isEdgeChar(char) && !isHandlePosition(x, y, centeredSwordLines)) {
+          edgePositions.push({x, y, char});
+        }
+      });
+    });
+    
+    // Vibrations- und Glitch-Effekte für dünne Linien
+    const edgeInterval = setInterval(() => {
+      const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}> = [];
       
-      const discharges = [];
-      const dischargeCount = (chargeLevel - 3) * 2;
+      // Aktuelle Level-Werte abrufen (jetzt basierend auf chargeLevel)
+      const currentVibration = vibrationIntensity[chargeLevel as keyof typeof vibrationIntensity] || vibrationIntensity[1];
+      const currentGlitchFreq = glitchFrequency[chargeLevel as keyof typeof glitchFrequency] || glitchFrequency[1];
+      const currentColorFreq = colorEffectFrequency[chargeLevel as keyof typeof colorEffectFrequency] || colorEffectFrequency[1];
+      const currentGlitchChars = edgeGlitchChars[chargeLevel as keyof typeof edgeGlitchChars] || edgeGlitchChars[1];
       
-      // Mögliche Entladungspunkte (x, y Koordinaten)
-      const dischargePoints = [
-        // Klingenspitze
-        { x: 7, y: 1 },
-        // Klingenmitte
-        { x: 7, y: 7 },
-        // Knauf
-        { x: 7, y: 15 },
-        // Griff
-        { x: 7, y: 17 }
-      ];
-      
-      for (let i = 0; i < dischargeCount; i++) {
-        // Wähle zwei zufällige Punkte für die Entladung
-        const pointIndex1 = Math.floor(Math.random() * dischargePoints.length);
-        let pointIndex2 = Math.floor(Math.random() * dischargePoints.length);
+      // Für jede dünne Linie Effekte anwenden
+      edgePositions.forEach(pos => {
+        const effect: {x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}} = {
+          x: pos.x,
+          y: pos.y
+        };
         
-        // Stelle sicher, dass wir zwei verschiedene Punkte haben
-        while (pointIndex2 === pointIndex1) {
-          pointIndex2 = Math.floor(Math.random() * dischargePoints.length);
+        // 1. Vibration basierend auf chargeLevel
+        if (Math.random() < currentVibration) {
+          effect.offset = getRandomOffset(currentVibration);
         }
         
-        const point1 = dischargePoints[pointIndex1];
-        const point2 = dischargePoints[pointIndex2];
+        // 2. Glitch-Effekt basierend auf chargeLevel
+        if (Math.random() < currentGlitchFreq) {
+          effect.char = currentGlitchChars[Math.floor(Math.random() * currentGlitchChars.length)];
+        }
         
-        // Berechne die Mitte zwischen den beiden Punkten für die Entladung
-        const midX = (point1.x + point2.x) / 2 + (Math.random() * 2 - 1);
-        const midY = (point1.y + point2.y) / 2 + (Math.random() * 2 - 1);
+        // 3. Farbeffekt basierend auf chargeLevel
+        if (Math.random() < currentColorFreq) {
+          effect.color = accentColors[Math.floor(Math.random() * accentColors.length)];
+        }
         
-        // Entladungszeichen
-        const dischargeChar = Math.random() > 0.5 ? '/' : '\\';
-        
-        discharges.push(
-          <div
-            key={`discharge-${i}`}
-            style={{
-              position: 'absolute',
-              left: `calc(50% + ${(midX - 7) * 0.6}ch)`,
-              top: `calc(50% - ${10 - midY}ch)`,
-              color: 'var(--grifter-yellow)',
-              opacity: 0.6 + (Math.random() * 0.4),
-              fontSize: '1em',
-              fontFamily: 'monospace',
-              animation: `dischargePulse ${0.2 + Math.random() * 0.3}s infinite alternate`,
-              zIndex: 6,
-              pointerEvents: 'none',
-              textShadow: `0 0 ${chargeLevel}px var(--grifter-yellow)`,
-            }}
-          >
-            {dischargeChar}
-          </div>
-        );
-      }
+        // Nur hinzufügen, wenn mindestens ein Effekt angewendet wurde
+        if (effect.offset || effect.char || effect.color) {
+          newEdgeEffects.push(effect);
+        }
+      });
       
-      return discharges;
-    };
+      setEdgeEffects(newEdgeEffects);
+      
+      // Bei höheren Charge-Leveln schnellere Aktualisierung
+      const updateSpeed = chargeLevel === 3 ? 50 : (chargeLevel === 2 ? 80 : 120);
+      
+      // Nach kurzer Zeit zurücksetzen für Flacker-Effekt
+      if (chargeLevel > 1) {
+        setTimeout(() => {
+          // Bei Charge-Level 3 komplexere Flacker-Muster
+          if (chargeLevel === 3 && Math.random() > 0.5) {
+            // Neuer Satz von Effekten statt komplettem Reset
+            const flickerEffects = newEdgeEffects.map(effect => {
+              // 50% Chance, dass sich der Effekt ändert
+              if (Math.random() > 0.5) {
+                return {
+                  ...effect,
+                  char: Math.random() > 0.7 ? currentGlitchChars[Math.floor(Math.random() * currentGlitchChars.length)] : effect.char,
+                  color: Math.random() > 0.7 ? accentColors[Math.floor(Math.random() * accentColors.length)] : effect.color,
+                  offset: Math.random() > 0.5 ? getRandomOffset(currentVibration) : effect.offset
+                };
+              }
+              return effect;
+            });
+            setEdgeEffects(flickerEffects);
+          } else {
+            // Bei Charge-Level 1-2 einfacher Reset
+            setEdgeEffects([]);
+          }
+        }, updateSpeed / 2);
+      }
+    }, chargeLevel === 3 ? 100 : (chargeLevel === 2 ? 150 : 200)); // Schnellere Updates bei höheren Charge-Leveln
     
-    return (
-      <>
-        {renderStaticLayer()}
-        {renderSparks()}
-        {renderDischarges()}
-      </>
-    );
-  };
-
+    return () => {
+      clearInterval(edgeInterval);
+    };
+  }, [centeredSwordLines, chargeLevel]);
+  
+  // Berechne Schatten basierend auf Glow-Intensität
+  const shadowSize = Math.floor(glowIntensity * 20);
+  const textShadow = `0 0 ${shadowSize}px ${baseColor}`;
+  
+  // Hintergrundfarbe (dunklere Version der Komplementärfarbe)
+  const backgroundColor = getDarkerColor(bgColor);
+  // Hellere Version der Komplementärfarbe für den Höhlenhintergrund
+  const lighterBgColor = getLighterColor(bgColor);
+  
   return (
-    <div className="w-full h-full flex items-center justify-center overflow-hidden select-none">
+    <div 
+      className="relative flex items-center justify-center w-full h-full overflow-hidden"
+      style={{ 
+        backgroundColor,
+        transition: 'background-color 1s ease',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh'
+      }}
+    >
+      {/* Höhlen-Hintergrund */}
       <div 
-        className="relative flex justify-center items-center" 
-        style={{ 
-          width: '100%', 
-          height: '100%',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-          MozUserSelect: 'none',
-          msUserSelect: 'none',
-          position: 'relative'
+        className="absolute inset-0"
+        style={{
+          opacity: 0.35, // Erhöht von 0.3 auf 0.35 für mehr Helligkeit
+          color: lighterBgColor, // Verwende die hellere Komplementärfarbe für den Hintergrund
+          filter: 'brightness(0.5) contrast(1.1)', // Erhöhte Helligkeit (0.4 -> 0.5) und Kontrast (+10%)
+          width: '100vw', // Volle Viewport-Breite
+          height: '100vh', // Volle Viewport-Höhe
+          overflow: 'hidden',
+          position: 'fixed', // Fixierte Position, damit es den gesamten Viewport abdeckt
+          top: 0,
+          left: 0
         }}
       >
-        {/* Charge-Effekte */}
-        {getChargeEffects()}
-        
-        <motion.pre
-          ref={swordRef}
-          className="text-base sm:text-lg md:text-xl lg:text-2xl h-auto"
-          style={{ 
-            lineHeight: '1', 
-            maxWidth: '100%',
-            color: 
-              currentLevel === 3 ? 'var(--grifter-blue)' : 
-              currentLevel === 2 ? 'var(--grifter-green)' : 
-              'var(--grifter-green)',
-            textShadow: 
-              currentLevel === 3 ? '0 0 4px var(--grifter-blue), 0 0 8px var(--grifter-pink)' : 
-              currentLevel === 2 ? '0 0 3px var(--grifter-green), 0 0 5px var(--grifter-blue)' :
-              '0 0 2px var(--grifter-green), 0 0 4px var(--grifter-pink)',
-            filter: 
-              currentLevel === 3 ? 'contrast(2.2) brightness(1.6)' : 
-              currentLevel === 2 ? 'contrast(1.8) brightness(1.4)' :
-              'contrast(1.7) brightness(1.3)',
-            position: 'relative',
+        <div 
+          className="w-full h-full"
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            transform: 'scale(1.5)', // Stärker vergrößert, um sicherzustellen, dass es den gesamten Viewport abdeckt
+            position: 'absolute',
+            top: 0,
             left: 0,
-            transform: `scale(${getScaleFactor()})`,
-            width: 'auto',
-            display: 'inline-block',
-            fontWeight: 'bold',
-            fontFamily: 'monospace',
-            whiteSpace: 'pre',
-            letterSpacing: 0,
-            textAlign: 'center',
-            transformOrigin: 'center center',
-            willChange: 'transform',
-            margin: '0 auto',
-            userSelect: 'none',
-            backgroundColor: 'transparent'
+            width: '100%',
+            height: '100%'
           }}
         >
-          {swordLines.map((line, lineIndex) => (
-            <div 
-              key={lineIndex} 
-              className="relative" 
-              style={{ 
-                whiteSpace: 'pre',
-                width: '100%',
-                textAlign: 'center',
-                overflow: 'visible',
-                position: 'relative'
-              }}
-            >
-              {/* Render each character with potential coloring */}
-              {Array.from(line).map((char, charIndex) => {
-                // Check if this character should be colored
-                const colorInfo = coloredChars.find(c => c.x === charIndex && c.y === lineIndex);
-                
-                // Calculate edge effect intensity
-                const edgeIntensity = getEdgeIntensity(charIndex, lineIndex, char);
-                
-                // Check if this is a special position (like tip, guard, etc)
-                const isSpecialPosition = currentHighlightPositions.some(
-                  pos => pos.x === charIndex && pos.y === lineIndex
-                );
-                
-                // Check if there's a data overlay at this position
-                const dataOverlayInfo = dataOverlay.find(d => d.x === charIndex && d.y === lineIndex);
-                
-                // If there's a data overlay, render it instead of the original character
-                if (dataOverlayInfo && char !== ' ') {
-                  return (
-                    <span 
-                      key={charIndex} 
-                      style={{ 
-                        color: 
-                          currentLevel === 3 ? 'var(--grifter-pink)' : 
-                          currentLevel === 2 ? 'var(--grifter-blue)' : 
-                          'var(--grifter-blue)',
-                        textShadow: 
-                          currentLevel === 3 ? '0 0 4px var(--grifter-pink), 0 0 8px var(--grifter-blue)' :
-                          currentLevel === 2 ? '0 0 3px var(--grifter-blue), 0 0 7px var(--grifter-green)' :
-                          '0 0 3px var(--grifter-blue), 0 0 6px var(--grifter-blue)',
-                        opacity: dataOverlayInfo.opacity,
-                        position: 'relative',
-                        zIndex: 3,
-                        fontWeight: 'bold',
-                        userSelect: 'none',
-                        display: 'inline-block',
-                        width: '1ch',
-                        textAlign: 'center'
-                      }}
-                    >
-                      {dataOverlayInfo.char}
-                    </span>
-                  );
-                }
-                
-                // Apply special styling for edges and highlights
-                if ((edgeIntensity > 0 || isSpecialPosition) && char !== ' ') {
-                  const highlightColor = isSpecialPosition 
-                    ? highlightColors[Math.floor(Math.random() * highlightColors.length)]
-                    : currentLevel === 3 ? 'var(--grifter-blue)' : 
-                      currentLevel === 2 ? 'var(--grifter-green)' : 
-                      'var(--grifter-green)';
+          <pre className="font-mono text-xs sm:text-sm leading-[1.0] whitespace-pre select-none">
+            {caveBackground.map((row, y) => (
+              <div key={y} style={{ lineHeight: '1.0' }}>
+                {row.map((char, x) => {
+                  // Prüfe, ob an dieser Position eine farbige Ader ist
+                  const vein = coloredVeins.find(v => v.x === x && v.y === y);
+                  
+                  // Stil für dieses Zeichen
+                  const style = vein ? {
+                    color: vein.color,
+                    textShadow: `0 0 3px ${vein.color}`,
+                    display: 'inline-block',
+                    filter: 'contrast(1.1)' // Erhöhter Kontrast für Äderchen
+                  } : { 
+                    display: 'inline-block'
+                  };
                   
                   return (
                     <span 
-                      key={charIndex} 
-                      style={{ 
-                        color: colorInfo ? colorInfo.color : highlightColor,
-                        textShadow: `0 0 ${2 + edgeIntensity * (
-                          currentLevel === 3 ? 5 : 
-                          currentLevel === 2 ? 4 : 
-                          3
-                        )}px ${highlightColor}`,
-                        position: 'relative',
-                        zIndex: 2,
-                        fontWeight: 'bold',
-                        userSelect: 'none',
-                        display: 'inline-block',
-                        width: '1ch',
-                        textAlign: 'center'
-                      }}
+                      key={`bg-${x}-${y}`}
+                      style={style}
                     >
                       {char}
                     </span>
                   );
-                }
-                
-                return (
-                  <span 
-                    key={charIndex} 
-                    style={{ 
-                      color: colorInfo ? colorInfo.color : (char === ' ' ? 'transparent' : 'inherit'),
-                      transition: 'color 0.3s ease',
-                      fontWeight: 'bold',
-                      userSelect: 'none',
-                      display: 'inline-block',
-                      width: char === ' ' ? '1ch' : 'auto',
-                      textAlign: 'center'
-                    }}
-                  >
-                    {char}
-                  </span>
-                );
-              })}
-            </div>
-          ))}
-        </motion.pre>
+                })}
+              </div>
+            ))}
+          </pre>
+        </div>
       </div>
       
-      {/* CSS für Charge-Effekte */}
-      <style jsx global>{`
-        @keyframes pulse {
-          0% { opacity: 0.3; transform: scale(0.8) rotate(0deg); }
-          100% { opacity: 1.0; transform: scale(1.2) rotate(360deg); }
-        }
-        
-        @keyframes staticFlicker {
-          0% { opacity: 0.2; transform: translateX(-1px); }
-          100% { opacity: 0.8; transform: translateX(1px); }
-        }
-        
-        @keyframes sparkFly1 {
-          0% { opacity: 0.9; transform: translate(0, 0) scale(1); }
-          100% { opacity: 0; transform: translate(var(--x, 2ch), var(--y, -1em)) scale(0.5); }
-        }
-        
-        @keyframes sparkFly2 {
-          0% { opacity: 0.9; transform: translate(0, 0) scale(1); }
-          100% { opacity: 0; transform: translate(var(--x, -2ch), var(--y, 1em)) scale(0.5); }
-        }
-        
-        @keyframes sparkFly3 {
-          0% { opacity: 0.9; transform: translate(0, 0) scale(1); }
-          100% { opacity: 0; transform: translate(var(--x, 1ch), var(--y, 1em)) scale(0.5); }
-        }
-        
-        @keyframes dischargePulse {
-          0% { opacity: 0.3; transform: scale(0.9); }
-          100% { opacity: 1.0; transform: scale(1.1); }
-        }
-      `}</style>
+      {/* Schwert im Vordergrund */}
+      <pre
+        className="relative z-10 font-mono text-xs sm:text-sm md:text-base lg:text-lg whitespace-pre select-none"
+        style={{
+          color: baseColor,
+          textShadow,
+          letterSpacing: '0.1em',
+          textAlign: 'center', // Zentriere den Text
+          width: '100%',       // Nutze die volle Breite
+          lineHeight: '1.2'    // Konsistenter Zeilenabstand
+        }}
+      >
+        {centeredSwordLines.map((line, y) => (
+          <div key={y} style={{ 
+            display: 'block',
+            width: '100%'
+          }}>
+            {Array.from(line).map((char, x) => {
+              // Finde Glitch-Effekt an dieser Position
+              const glitch = glitchChars.find(g => g.x === x && g.y === y);
+              
+              // Finde farbiges Tile an dieser Position
+              const coloredTile = coloredTiles.find(t => t.x === x && t.y === y);
+              
+              // Finde Edge-Effekt an dieser Position
+              const edgeEffect = edgeEffects.find(e => e.x === x && e.y === y);
+              
+              // Prüfe, ob dieses Zeichen eine dünne Linie ist und nicht im Griff-Bereich
+              const isEdge = isEdgeChar(char) && !isHandlePosition(x, y, centeredSwordLines);
+              
+              // Stil für dieses Zeichen
+              let style: React.CSSProperties = { display: 'inline-block' };
+              
+              // Anwenden von Farb-Effekten (Priorität: Edge > ColoredTile)
+              if (edgeEffect?.color) {
+                style.color = edgeEffect.color;
+                style.textShadow = `0 0 ${shadowSize}px ${edgeEffect.color}`;
+              } else if (coloredTile) {
+                style.color = coloredTile.color;
+                style.textShadow = `0 0 ${shadowSize}px ${coloredTile.color}`;
+              }
+              
+              // Anwenden von Positions-Effekten für Kanten
+              if (isEdge && edgeEffect?.offset) {
+                style.transform = `translate(${edgeEffect.offset.x}px, ${edgeEffect.offset.y}px)`;
+                
+                // Bei höheren Charge-Leveln zusätzliche Effekte
+                if (chargeLevel >= 2) {
+                  style.transition = 'transform 0.05s ease';
+                }
+                if (chargeLevel >= 3) {
+                  style.filter = Math.random() > 0.7 ? 'brightness(1.5)' : '';
+                }
+              }
+              
+              // Zeichen bestimmen (Priorität: Glitch > EdgeEffect > Original)
+              const displayChar = glitch ? glitch.char : 
+                                 (edgeEffect?.char ? edgeEffect.char : char);
+              
+              return (
+                <span key={`${x}-${y}`} style={style}>
+                  {displayChar}
+                </span>
+              );
+            })}
+          </div>
+        ))}
+      </pre>
     </div>
   );
 } 

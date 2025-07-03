@@ -3,8 +3,8 @@
 /**
  * GlitchButton Component
  * 
- * A cyberpunk-styled button with glitch effects that matches the overall aesthetic
- * of the SWORD application.
+ * Ein Button im Stil alter steinerner Glyphen mit Glitch-Effekten,
+ * der zum Gesamtbild der SWORD-Anwendung passt.
  */
 import React, { useState, useEffect } from 'react';
 
@@ -15,8 +15,8 @@ interface GlitchButtonProps {
   className?: string;
 }
 
-// Glitch-Symbole
-const glitchSymbols = ['░', '▒', '▓', '|', '/', '\\', '0', '1', '*', '>', '<'];
+// Glitch-Symbole im Stil alter Runen
+const glitchSymbols = ['᛭', '᛫', '᛬', 'ᛰ', 'ᛱ', 'ᛲ', 'ᛳ', 'ᛴ', 'ᛵ', 'ᛶ', 'ᛷ', 'ᛸ', '᛹', '᛺', '᛻', '᛼', '᛽', '᛾', '᛿'];
 
 export default function GlitchButton({ text, onClick, variant = 'free', className = '' }: GlitchButtonProps) {
   const [isGlitching, setIsGlitching] = useState(false);
@@ -76,21 +76,21 @@ export default function GlitchButton({ text, onClick, variant = 'free', classNam
   const getColors = () => {
     if (variant === 'free') {
       return {
-        baseColor: 'var(--grifter-green)',
-        glowColor: 'var(--grifter-blue)',
-        textColor: 'text-[#00FCA6]',
-        borderColor: 'border-[#00FCA6]',
-        hoverColor: 'hover:border-[#3EE6FF]',
-        shadowColor: 'shadow-[#00FCA6]'
+        baseColor: '#7A7267', // Steingrau mit grünlichem Ton
+        glowColor: '#A9E5BB', // Grünliches Leuchten
+        textColor: 'text-[#A9E5BB]',
+        borderColor: 'border-[#7A7267]',
+        hoverColor: 'hover:border-[#A9E5BB]',
+        shadowColor: 'shadow-[#A9E5BB]'
       };
     } else {
       return {
-        baseColor: 'var(--grifter-pink)',
-        glowColor: 'var(--grifter-yellow)',
-        textColor: 'text-[#FF3EC8]',
-        borderColor: 'border-[#FF3EC8]',
-        hoverColor: 'hover:border-[#F8E16C]',
-        shadowColor: 'shadow-[#FF3EC8]'
+        baseColor: '#7A6757', // Steingrau mit rötlichem Ton
+        glowColor: '#E5A9BB', // Rötliches Leuchten
+        textColor: 'text-[#E5A9BB]',
+        borderColor: 'border-[#7A6757]',
+        hoverColor: 'hover:border-[#E5A9BB]',
+        shadowColor: 'shadow-[#E5A9BB]'
       };
     }
   };
@@ -104,14 +104,16 @@ export default function GlitchButton({ text, onClick, variant = 'free', classNam
       onMouseLeave={() => setIsHovered(false)}
       className={`
         px-3 py-1 
-        border border-opacity-70 ${colors.borderColor} ${colors.hoverColor}
-        bg-black bg-opacity-30
-        font-mono text-xs sm:text-sm uppercase tracking-wider
+        border-2 border-opacity-90 ${colors.borderColor} ${colors.hoverColor}
+        bg-[#2A2520] bg-opacity-90
+        font-['Courier_New'] text-xs sm:text-sm uppercase tracking-wider
         ${colors.textColor}
         transition-all duration-150
         ${isGlitching ? 'translate-x-[1px] translate-y-[1px]' : ''}
-        hover:shadow-[0_0_8px_rgba(0,255,170,0.7)]
+        hover:shadow-[0_0_8px_rgba(169,229,187,0.7)]
         relative overflow-hidden
+        rounded-none
+        pixelated
         ${className}
       `}
       style={{
@@ -119,10 +121,22 @@ export default function GlitchButton({ text, onClick, variant = 'free', classNam
           ? `0 0 5px ${colors.glowColor}, 0 0 10px ${colors.glowColor}` 
           : `0 0 3px ${colors.baseColor}`,
         clipPath: isGlitching 
-          ? 'polygon(0 0, 100% 0, 100% 100%, 0 100%)' 
-          : 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'
+          ? 'polygon(0 2px, 2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px))' 
+          : 'polygon(0 0, 100% 0, 100% 100%, 0 100%)',
+        imageRendering: 'pixelated',
+        boxShadow: `inset 0 0 3px ${colors.baseColor}, 0 0 2px ${colors.baseColor}`,
+        letterSpacing: '0.15em'
       }}
     >
+      {/* Steinmuster-Hintergrund */}
+      <div 
+        className="absolute inset-0 opacity-20 pointer-events-none"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.15' fill-rule='evenodd'%3E%3Cpath d='M5 0h1L0 5v1H0V0h5z'/%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundSize: '4px 4px'
+        }}
+      />
+      
       {/* Glitch-Overlay (selten sichtbar) */}
       {isGlitching && (
         <span 
@@ -138,7 +152,7 @@ export default function GlitchButton({ text, onClick, variant = 'free', classNam
       )}
       
       {/* Haupttext */}
-      <span className="relative z-10">
+      <span className="relative z-10 block py-[2px] leading-none">
         {isGlitching ? glitchText : text}
       </span>
     </button>
