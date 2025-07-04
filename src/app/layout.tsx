@@ -5,12 +5,20 @@
  * It provides the HTML structure and includes global styles and metadata.
  */
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Press_Start_2P } from 'next/font/google';
 import '../styles/globals.css';
 import FlashWrapper from '@/components/layout/FlashWrapper';
 
 // Initialize the Inter font with Latin subset
 const inter = Inter({ subsets: ['latin'] });
+
+// Initialize the Press Start 2P font for pixel-style text
+const pressStart2P = Press_Start_2P({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-press-start-2p',
+  display: 'swap',
+});
 
 // Metadata for the application
 export const metadata: Metadata = {
@@ -24,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark overflow-hidden">
+    <html lang="en" className={`dark overflow-hidden ${pressStart2P.variable}`}>
       <body className={`${inter.className} min-h-screen overflow-hidden`} style={{
         backgroundColor: 'var(--color-bg-primary)',
         backgroundImage: 'radial-gradient(circle at 50% 50%, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%)',

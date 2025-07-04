@@ -6,22 +6,35 @@
  * Ein Button im Stil alter steinerner Glyphen mit Glitch-Effekten,
  * der zum Gesamtbild der SWORD-Anwendung passt.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface GlitchButtonProps {
   text: string;
   onClick?: () => void;
   variant?: 'free' | 'paid';
   className?: string;
+  cooldown?: number; // Cooldown-Zeit in ms
 }
 
 // Glitch-Symbole im Stil alter Runen
 const glitchSymbols = ['᛭', '᛫', '᛬', 'ᛰ', 'ᛱ', 'ᛲ', 'ᛳ', 'ᛴ', 'ᛵ', 'ᛶ', 'ᛷ', 'ᛸ', '᛹', '᛺', '᛻', '᛼', '᛽', '᛾', '᛿'];
 
-export default function GlitchButton({ text, onClick, variant = 'free', className = '' }: GlitchButtonProps) {
+export default function GlitchButton({ 
+  text, 
+  onClick, 
+  variant = 'free', 
+  className = '',
+  cooldown = 1000 // Standard-Cooldown: 1 Sekunde
+}: GlitchButtonProps) {
   const [isGlitching, setIsGlitching] = useState(false);
   const [glitchText, setGlitchText] = useState(text);
   const [isHovered, setIsHovered] = useState(false);
+  const [isCoolingDown, setIsCoolingDown] = useState(false);
+
+  // Aktualisiere den glitchText, wenn sich der text ändert
+  useEffect(() => {
+    setGlitchText(text);
+  }, [text]);
 
   // Zufällige Glitch-Effekte
   useEffect(() => {
@@ -72,6 +85,25 @@ export default function GlitchButton({ text, onClick, variant = 'free', classNam
     }, 150);
   };
 
+  // Click-Handler mit Cooldown
+  const handleClick = useCallback(() => {
+    if (isCoolingDown || !onClick) return;
+    
+    // Button-Klick ausführen
+    onClick();
+    
+    // Cooldown aktivieren
+    setIsCoolingDown(true);
+    
+    // Visuelles Feedback während des Cooldowns
+    triggerGlitch();
+    
+    // Nach der Cooldown-Zeit zurücksetzen
+    setTimeout(() => {
+      setIsCoolingDown(false);
+    }, cooldown);
+  }, [onClick, isCoolingDown, cooldown]);
+
   // Bestimme Farben basierend auf Variante
   const getColors = () => {
     if (variant === 'free') {
@@ -99,9 +131,10 @@ export default function GlitchButton({ text, onClick, variant = 'free', classNam
 
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      disabled={isCoolingDown}
       className={`
         px-3 py-1 
         border-2 border-opacity-90 ${colors.borderColor} ${colors.hoverColor}
@@ -110,7 +143,7 @@ export default function GlitchButton({ text, onClick, variant = 'free', classNam
         ${colors.textColor}
         transition-all duration-150
         ${isGlitching ? 'translate-x-[1px] translate-y-[1px]' : ''}
-        hover:shadow-[0_0_8px_rgba(169,229,187,0.7)]
+        ${isCoolingDown ? 'opacity-70 cursor-not-allowed' : 'hover:shadow-[0_0_8px_rgba(169,229,187,0.7)]'}
         relative overflow-hidden
         rounded-none
         pixelated
@@ -136,6 +169,19 @@ export default function GlitchButton({ text, onClick, variant = 'free', classNam
           backgroundSize: '4px 4px'
         }}
       />
+      
+      {/* Cooldown-Overlay */}
+      {isCoolingDown && (
+        <div 
+          className="absolute bottom-0 left-0 h-1 bg-opacity-70"
+          style={{
+            width: '100%',
+            animation: `cooldown ${cooldown}ms linear forwards`,
+            backgroundColor: variant === 'free' ? '#A9E5BB' : '#E5A9BB',
+            boxShadow: `0 0 5px ${variant === 'free' ? '#A9E5BB' : '#E5A9BB'}`
+          }}
+        />
+      )}
       
       {/* Glitch-Overlay (selten sichtbar) */}
       {isGlitching && (

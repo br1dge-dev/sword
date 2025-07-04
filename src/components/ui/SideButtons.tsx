@@ -5,8 +5,11 @@
  * 
  * This component renders buttons on the left and right sides of the screen.
  */
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import GlitchButton from './GlitchButton';
+import ForgeProgressBar from './ForgeProgressBar';
+import ChargeProgressBar from './ChargeProgressBar';
+import GlitchProgressBar from './GlitchProgressBar';
 import { useFlashStore } from '@/store/flashStore';
 import { usePowerUpStore } from '@/store/powerUpStore';
 
@@ -16,46 +19,61 @@ interface SideButtonsProps {
 
 export default function SideButtons({ className = '' }: SideButtonsProps) {
   const { startFlash } = useFlashStore();
-  const { currentLevel, startPowerUp, chargeLevel, increaseChargeLevel } = usePowerUpStore();
+  const { resetAllEffects } = usePowerUpStore();
   
-  // Bestimme den Text für den Power-Up-Button basierend auf dem aktuellen Level
-  const getPowerUpText = () => {
-    return `sword-lvl-${currentLevel}`;
-  };
+  // Zustandsvariablen für Fehlerbehandlung
+  const [errorCount, setErrorCount] = useState(0);
   
-  // Bestimme den Text für den Charge-Button basierend auf dem aktuellen Charge-Level
-  const getChargeText = () => {
-    return `charge-lvl-${chargeLevel}`;
-  };
+  // Sichere Wrapper für die Aktionen
+  const safeStartFlash = useCallback(() => {
+    try {
+      startFlash();
+    } catch (error) {
+      console.error("Fehler beim Starten des Flash-Effekts:", error);
+      handleError();
+    }
+  }, [startFlash]);
+  
+  // Fehlerbehandlung
+  const handleError = useCallback(() => {
+    setErrorCount(prev => {
+      // Bei zu vielen Fehlern alle Effekte zurücksetzen
+      if (prev >= 3) {
+        console.warn("Zu viele Fehler aufgetreten, setze alle Effekte zurück");
+        try {
+          resetAllEffects();
+        } catch (e) {
+          console.error("Fehler beim Zurücksetzen der Effekte:", e);
+        }
+        return 0;
+      }
+      return prev + 1;
+    });
+  }, [resetAllEffects]);
   
   return (
     <>
-      {/* Linke Buttons */}
+      {/* Linke Seite mit allen Buttons und Progress-Bars */}
       <div className={`fixed left-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-10 ${className}`}>
+        {/* X-RAY Button */}
         <GlitchButton 
           text="X-RAY" 
           variant="free"
-          onClick={() => startFlash()}
+          onClick={safeStartFlash}
+          cooldown={1500} // 1.5 Sekunden Cooldown für X-RAY
         />
-        <GlitchButton 
-          text={getPowerUpText()} 
-          variant="free"
-          onClick={() => startPowerUp()}
-        />
-      </div>
-      
-      {/* Rechte Buttons */}
-      <div className={`fixed right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-10 ${className}`}>
-        <GlitchButton 
-          text={getChargeText()} 
-          variant="paid"
-          onClick={() => increaseChargeLevel()}
-        />
-        <GlitchButton 
-          text="paid-invert" 
-          variant="paid"
-          onClick={() => console.log('paid-invert clicked')}
-        />
+        
+        {/* Alle Progress-Bars */}
+        <div className="flex flex-col gap-3 mt-2">
+          {/* Forge-Fortschrittsbalken */}
+          <ForgeProgressBar />
+          
+          {/* Charge-Fortschrittsbalken */}
+          <ChargeProgressBar />
+          
+          {/* Glitch-Fortschrittsbalken */}
+          <GlitchProgressBar />
+        </div>
       </div>
     </>
   );

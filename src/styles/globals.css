@@ -27,6 +27,26 @@
   --grifter-dark: #181A1B;
 }
 
+/* Cooldown-Animation für Buttons */
+@keyframes cooldown {
+  0% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
+}
+
+/* Pulse-Animation für Glüheffekte */
+@keyframes pulse {
+  0% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
 @layer base {
   body {
     @apply font-mono antialiased;

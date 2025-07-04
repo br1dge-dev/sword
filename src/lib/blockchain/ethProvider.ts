@@ -6,6 +6,20 @@
  */
 import { ethers } from 'ethers';
 
+// Definiere einen Typ für den Ethereum-Provider
+interface EthereumProvider {
+  request: (args: { method: string; params?: any[] }) => Promise<any>;
+  on: (eventName: string, listener: (...args: any[]) => void) => void;
+  removeListener: (eventName: string, listener: (...args: any[]) => void) => void;
+}
+
+// Erweitere das Window-Interface
+declare global {
+  interface Window {
+    ethereum?: EthereumProvider;
+  }
+}
+
 /**
  * Creates an Ethereum provider using WebSocket connection
  * 
@@ -45,6 +59,28 @@ export function listenForBlocks(
 }
 
 /**
+ * Checks if an Ethereum provider is available in the browser
+ * 
+ * @returns {boolean} True if ethereum provider is available
+ */
+export function isEthereumProviderAvailable(): boolean {
+  return typeof window !== 'undefined' && 
+         typeof window.ethereum !== 'undefined';
+}
+
+/**
+ * Gets the Ethereum provider safely
+ * 
+ * @returns {EthereumProvider|null} The ethereum provider or null if not available
+ */
+export function getEthereumProvider(): EthereumProvider | null {
+  if (!isEthereumProviderAvailable()) {
+    return null;
+  }
+  return window.ethereum as EthereumProvider;
+}
+
+/**
  * Signs a message using the user's wallet
  * 
  * @param {string} message - Message to sign
@@ -52,16 +88,18 @@ export function listenForBlocks(
  */
 export async function signMessage(message: string): Promise<string> {
   // Check if window.ethereum is available
-  if (!window.ethereum) {
+  if (!isEthereumProviderAvailable()) {
     throw new Error('No Ethereum provider found. Please install MetaMask.');
   }
   
+  const ethereum = window.ethereum as EthereumProvider;
+  
   // Request account access
-  const accounts = await window.ethereum.request({ 
+  const accounts = await ethereum.request({ 
     method: 'eth_requestAccounts' 
   });
   
-  const provider = new ethers.BrowserProvider(window.ethereum);
+  const provider = new ethers.BrowserProvider(ethereum as unknown as ethers.Eip1193Provider);
   const signer = await provider.getSigner();
   
   // Sign the message
