@@ -18,15 +18,18 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
     isChargeComplete, 
     increaseChargeProgress, 
     increaseChargeLevel, 
-    chargeLevel 
+    chargeLevel,
+    maxChargeLevel
   } = usePowerUpStore();
   
   const [lightningButtonCooldown, setLightningButtonCooldown] = useState(false);
   const [nuclearButtonPressed, setNuclearButtonPressed] = useState(false);
   
+  const isMaxLevel = chargeLevel >= maxChargeLevel;
+  
   // Blitz-Button-Handler
   const handleLightningClick = () => {
-    if (lightningButtonCooldown || isChargeComplete) return;
+    if (lightningButtonCooldown || isChargeComplete || isMaxLevel) return;
     
     increaseChargeProgress();
     setLightningButtonCooldown(true);
@@ -54,7 +57,9 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
   const getTileColor = (index: number, totalTiles: number) => {
     const tileProgress = (index + 1) / totalTiles * 100;
     
-    if (tileProgress > chargeProgress) {
+    if (isMaxLevel) {
+      return 'bg-yellow-500'; // Alle Tiles sind gelb im MAX-Level
+    } else if (tileProgress > chargeProgress) {
       return 'bg-gray-800'; // Leere Tiles
     } else if (chargeProgress < 50) {
       return 'bg-yellow-300'; // Blasses Gelb
@@ -72,14 +77,14 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
     
     for (let i = 0; i < totalTiles; i++) {
       const tileProgress = (i + 1) / totalTiles * 100;
-      const isActive = tileProgress <= chargeProgress;
+      const isActive = isMaxLevel || tileProgress <= chargeProgress;
       
       tiles.push(
         <div 
           key={i}
           className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
           style={{
-            boxShadow: isActive && chargeProgress >= 90 ? 'inset 0 0 3px rgba(255,255,0,0.8)' : 
+            boxShadow: isActive && (isMaxLevel || chargeProgress >= 90) ? 'inset 0 0 3px rgba(255,255,0,0.8)' : 
                       isActive && chargeProgress >= 50 ? 'inset 0 0 2px rgba(255,255,0,0.5)' : 
                       'none'
           }}
@@ -104,22 +109,28 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
         
         <div className="flex items-center gap-2">
           {/* Fortschrittsbalken mit genau 10 Tiles */}
-          <div className="relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex"
+          <div className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex
+                         ${isMaxLevel ? 'max-level-shine' : ''}`}
                style={{ 
                  boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
                  imageRendering: 'pixelated'
                }}>
             {renderProgressTiles()}
+            
+            {/* MAX-Text bei maximalem Level */}
+            {isMaxLevel && (
+              <div className="max-level-text text-[#F8E16C]">MAX</div>
+            )}
           </div>
           
           {/* Blitz-Button */}
           <button
             onClick={handleLightningClick}
-            disabled={lightningButtonCooldown || isChargeComplete}
+            disabled={lightningButtonCooldown || isChargeComplete || isMaxLevel}
             className={`w-6 h-6 flex items-center justify-center 
                        border border-gray-700 bg-gray-800 
                        ${lightningButtonCooldown ? 'opacity-50' : 'hover:border-yellow-400'} 
-                       ${isChargeComplete ? 'opacity-50 cursor-not-allowed' : ''}`}
+                       ${isChargeComplete || isMaxLevel ? 'opacity-50 cursor-not-allowed' : ''}`}
             style={{ 
               boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(255,255,0,0.3)',
               imageRendering: 'pixelated',
@@ -185,7 +196,7 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
         
         {/* Level-Anzeige */}
         <div className="mt-1 text-[10px] text-left opacity-80 font-mono text-[#F8E16C]">
-          LVL {chargeLevel}/{usePowerUpStore.getState().maxChargeLevel}
+          LVL {chargeLevel}/{maxChargeLevel}
         </div>
       </div>
     </div>

@@ -33,12 +33,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`dark overflow-hidden ${pressStart2P.variable}`}>
-      <body className={`${inter.className} min-h-screen overflow-hidden`} style={{
+      <body className={`${inter.className} min-h-screen overflow-hidden horizontal-scanlines`} style={{
         backgroundColor: 'var(--color-bg-primary)',
         backgroundImage: 'radial-gradient(circle at 50% 50%, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%)',
       }}>
         <FlashWrapper>
-          <div className="crt-effect scanlines-subtle crt-curve-subtle min-h-screen overflow-hidden">
+          <div className="crt-effect crt-curve-strong vignette min-h-screen overflow-hidden">
             {children}
           </div>
         </FlashWrapper>

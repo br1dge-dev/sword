@@ -6,6 +6,7 @@
  */
 import AsciiSword from '@/components/ascii/AsciiSword';
 import SideButtons from '@/components/ui/SideButtons';
+import MusicPlayer from '@/components/ui/MusicPlayer';
 import { usePowerUpStore } from '@/store/powerUpStore';
 
 export default function HomePage() {
@@ -22,6 +23,11 @@ export default function HomePage() {
       
       {/* Seitliche Buttons */}
       <SideButtons />
+      
+      {/* Music Player (unten rechts) */}
+      <div className="fixed right-[12%] bottom-8 z-10">
+        <MusicPlayer />
+      </div>
     </main>
   );
 } 

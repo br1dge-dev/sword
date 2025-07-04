@@ -18,15 +18,18 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
     isGlitchComplete, 
     increaseGlitchProgress, 
     increaseGlitchLevel, 
-    glitchLevel 
+    glitchLevel,
+    maxGlitchLevel
   } = usePowerUpStore();
   
   const [glitchButtonCooldown, setGlitchButtonCooldown] = useState(false);
   const [upgradeButtonPressed, setUpgradeButtonPressed] = useState(false);
   
+  const isMaxLevel = glitchLevel >= maxGlitchLevel;
+  
   // Glitch-Button-Handler
   const handleGlitchClick = () => {
-    if (glitchButtonCooldown || isGlitchComplete) return;
+    if (glitchButtonCooldown || isGlitchComplete || isMaxLevel) return;
     
     increaseGlitchProgress();
     setGlitchButtonCooldown(true);
@@ -54,7 +57,10 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
   const getTileColor = (index: number, totalTiles: number) => {
     const tileProgress = (index + 1) / totalTiles * 100;
     
-    if (tileProgress > glitchProgress) {
+    if (isMaxLevel) {
+      // Bei MAX-Level einheitliche Farbe mit gelegentlichen Glitch-Effekten
+      return 'bg-pink-500';
+    } else if (tileProgress > glitchProgress) {
       return 'bg-gray-800'; // Leere Tiles
     } else if (glitchProgress < 50) {
       return 'bg-pink-300'; // Blasses Pink
@@ -72,10 +78,10 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
     
     for (let i = 0; i < totalTiles; i++) {
       const tileProgress = (i + 1) / totalTiles * 100;
-      const isActive = tileProgress <= glitchProgress;
+      const isActive = isMaxLevel || tileProgress <= glitchProgress;
       
-      // Zufällige Glitch-Effekte für aktive Tiles
-      const isGlitching = isActive && Math.random() > 0.85;
+      // Zufällige Glitch-Effekte für aktive Tiles, aber weniger häufig im MAX-Level
+      const isGlitching = isActive && (!isMaxLevel ? Math.random() > 0.85 : Math.random() > 0.7);
       const glitchColor = Math.random() > 0.5 ? 'bg-green-400' : 'bg-pink-400';
       
       tiles.push(
@@ -83,7 +89,7 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
           key={i}
           className={`h-full w-[10%] ${isGlitching ? glitchColor : getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
           style={{
-            boxShadow: isActive && glitchProgress >= 90 ? 'inset 0 0 3px rgba(255,0,255,0.8)' : 
+            boxShadow: isActive && (isMaxLevel || glitchProgress >= 90) ? 'inset 0 0 3px rgba(255,0,255,0.8)' : 
                       isActive && glitchProgress >= 50 ? 'inset 0 0 2px rgba(255,0,255,0.5)' : 
                       'none'
           }}
@@ -108,22 +114,28 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
         
         <div className="flex items-center gap-2">
           {/* Fortschrittsbalken mit genau 10 Tiles */}
-          <div className="relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex"
+          <div className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex
+                         ${isMaxLevel ? 'max-level-shine' : ''}`}
                style={{ 
                  boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
                  imageRendering: 'pixelated'
                }}>
             {renderProgressTiles()}
+            
+            {/* MAX-Text bei maximalem Level */}
+            {isMaxLevel && (
+              <div className="max-level-text text-[#FF3EC8]">MAX</div>
+            )}
           </div>
           
           {/* Glitch-Button */}
           <button
             onClick={handleGlitchClick}
-            disabled={glitchButtonCooldown || isGlitchComplete}
+            disabled={glitchButtonCooldown || isGlitchComplete || isMaxLevel}
             className={`w-6 h-6 flex items-center justify-center 
                        border border-gray-700 bg-gray-800 
                        ${glitchButtonCooldown ? 'opacity-50' : 'hover:border-pink-400'} 
-                       ${isGlitchComplete ? 'opacity-50 cursor-not-allowed' : ''}`}
+                       ${isGlitchComplete || isMaxLevel ? 'opacity-50 cursor-not-allowed' : ''}`}
             style={{ 
               boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(255,0,255,0.3)',
               imageRendering: 'pixelated',
@@ -190,7 +202,7 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
         
         {/* Level-Anzeige */}
         <div className="mt-1 text-[10px] text-left opacity-80 font-mono text-[#FF3EC8]">
-          LVL {glitchLevel}/{usePowerUpStore.getState().maxGlitchLevel}
+          LVL {glitchLevel}/{maxGlitchLevel}
         </div>
       </div>
     </div>

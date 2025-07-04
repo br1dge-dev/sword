@@ -6,7 +6,7 @@
  * This component renders buttons on the left and right sides of the screen.
  */
 import React, { useState, useCallback } from 'react';
-import GlitchButton from './GlitchButton';
+import CleanseButton from './CleanseButton';
 import ForgeProgressBar from './ForgeProgressBar';
 import ChargeProgressBar from './ChargeProgressBar';
 import GlitchProgressBar from './GlitchProgressBar';
@@ -24,15 +24,19 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
   // Zustandsvariablen für Fehlerbehandlung
   const [errorCount, setErrorCount] = useState(0);
   
-  // Sichere Wrapper für die Aktionen
-  const safeStartFlash = useCallback(() => {
+  // Handler für den CLEANSE-Button
+  const handleCleanse = useCallback(() => {
     try {
+      // Flash-Effekt starten
       startFlash();
+      
+      // Alle Fortschritte zurücksetzen
+      resetAllEffects();
     } catch (error) {
-      console.error("Fehler beim Starten des Flash-Effekts:", error);
+      console.error("Fehler beim Ausführen der Cleanse-Aktion:", error);
       handleError();
     }
-  }, [startFlash]);
+  }, [startFlash, resetAllEffects]);
   
   // Fehlerbehandlung
   const handleError = useCallback(() => {
@@ -54,17 +58,15 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
   return (
     <>
       {/* Linke Seite mit allen Buttons und Progress-Bars */}
-      <div className={`fixed left-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-10 ${className}`}>
-        {/* X-RAY Button */}
-        <GlitchButton 
-          text="X-RAY" 
-          variant="free"
-          onClick={safeStartFlash}
-          cooldown={1500} // 1.5 Sekunden Cooldown für X-RAY
+      <div className={`fixed left-[12%] top-1/2 -translate-y-1/2 flex flex-col gap-4 z-10 ${className}`}>
+        {/* CLEANSE Button */}
+        <CleanseButton 
+          onClick={handleCleanse}
+          cooldown={3000} // 3 Sekunden Cooldown für CLEANSE
         />
         
         {/* Alle Progress-Bars */}
-        <div className="flex flex-col gap-3 mt-2">
+        <div className="flex flex-col gap-5 mt-4">
           {/* Forge-Fortschrittsbalken */}
           <ForgeProgressBar />
           

@@ -18,15 +18,18 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
     isForgeComplete, 
     increaseForgeProgress, 
     startPowerUp, 
-    currentLevel 
+    currentLevel,
+    maxLevel
   } = usePowerUpStore();
   
   const [fireButtonCooldown, setFireButtonCooldown] = useState(false);
   const [hammerButtonPressed, setHammerButtonPressed] = useState(false);
   
+  const isMaxLevel = currentLevel >= maxLevel;
+  
   // Feuer-Button-Handler
   const handleFireClick = () => {
-    if (fireButtonCooldown || isForgeComplete) return;
+    if (fireButtonCooldown || isForgeComplete || isMaxLevel) return;
     
     increaseForgeProgress();
     setFireButtonCooldown(true);
@@ -54,7 +57,9 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
   const getTileColor = (index: number, totalTiles: number) => {
     const tileProgress = (index + 1) / totalTiles * 100;
     
-    if (tileProgress > forgeProgress) {
+    if (isMaxLevel) {
+      return 'bg-orange-500'; // Alle Tiles sind glühend im MAX-Level
+    } else if (tileProgress > forgeProgress) {
       return 'bg-gray-800'; // Leere Tiles
     } else if (forgeProgress < 50) {
       return 'bg-gray-400'; // Kaltes Metall
@@ -72,14 +77,14 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
     
     for (let i = 0; i < totalTiles; i++) {
       const tileProgress = (i + 1) / totalTiles * 100;
-      const isActive = tileProgress <= forgeProgress;
+      const isActive = isMaxLevel || tileProgress <= forgeProgress;
       
       tiles.push(
         <div 
           key={i}
           className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
           style={{
-            boxShadow: isActive && forgeProgress >= 90 ? 'inset 0 0 3px rgba(255,165,0,0.8)' : 
+            boxShadow: isActive && (isMaxLevel || forgeProgress >= 90) ? 'inset 0 0 3px rgba(255,165,0,0.8)' : 
                       isActive && forgeProgress >= 50 ? 'inset 0 0 2px rgba(255,255,0,0.5)' : 
                       'none'
           }}
@@ -104,22 +109,28 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
         
         <div className="flex items-center gap-2">
           {/* Fortschrittsbalken mit genau 10 Tiles */}
-          <div className="relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex"
+          <div className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex
+                         ${isMaxLevel ? 'max-level-shine' : ''}`}
                style={{ 
                  boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
                  imageRendering: 'pixelated'
                }}>
             {renderProgressTiles()}
+            
+            {/* MAX-Text bei maximalem Level */}
+            {isMaxLevel && (
+              <div className="max-level-text text-[#00FCA6]">MAX</div>
+            )}
           </div>
           
           {/* Feuer-Button */}
           <button
             onClick={handleFireClick}
-            disabled={fireButtonCooldown || isForgeComplete}
+            disabled={fireButtonCooldown || isForgeComplete || isMaxLevel}
             className={`w-6 h-6 flex items-center justify-center 
                        border border-gray-700 bg-gray-800 
                        ${fireButtonCooldown ? 'opacity-50' : 'hover:border-orange-500'} 
-                       ${isForgeComplete ? 'opacity-50 cursor-not-allowed' : ''}`}
+                       ${isForgeComplete || isMaxLevel ? 'opacity-50 cursor-not-allowed' : ''}`}
             style={{ 
               boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(255,165,0,0.3)',
               imageRendering: 'pixelated',
@@ -183,7 +194,7 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
         
         {/* Level-Anzeige */}
         <div className="mt-1 text-[10px] text-left opacity-80 font-mono text-[#00FCA6]">
-          LVL {currentLevel}/{usePowerUpStore.getState().maxLevel}
+          LVL {currentLevel}/{maxLevel}
         </div>
       </div>
     </div>
