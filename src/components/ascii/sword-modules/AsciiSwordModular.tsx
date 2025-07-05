@@ -593,7 +593,7 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
       
       console.log(`%c[BEAT_BACKGROUND] Beat triggered background pattern change! Energy: ${beatEnergy.toFixed(2)}`, 'color: #FF3EC8; font-weight: bold;');
     }
-  }, [beatDetected, beatEnergy, glitchLevel, centeredSwordLines]);
+  }, [beatDetected]); // Nur von beatDetected abhängig machen, nicht von beatEnergy oder glitchLevel
   
   // Beat-Energie-Reaktion - Intensität der Effekte anpassen
   useEffect(() => {

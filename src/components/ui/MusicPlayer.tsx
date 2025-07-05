@@ -37,8 +37,9 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
   // Beat-Erkennung
   const { setBeatDetected, setBeatEnergy } = usePowerUpStore();
   const lastVolumeRef = useRef<number>(0);
-  const beatThresholdRef = useRef<number>(0.08); // Schwellenwert für Beat-Erkennung weiter reduziert
+  const beatThresholdRef = useRef<number>(0.05); // Noch niedrigerer Schwellenwert für Beat-Erkennung
   const beatCooldownRef = useRef<boolean>(false);
+  const lastBeatTimeRef = useRef<number>(0);
   
   // Initialisiere Web Audio API
   useEffect(() => {
@@ -106,18 +107,23 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
       
       // Logge alle 10 Frames die Audio-Analyse-Daten
       if (frameCount % 10 === 0) {
-        console.log(`%c[AUDIO_ANALYSIS] Volume: ${bassVolume.toFixed(2)}, Avg: ${averageEnergy.toFixed(2)}, Variation: ${energyVariation.toFixed(2)}, Delta: ${volumeDelta.toFixed(2)}`, 
+        console.log(`%c[AUDIO_ANALYSIS] Volume: ${bassVolume.toFixed(2)}, Avg: ${averageEnergy.toFixed(2)}, Variation: ${energyVariation.toFixed(2)}, Delta: ${volumeDelta.toFixed(2)}, Cooldown: ${beatCooldownRef.current}`, 
                    'color: #44AAFF; font-weight: bold;');
       }
       
-      // Verbesserte Beat-Erkennung mit noch niedrigerem Schwellenwert und angepassten Bedingungen
+      // DRASTISCH verbesserte Beat-Erkennung mit noch niedrigerem Schwellenwert und angepassten Bedingungen
       if (!beatCooldownRef.current && 
-          ((volumeDelta > beatThresholdRef.current && bassVolume > 0.08) || // Plötzlicher Anstieg, niedrigerer Schwellenwert
-           (energyVariation > 1.1 && bassVolume > 0.12) ||  // Niedrigerer Schwellenwert für Variation
-           (bassVolume > 0.25 && volumeDelta > 0.05))) {   // Zusätzliche Bedingung für hohe Lautstärke
+          ((volumeDelta > beatThresholdRef.current && bassVolume > 0.05) || // Plötzlicher Anstieg, noch niedrigerer Schwellenwert
+           (energyVariation > 1.05 && bassVolume > 0.08) ||  // Niedrigerer Schwellenwert für Variation
+           (bassVolume > 0.2 && volumeDelta > 0.03) ||      // Zusätzliche Bedingung für hohe Lautstärke
+           // Notfall-Bedingung: Erzeuge künstliche Beats, wenn längere Zeit kein Beat erkannt wurde
+           (Date.now() - lastBeatTimeRef.current > 1000 && bassVolume > 0.15))) {   
+        
         // Beat erkannt
         setBeatDetected(true);
         beatCooldownRef.current = true;
+        const now = Date.now();
+        lastBeatTimeRef.current = now;
         
         // Beat-Feedback in der Konsole
         console.log(`%c[BEAT_DETECTED] Beat erkannt! Energie: ${bassVolume.toFixed(2)}, Delta: ${volumeDelta.toFixed(2)}, Variation: ${energyVariation.toFixed(2)}`, 
@@ -125,7 +131,8 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
         
         // Debug-Log für den Store-Zustand nach setBeatDetected
         setTimeout(() => {
-          console.log(`%c[BEAT_DEBUG_STORE] Store-Status nach setBeatDetected(true): beatDetected=${usePowerUpStore.getState().beatDetected}`, 
+          const storeState = usePowerUpStore.getState();
+          console.log(`%c[BEAT_DEBUG_STORE] Store-Status nach setBeatDetected(true): beatDetected=${storeState.beatDetected}, beatEnergy=${storeState.beatEnergy.toFixed(2)}`, 
                      'color: #FF3EC8; background-color: #222222; font-weight: bold;');
         }, 10);
         
@@ -136,7 +143,8 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
           
           // Debug-Log für den Store-Zustand nach setBeatDetected(false)
           setTimeout(() => {
-            console.log(`%c[BEAT_DEBUG_STORE] Store-Status nach setBeatDetected(false): beatDetected=${usePowerUpStore.getState().beatDetected}`, 
+            const storeState = usePowerUpStore.getState();
+            console.log(`%c[BEAT_DEBUG_STORE] Store-Status nach setBeatDetected(false): beatDetected=${storeState.beatDetected}, beatEnergy=${storeState.beatEnergy.toFixed(2)}`, 
                        'color: #FF3EC8; background-color: #222222; font-weight: bold;');
           }, 10);
         }, 100);
@@ -145,7 +153,7 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
         setTimeout(() => {
           beatCooldownRef.current = false;
           console.log(`%c[BEAT_COOLDOWN] Beat-Cooldown beendet, bereit für nächsten Beat`, 'color: #FF3EC8; font-weight: bold;');
-        }, 180); // 180ms Cooldown zwischen Beats (weiter reduziert für schnellere Reaktion)
+        }, 150); // 150ms Cooldown zwischen Beats (noch weiter reduziert für schnellere Reaktion)
       }
       
       // Aktuelles Volumen für nächsten Vergleich speichern
