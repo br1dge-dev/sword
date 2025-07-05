@@ -1,4 +1,4 @@
-# Effect Overview
+# Effekte-Übersicht
 
 Dieses Dokument bietet einen Überblick über alle visuellen Effekte in der Schwert-Anwendung und deren Timing-Werte.
 
