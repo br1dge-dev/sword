@@ -1,145 +1,145 @@
-# Effekte-Übersicht
+# Effect Overview
 
-Dieses Dokument bietet einen Überblick über alle visuellen Effekte in der Schwert-Anwendung und deren Timing-Werte.
+This document provides an overview of all visual effects in the sword application and their timing values.
 
-## Implementierungsstruktur
+## Implementation Structure
 
-Die visuellen Effekte sind hauptsächlich in folgenden Dateien implementiert:
+The visual effects are mainly implemented in the following files:
 
-- **src/components/ascii/AsciiSword.tsx**: Hauptkomponente für das ASCII-Schwert mit allen visuellen Effekten
-- **src/store/powerUpStore.ts**: Zustandsverwaltung für Level, Charge- und Glitch-Effekte
-- **src/components/ui/ChargeProgressBar.tsx**: Komponente für die Charge-Fortschrittsanzeige
-- **src/components/ui/GlitchProgressBar.tsx**: Komponente für die Glitch-Fortschrittsanzeige
-- **src/app/page.tsx**: Enthält die Effekt-Tracking-Logik und Kategorisierung
+- **src/components/ascii/AsciiSword.tsx**: Main component for the ASCII sword with all visual effects
+- **src/store/powerUpStore.ts**: State management for level, charge, and glitch effects
+- **src/components/ui/ChargeProgressBar.tsx**: Component for the charge progress display
+- **src/components/ui/GlitchProgressBar.tsx**: Component for the glitch progress display
+- **src/app/page.tsx**: Contains the effect tracking logic and categorization
 
-## Abhängigkeiten
+## Dependencies
 
-- **Zustand**: Die Effekte werden durch verschiedene Zustandsvariablen gesteuert:
-  - `currentLevel`: Schwert-Level (1-3)
-  - `chargeLevel`: Aufladungs-Level (1-3)
-  - `glitchLevel`: Glitch-Level (1-3)
+- **State**: The effects are controlled by various state variables:
+  - `currentLevel`: Sword level (1-3)
+  - `chargeLevel`: Charge level (1-3)
+  - `glitchLevel`: Glitch level (1-3)
 
-- **Bibliotheken**:
-  - `zustand`: Für Zustandsverwaltung
-  - `zustand/middleware/persist`: Für persistente Speicherung der Effekt-Zustände
+- **Libraries**:
+  - `zustand`: For state management
+  - `zustand/middleware/persist`: For persistent storage of effect states
 
-## Hintergrund-Effekte
+## Background Effects
 
-- **Hintergrund-Muster-Aktualisierung**: Ändert sich alle 2 Sekunden mit 50% Chance (reduziert von 3 Sekunden)
-- **Äderchen-Effekt**: Aktualisiert alle 1500ms - (glitchLevel * 300ms)
-  - Glitch-Chance steigt mit glitchLevel: 30%, 40%, 50%, 60% (erhöht)
-  - Kurzer Blitz-Effekt dauert 100ms
+- **Background Pattern Update**: Changes every 2 seconds with 50% chance (reduced from 3 seconds)
+- **Veins Effect**: Updates every 1500ms - (glitchLevel * 300ms)
+  - Glitch chance increases with glitchLevel: 30%, 40%, 50%, 60% (increased)
+  - Brief flash effect lasts 100ms
 
-## Farb-Effekte
+## Color Effects
 
-- **Basis-Farbwechsel**:
-  - Aktualisiert alle 80-160ms (extrem häufig)
-  - Farbwechsel-Wahrscheinlichkeit basierend auf glitchLevel: 85%, 88%, 91%, 94% (extrem hohe Chance)
-  - Farben bleiben für 0,5-2 Sekunden stabil (gesteuert durch colorStability, stark verkürzt)
-  - Verwendet harmonische Farbpaare mit 4 verschiedenen Harmonie-Typen:
-    1. Komplementär mit Variation
-    2. Dunklere Version der Komplementärfarbe
-    3. Analogfarbe (verschoben auf dem Farbrad)
-    4. Kontrastierende Akzentfarbe
+- **Base Color Change**:
+  - Updates every 80-160ms (extremely frequent)
+  - Color change probability based on glitchLevel: 85%, 88%, 91%, 94% (extremely high chance)
+  - Colors remain stable for 0.5-2 seconds (controlled by colorStability, significantly shortened)
+  - Uses harmonic color pairs with 4 different harmony types:
+    1. Complementary with variation
+    2. Darker version of complementary
+    3. Analogous color (shifted on color wheel)
+    4. Contrasting accent color
 
-- **Farbige Kacheln**:
-  - Aktualisiert alle 80-140ms (extrem häufig)
-  - Anzahl der Cluster basierend auf glitchLevel: 2, 4, 7, 10 (deutlich erhöht)
-  - Clustergröße: 2-6 Kacheln, größer bei höherem glitchLevel
+- **Colored Tiles**:
+  - Updates every 80-140ms (extremely frequent)
+  - Number of clusters based on glitchLevel: 2, 4, 7, 10 (significantly increased)
+  - Cluster size: 2-6 tiles, larger with higher glitchLevel
 
-## Leucht-Effekt
+## Glow Effect
 
-- **Puls-Effekt**: Aktualisiert alle 100-200ms
-- **Intensität**: Zufällig zwischen 0,3 und 1,0
+- **Pulse Effect**: Updates every 100-200ms
+- **Intensity**: Random between 0.3 and 1.0
 
-## Glitch-Effekte
+## Glitch Effects
 
 - **DOS-Style Glitches**:
-  - Aktualisiert alle 200-400ms mit 50% Chance
-  - 2-8 Glitches gleichzeitig
-  - Dauer: 80ms (verkürzt für aggressiveren Effekt)
+  - Updates every 200-400ms with 50% chance
+  - 2-8 glitches simultaneously
+  - Duration: 80ms (shortened for more aggressive effect)
 
-- **Unicode-Glitches**:
-  - Frequenz: 500ms - (glitchLevel * 50ms)
-  - Chance steigt mit glitchLevel: 30%, 40%, 50%, 60%
-  - Anzahl der Glitches: glitchLevel * 3 + glitchLevel
-  - Dauer: 100ms + (glitchLevel * 20ms)
+- **Unicode Glitches**:
+  - Frequency: 500ms - (glitchLevel * 50ms)
+  - Chance increases with glitchLevel: 30%, 40%, 50%, 60%
+  - Number of glitches: glitchLevel * 3 + glitchLevel
+  - Duration: 100ms + (glitchLevel * 20ms)
 
-- **Unschärfe-Effekt**:
-  - Prozentsatz unscharfer Zeichen basierend auf glitchLevel: 1%, 2%, 3%
-  - Aktualisiert alle 500ms
+- **Blur Effect**:
+  - Percentage of blurred characters based on glitchLevel: 1%, 2%, 3%
+  - Updates every 500ms
 
-- **Verzerrungseffekt (Skew)**:
-  - Aktiv ab glitchLevel 2
-  - Prozentsatz verzerrter Zeichen: 0,5% * glitchLevel
-  - Winkel: -5° bis +5°
-  - Aktualisiert alle 300ms
+- **Skew Effect**:
+  - Active from glitchLevel 2
+  - Percentage of skewed characters: 0.5% * glitchLevel
+  - Angle: -5° to +5°
+  - Updates every 300ms
 
-- **Transparenz-Effekt**:
-  - Aktiv ab glitchLevel 3
-  - Prozentsatz transparenter Zeichen: 0,3% * glitchLevel
-  - Transparenz: 70-100%
-  - Aktualisiert alle 400ms
+- **Opacity Effect**:
+  - Active from glitchLevel 3
+  - Percentage of transparent characters: 0.3% * glitchLevel
+  - Transparency: 70-100%
+  - Updates every 400ms
 
-## Auflade-Effekte
+## Charge Effects
 
-- **Kanten-Effekte** (für dünne Linien):
-  - Aktualisierungsfrequenz basierend auf chargeLevel:
+- **Edge Effects** (for thin lines):
+  - Update frequency based on chargeLevel:
     - Level 1: 200ms
-    - Level 2: 120ms (verbessert von 150ms auf 120ms, dann auf 70ms)
+    - Level 2: 120ms (improved from 150ms to 120ms, then to 70ms)
     - Level 3: 100ms
   
-  - Vibrations-Intensität nach chargeLevel:
-    - Level 1: 0,2 (20% Chance)
-    - Level 2: 0,6 (60% Chance, verbessert von 0,5)
-    - Level 3: 0,8 (80% Chance)
+  - Vibration intensity by chargeLevel:
+    - Level 1: 0.2 (20% chance)
+    - Level 2: 0.6 (60% chance, improved from 0.5)
+    - Level 3: 0.8 (80% chance)
   
-  - Glitch-Häufigkeit nach chargeLevel:
-    - Level 1: 0,1 (10% Chance)
-    - Level 2: 0,25 (25% Chance, 37,5% mit Multiplikator)
-    - Level 3: 0,4 (40% Chance)
+  - Glitch frequency by chargeLevel:
+    - Level 1: 0.1 (10% chance)
+    - Level 2: 0.25 (25% chance, 37.5% with multiplier)
+    - Level 3: 0.4 (40% chance)
   
-  - Farbeffekt-Häufigkeit nach chargeLevel:
-    - Level 1: 0,15 (15% Chance)
-    - Level 2: 0,25 (25% Chance)
-    - Level 3: 0,4 (40% Chance)
+  - Color effect frequency by chargeLevel:
+    - Level 1: 0.15 (15% chance)
+    - Level 2: 0.25 (25% chance)
+    - Level 3: 0.4 (40% chance)
 
-  - Flacker-Verhalten nach chargeLevel:
-    - Level 1: Vollständiger Reset
-    - Level 2: Teilweiser Reset (behält 30-70% der Effekte) + 3-7 neue Effekte
-    - Level 3: Komplexe Muster (50% Chance) oder vollständiger Reset
+  - Flicker behavior by chargeLevel:
+    - Level 1: Complete reset
+    - Level 2: Partial reset (keeps 30-70% of effects) + 3-7 new effects
+    - Level 3: Complex patterns (50% chance) or complete reset
 
-## Audio-Effekte
+## Audio Effects
 
-- **Musik-Player**:
-  - Implementiert in src/components/ui/MusicPlayer.tsx
-  - 4 verfügbare Tracks: GR1FTSWORD, FLASHWORD, FUNKSWORD, ATARISWORD
-  - Fortschrittsanzeige mit 10 Tiles
+- **Music Player**:
+  - Implemented in src/components/ui/MusicPlayer.tsx
+  - 4 available tracks: GR1FTSWORD, FLASHWORD, FUNKSWORD, ATARISWORD
+  - Progress display with 10 tiles
 
-## Aktuelle Verbesserungen
+## Recent Improvements
 
-1. **Auflade-Effekte auf Level 2**:
-   - Konsistente Vibration mit variabler Intensität hinzugefügt
-   - Glitch-Wahrscheinlichkeit um 50% erhöht
-   - Sichergestellt, dass mindestens ein Effekt immer angewendet wird
-   - Teilweiser Reset mit 30-70% Beibehaltung der Effekte implementiert
-   - 3-7 neue Effekte während jedes Flacker-Zyklus hinzugefügt
-   - Aktualisierungsintervall von 150ms auf 70ms reduziert
+1. **Charge Effects at Level 2**:
+   - Added consistent vibration with variable intensity
+   - Increased glitch probability by 50%
+   - Ensured at least one effect is always applied
+   - Implemented partial reset with 30-70% retention of effects
+   - Added 3-7 new effects during each flicker cycle
+   - Reduced update interval from 150ms to 70ms
 
-2. **Farb-System**:
-   - Farb-Stabilitätssystem hinzugefügt (0,5-2 Sekunden, stark verkürzt)
-   - 4 verschiedene Farbharmonie-Typen implementiert
-   - Sofortige Farb-Umkehrung verhindert
-   - Farb-Dauer von 250-400ms auf 80-160ms reduziert für extremere Effekte
-   - 5 neue Basisfarben für mehr Vielfalt hinzugefügt
-   - Beziehung zwischen Hintergrund- und Schwertfarbe verbessert
+2. **Color System**:
+   - Added color stability system (0.5-2 seconds, significantly shortened)
+   - Implemented 4 different color harmony types
+   - Prevented immediate color reversion
+   - Reduced color duration from 250-400ms to 80-160ms for more extreme effects
+   - Added 5 new base colors for more variety
+   - Improved background-sword color relationship
 
-3. **Hintergrund-Aktualisierungen**:
-   - Aktualisierungschance von 40% auf 50% erhöht
-   - Aktualisierungsintervall von 3 auf 2 Sekunden reduziert
+3. **Background Updates**:
+   - Increased update chance from 40% to 50%
+   - Reduced update interval from 3 to 2 seconds
 
-4. **Kachel-Farbeffekte**:
-   - Separater Timer für Kachel-Umfärbungen hinzugefügt
-   - Aktualisierungsintervall auf 80-140ms reduziert für extreme Häufigkeit
-   - Clustergröße auf 2-6 zusammenhängende Kacheln erhöht
-   - Anzahl der Cluster deutlich erhöht (3-7 Basis + glitchLevel-abhängige Zusätze) 
+4. **Tile Color Effects**:
+   - Added separate timer for tile colorization
+   - Reduced update interval to 80-140ms for extreme frequency
+   - Increased cluster size to 2-6 connected tiles
+   - Significantly increased number of clusters (3-7 base + glitchLevel-dependent additions) 
