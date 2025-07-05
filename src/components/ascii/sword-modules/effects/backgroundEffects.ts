@@ -548,9 +548,10 @@ function simplex2(x: number, y: number): number {
   };
   
   // Wähle Gradienten für jede Ecke
-  const gi0 = Math.floor(hash(i, j) * 8);
-  const gi1 = Math.floor(hash(i + i1, j + j1) * 8);
-  const gi2 = Math.floor(hash(i + 1, j + 1) * 8);
+  // Stelle sicher, dass die Indizes innerhalb des gültigen Bereichs liegen (0-7)
+  const gi0 = Math.floor(hash(i, j) * 8) % 8;
+  const gi1 = Math.floor(hash(i + i1, j + j1) * 8) % 8;
+  const gi2 = Math.floor(hash(i + 1, j + 1) * 8) % 8;
   
   // Berechne Beiträge von den drei Ecken
   let n0 = 0, n1 = 0, n2 = 0;
@@ -596,21 +597,21 @@ export function generateBeatReactiveBackground(width: number, height: number, be
   
   // Beat-Energie für visuelle Effekte nutzen
   // Höhere Energie = intensivere Muster
-  const energyFactor = Math.max(0.3, beatEnergy * 2.0); // STARK verstärkter Energiefaktor (2.0x)
+  const energyFactor = Math.max(0.3, beatEnergy * 2.5); // NOCH STÄRKER verstärkter Energiefaktor (2.5x)
   
   // Musterparameter basierend auf Beat-Energie
-  const patternFrequency = 0.05 + (beatEnergy * 0.15); // Höhere Frequenz bei stärkeren Beats
-  const waveAmplitude = 2 + (beatEnergy * 6); // Größere Wellen bei stärkeren Beats
-  const noiseScale = 0.1 + (beatEnergy * 0.2); // Mehr Rauschen bei stärkeren Beats
+  const patternFrequency = 0.05 + (beatEnergy * 0.2); // Höhere Frequenz bei stärkeren Beats
+  const waveAmplitude = 2 + (beatEnergy * 8); // Größere Wellen bei stärkeren Beats
+  const noiseScale = 0.1 + (beatEnergy * 0.3); // Mehr Rauschen bei stärkeren Beats
   
   // Schwellenwert für Explosionen - niedriger = mehr Explosionen
-  const explosionThreshold = 0.15; // Stark reduzierter Schwellenwert (vorher 0.2)
+  const explosionThreshold = 0.1; // Noch niedriger für mehr Explosionen
   
   // Größe der Explosionen basierend auf Beat-Energie
-  const explosionSize = Math.floor(3 + (beatEnergy * 8)); // Größere Explosionen bei stärkeren Beats
+  const explosionSize = Math.floor(3 + (beatEnergy * 10)); // Größere Explosionen bei stärkeren Beats
   
   // Anzahl der Explosionen basierend auf Beat-Energie
-  const numExplosions = Math.floor(1 + (beatEnergy * 10)); // Mehr Explosionen bei stärkeren Beats
+  const numExplosions = Math.floor(2 + (beatEnergy * 15)); // Mehr Explosionen bei stärkeren Beats
   
   // Generiere Explosionszentren
   const explosionCenters = [];
@@ -653,21 +654,30 @@ export function generateBeatReactiveBackground(width: number, height: number, be
           // Punkt liegt innerhalb einer Explosion
           // Je näher am Zentrum, desto stärker der Effekt
           const intensity = 1 - (distance / explosion.size);
-          value += intensity * 10 * energyFactor; // Verstärkter Explosionseffekt
+          value += intensity * 12 * energyFactor; // Noch stärkerer Explosionseffekt
         }
       }
       
       // Zeichen basierend auf dem Wert auswählen
       let char = ' ';
       
+      // Dynamischere Zeichenauswahl basierend auf Beat-Energie
       if (value > 4 * energyFactor) {
-        char = '#';
+        // Intensive Zeichen für hohe Werte
+        const intensiveChars = ['#', '@', '%', '&', '*'];
+        char = intensiveChars[Math.floor(Math.random() * intensiveChars.length)];
       } else if (value > 3 * energyFactor) {
-        char = '+';
+        // Mittlere Intensität
+        const mediumChars = ['+', 'x', 'X', '='];
+        char = mediumChars[Math.floor(Math.random() * mediumChars.length)];
       } else if (value > 2 * energyFactor) {
-        char = '=';
+        // Niedrigere Intensität
+        const lowChars = ['=', '-', '~', ':'];
+        char = lowChars[Math.floor(Math.random() * lowChars.length)];
       } else if (value > 1 * energyFactor) {
-        char = '-';
+        // Sehr niedrige Intensität
+        const veryLowChars = ['-', '.', ':', '·'];
+        char = veryLowChars[Math.floor(Math.random() * veryLowChars.length)];
       } else if (value > 0.5 * energyFactor) {
         char = '.';
       } else if (value > 0.2 * energyFactor) {
@@ -675,15 +685,33 @@ export function generateBeatReactiveBackground(width: number, height: number, be
       }
       
       // Zufällige Explosionseffekte basierend auf Beat-Energie
-      if (Math.random() < beatEnergy * 0.05) {
-        const explosionChars = ['*', '+', 'x', 'X', '&', '%', '@'];
+      // Erhöhte Wahrscheinlichkeit für Explosionseffekte
+      if (Math.random() < beatEnergy * 0.1) {
+        const explosionChars = ['*', '+', 'x', 'X', '&', '%', '@', '!', '?', '$', '#'];
         char = explosionChars[Math.floor(Math.random() * explosionChars.length)];
       }
       
-      // Zusätzliche Beat-reaktive Elemente
-      if (beatEnergy > explosionThreshold && Math.random() < beatEnergy * 0.2) {
-        const specialChars = ['█', '▓', '▒', '░', '■', '□', '▪', '▫'];
+      // Zusätzliche Beat-reaktive Elemente mit niedrigerem Schwellenwert
+      if (beatEnergy > explosionThreshold && Math.random() < beatEnergy * 0.3) {
+        const specialChars = ['█', '▓', '▒', '░', '■', '□', '▪', '▫', '◊', '○', '●', '◌', '◍'];
         char = specialChars[Math.floor(Math.random() * specialChars.length)];
+      }
+      
+      // Füge manchmal "Schockwellen" hinzu, wenn Beat-Energie hoch ist
+      if (beatEnergy > 0.5 && Math.random() < 0.05) {
+        // Berechne Entfernung vom Zentrum
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const distanceFromCenter = Math.sqrt(dx * dx + dy * dy);
+        
+        // Erstelle ringförmige Schockwellen
+        const ringRadius = (timestamp % 2000) / 2000 * Math.min(width, height) / 2;
+        if (Math.abs(distanceFromCenter - ringRadius) < 2) {
+          const ringChars = ['O', '0', '○', '●', '◌', '◍', '◎', '◉'];
+          char = ringChars[Math.floor(Math.random() * ringChars.length)];
+        }
       }
       
       row.push(char);

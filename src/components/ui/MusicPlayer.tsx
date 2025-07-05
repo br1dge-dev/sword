@@ -33,36 +33,92 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioSetupCompleteRef = useRef<boolean>(false);
   
   // Beat-Erkennung
   const { setBeatDetected, setBeatEnergy } = usePowerUpStore();
   const lastVolumeRef = useRef<number>(0);
-  const beatThresholdRef = useRef<number>(0.05); // Noch niedrigerer Schwellenwert für Beat-Erkennung
+  const beatThresholdRef = useRef<number>(0.025); // Niedriger Schwellenwert für Beat-Erkennung
   const beatCooldownRef = useRef<boolean>(false);
   const lastBeatTimeRef = useRef<number>(0);
+  const beatDetectionRunningRef = useRef<boolean>(false);
   
   // Initialisiere Web Audio API
   useEffect(() => {
     if (!audioContextRef.current) {
-      // AudioContext sofort erstellen (nicht auf Benutzerinteraktion warten)
       try {
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
         audioContextRef.current = new AudioContext();
         
         console.log("%c[AUDIO_DEBUG] AudioContext erstellt: ", "color: #44AAFF; font-weight: bold;", audioContextRef.current);
-        
-        // Auf Play-Button-Klick warten, um Audio-Analyse zu starten
-        // (AudioContext ist jetzt schon erstellt)
       } catch (err) {
         console.error("Fehler bei der Initialisierung der Web Audio API:", err);
       }
     }
+    
+    // Cleanup beim Unmount
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(err => {
+          console.error("Fehler beim Schließen des AudioContext:", err);
+        });
+      }
+    };
   }, []);
+  
+  // Setup der Audio-Analyse
+  const setupAudioAnalysis = () => {
+    if (audioSetupCompleteRef.current) {
+      console.log("%c[AUDIO_DEBUG] Audio-Setup bereits abgeschlossen", "color: #44AAFF; font-weight: bold;");
+      return true;
+    }
+    
+    if (!audioRef.current || !audioContextRef.current) {
+      console.error("%c[AUDIO_ERROR] Audio-Element oder AudioContext nicht verfügbar", "color: red; font-weight: bold;");
+      return false;
+    }
+    
+    try {
+      console.log("%c[AUDIO_DEBUG] Initialisiere Web Audio API...", "color: #44AAFF; font-weight: bold;");
+      
+      // Erstelle MediaElementSource
+      sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
+      
+      // Erstelle Analyser mit optimierten Einstellungen für Beat-Erkennung
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      
+      // Analysator konfigurieren - kleinere FFT-Größe für schnellere Reaktion
+      analyserRef.current.fftSize = 256; // Kleinere FFT-Größe für schnellere Reaktion
+      analyserRef.current.smoothingTimeConstant = 0.6; // Weniger Glättung für schnellere Reaktion
+      
+      console.log("%c[AUDIO_DEBUG] Analyser konfiguriert: fftSize=" + analyserRef.current.fftSize + 
+                 ", frequencyBinCount=" + analyserRef.current.frequencyBinCount + 
+                 ", smoothingTimeConstant=" + analyserRef.current.smoothingTimeConstant, 
+                 "color: #44AAFF; font-weight: bold;");
+      
+      // Verbindungen herstellen
+      sourceNodeRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+      
+      console.log("%c[AUDIO] Web Audio API initialisiert beim Play", "color: #44AAFF; font-weight: bold;");
+      
+      audioSetupCompleteRef.current = true;
+      return true;
+    } catch (err) {
+      console.error("%c[AUDIO_ERROR] Fehler bei der Initialisierung der Web Audio API:", "color: red; font-weight: bold;", err);
+      return false;
+    }
+  };
   
   // Beat-Erkennung
   const startBeatDetection = () => {
-    if (!analyserRef.current || !audioContextRef.current) {
-      console.error("%c[AUDIO_ERROR] Analyser oder AudioContext nicht verfügbar!", "color: red; font-weight: bold;");
+    if (beatDetectionRunningRef.current) {
+      console.log("%c[AUDIO_DEBUG] Beat-Erkennung läuft bereits", "color: #44AAFF; font-weight: bold;");
+      return;
+    }
+    
+    if (!analyserRef.current) {
+      console.error("%c[AUDIO_ERROR] Analyser nicht verfügbar!", "color: red; font-weight: bold;");
       return;
     }
     
@@ -74,9 +130,13 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
     let energyIndex = 0;
     let frameCount = 0;
     
+    console.log("%c[AUDIO_DEBUG] Beat detection gestartet mit bufferLength: " + bufferLength, "color: #44AAFF; font-weight: bold;");
+    beatDetectionRunningRef.current = true;
+    
     const detectBeat = () => {
-      if (!analyserRef.current || !isPlaying) {
-        requestAnimationFrame(detectBeat);
+      if (!analyserRef.current) {
+        console.log("%c[AUDIO_DEBUG] Analyser nicht mehr verfügbar", "color: #44AAFF; font-weight: bold;");
+        beatDetectionRunningRef.current = false;
         return;
       }
       
@@ -111,13 +171,13 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
                    'color: #44AAFF; font-weight: bold;');
       }
       
-      // DRASTISCH verbesserte Beat-Erkennung mit noch niedrigerem Schwellenwert und angepassten Bedingungen
+      // Beat-Erkennung mit niedrigen Schwellenwerten
       if (!beatCooldownRef.current && 
-          ((volumeDelta > beatThresholdRef.current && bassVolume > 0.05) || // Plötzlicher Anstieg, noch niedrigerer Schwellenwert
-           (energyVariation > 1.05 && bassVolume > 0.08) ||  // Niedrigerer Schwellenwert für Variation
-           (bassVolume > 0.2 && volumeDelta > 0.03) ||      // Zusätzliche Bedingung für hohe Lautstärke
+          ((volumeDelta > beatThresholdRef.current && bassVolume > 0.03) || 
+           (energyVariation > 1.02 && bassVolume > 0.04) || 
+           (bassVolume > 0.1 && volumeDelta > 0.015) || 
            // Notfall-Bedingung: Erzeuge künstliche Beats, wenn längere Zeit kein Beat erkannt wurde
-           (Date.now() - lastBeatTimeRef.current > 1000 && bassVolume > 0.15))) {   
+           (Date.now() - lastBeatTimeRef.current > 800 && bassVolume > 0.08))) {   
         
         // Beat erkannt
         setBeatDetected(true);
@@ -153,14 +213,16 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
         setTimeout(() => {
           beatCooldownRef.current = false;
           console.log(`%c[BEAT_COOLDOWN] Beat-Cooldown beendet, bereit für nächsten Beat`, 'color: #FF3EC8; font-weight: bold;');
-        }, 150); // 150ms Cooldown zwischen Beats (noch weiter reduziert für schnellere Reaktion)
+        }, 120); // Kürzerer Cooldown
       }
       
       // Aktuelles Volumen für nächsten Vergleich speichern
       lastVolumeRef.current = bassVolume;
       
-      // Nächsten Frame anfordern
-      requestAnimationFrame(detectBeat);
+      // Nächsten Frame anfordern, solange die Komponente gemountet ist
+      if (beatDetectionRunningRef.current) {
+        requestAnimationFrame(detectBeat);
+      }
     };
     
     // Beat-Erkennung starten
@@ -198,6 +260,22 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
     };
   }, []);
   
+  // Cleanup beim Unmount
+  useEffect(() => {
+    return () => {
+      beatDetectionRunningRef.current = false;
+      
+      // Verbindungen trennen
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.disconnect();
+      }
+      
+      if (analyserRef.current) {
+        analyserRef.current.disconnect();
+      }
+    };
+  }, []);
+  
   // Play/Pause-Funktion
   const togglePlay = () => {
     const audio = audioRef.current;
@@ -212,28 +290,8 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
         audioContextRef.current.resume();
       }
       
-      // Wenn noch nicht initialisiert, Audio-Analyse einrichten
-      if (audioRef.current && audioContextRef.current && !sourceNodeRef.current) {
-        try {
-          sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
-          analyserRef.current = audioContextRef.current.createAnalyser();
-          
-          // Analysator konfigurieren
-          analyserRef.current.fftSize = 256;
-          analyserRef.current.smoothingTimeConstant = 0.8;
-          
-          // Verbindungen herstellen
-          sourceNodeRef.current.connect(analyserRef.current);
-          analyserRef.current.connect(audioContextRef.current.destination);
-          
-          console.log("%c[AUDIO] Web Audio API initialisiert beim Play", "color: #44AAFF; font-weight: bold;");
-          
-          // Beat-Erkennung starten
-          startBeatDetection();
-        } catch (err) {
-          console.error("Fehler bei der Initialisierung der Web Audio API:", err);
-        }
-      }
+      // Audio-Analyse einrichten, falls noch nicht geschehen
+      const setupComplete = setupAudioAnalysis();
       
       // Versuche zu spielen und fange Fehler ab
       const playPromise = audio.play();
@@ -243,9 +301,15 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
             setError(null);
             setIsPlaying(true);
             console.log("%c[AUDIO] Wiedergabe gestartet", "color: #44AAFF; font-weight: bold;");
+            
+            // Wenn die Wiedergabe erfolgreich gestartet wurde und das Setup abgeschlossen ist,
+            // starte die Beat-Erkennung
+            if (setupComplete && analyserRef.current) {
+              startBeatDetection();
+            }
           })
           .catch(err => {
-            console.error("Fehler beim Abspielen:", err);
+            console.error("%c[AUDIO_ERROR] Fehler beim Abspielen:", "color: red; font-weight: bold;", err);
             setError("Wiedergabe nicht möglich");
             setIsPlaying(false);
           });
