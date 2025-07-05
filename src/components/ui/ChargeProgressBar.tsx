@@ -104,7 +104,7 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
                textShadow: '0 0 1px #F8E16C',
                letterSpacing: '0.05em'
              }}>
-          CHARGE
+          CHARGE - LVL {chargeLevel}
         </div>
         
         <div className="flex items-center gap-2">
@@ -192,11 +192,6 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
               )}
             </div>
           </button>
-        </div>
-        
-        {/* Level-Anzeige */}
-        <div className="mt-1 text-[10px] text-left opacity-80 font-mono text-[#F8E16C]">
-          LVL {chargeLevel}/{maxChargeLevel}
         </div>
       </div>
     </div>

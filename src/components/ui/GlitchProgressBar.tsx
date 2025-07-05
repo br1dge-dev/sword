@@ -109,7 +109,7 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
                textShadow: '0 0 1px #FF3EC8',
                letterSpacing: '0.05em'
              }}>
-          GLITCH
+          GLITCH - LVL {glitchLevel}
         </div>
         
         <div className="flex items-center gap-2">
@@ -198,11 +198,6 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
               )}
             </div>
           </button>
-        </div>
-        
-        {/* Level-Anzeige */}
-        <div className="mt-1 text-[10px] text-left opacity-80 font-mono text-[#FF3EC8]">
-          LVL {glitchLevel}/{maxGlitchLevel}
         </div>
       </div>
     </div>

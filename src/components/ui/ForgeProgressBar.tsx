@@ -104,7 +104,7 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
                textShadow: '0 0 1px #00FCA6',
                letterSpacing: '0.05em'
              }}>
-          FORGE
+          FORGE - LVL {currentLevel}
         </div>
         
         <div className="flex items-center gap-2">
@@ -190,11 +190,6 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
               )}
             </div>
           </button>
-        </div>
-        
-        {/* Level-Anzeige */}
-        <div className="mt-1 text-[10px] text-left opacity-80 font-mono text-[#00FCA6]">
-          LVL {currentLevel}/{maxLevel}
         </div>
       </div>
     </div>
