@@ -91,7 +91,7 @@ const edgeGlitchChars = {
 // Vibrations-Intensität für verschiedene Level
 const vibrationIntensity = {
   1: 0.2,  // Leichte Vibration
-  2: 0.5,  // Mittlere Vibration
+  2: 0.6,  // Mittlere Vibration (erhöht von 0.5)
   3: 0.8   // Starke Vibration
 };
 
@@ -121,10 +121,10 @@ const colorEffectFrequency = {
 
 // Farbeffekt-Intensität (Anzahl der farbigen Tiles)
 const colorEffectIntensity = {
-  0: 1,     // Minimale Farbeffekte
-  1: 3,     // 3 Cluster
-  2: 5,     // 5 Cluster
-  3: 8      // 8 Cluster
+  0: 2,     // Minimale Farbeffekte (erhöht von 1)
+  1: 4,     // 4 Cluster (erhöht von 3)
+  2: 7,     // 7 Cluster (erhöht von 5)
+  3: 10     // 10 Cluster (erhöht von 8)
 };
 
 // Höhlen/Fels Hintergrund-Muster
@@ -157,7 +157,12 @@ const baseColors = [
   '#00FF66', // Radioaktives Grün
   '#FF00A0', // Hot Pink
   '#7DF9FF', // Elektrisches Cyan
-  '#CCFF00'  // Giftig Grün-Gelb
+  '#CCFF00', // Giftig Grün-Gelb
+  '#FF5F1F', // Neon-Orange
+  '#19FFBF', // Türkis
+  '#B3FF00', // Lime
+  '#FF00FF', // Magenta
+  '#00FFCC'  // Mint
 ];
 
 // Noch ungewöhnlichere Akzentfarben
@@ -506,6 +511,134 @@ function getRandomOffset(intensity: number): {x: number, y: number} {
   };
 }
 
+/**
+ * Erzeugt eine harmonische Farbkombination für Schwert und Hintergrund
+ * @returns {Object} Ein Objekt mit Schwert- und Hintergrundfarbe
+ */
+function generateHarmonicColorPair(): { swordColor: string, bgColor: string } {
+  // Wähle eine zufällige Basisfarbe für das Schwert
+  const swordColor = baseColors[Math.floor(Math.random() * baseColors.length)];
+  
+  // Erzeuge eine harmonische Hintergrundfarbe
+  let bgColor;
+  
+  // Zufällige Auswahl des Farbharmonie-Typs
+  const harmonyType = Math.floor(Math.random() * 4);
+  
+  switch (harmonyType) {
+    case 0: // Komplementär mit Variation
+      {
+        const compColor = getComplementaryColor(swordColor);
+        // Leichte Variation hinzufügen
+        const variation = Math.floor(Math.random() * 30) - 15; // -15 bis +15
+        const r = parseInt(compColor.slice(1, 3), 16);
+        const g = parseInt(compColor.slice(3, 5), 16);
+        const b = parseInt(compColor.slice(5, 7), 16);
+        
+        // Variation mit Begrenzung anwenden
+        const newR = Math.min(255, Math.max(0, r + variation));
+        const newG = Math.min(255, Math.max(0, g + variation));
+        const newB = Math.min(255, Math.max(0, b + variation));
+        
+        // Zurück zu Hex
+        bgColor = `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+      }
+      break;
+      
+    case 1: // Dunklere Version der Komplementärfarbe
+      {
+        const compColor = getComplementaryColor(swordColor);
+        bgColor = getDarkerColor(compColor, 0.2 + Math.random() * 0.3); // 20-50% dunkler
+      }
+      break;
+      
+    case 2: // Analogfarbe (leicht verschoben auf dem Farbrad)
+      {
+        // Hex zu RGB konvertieren
+        const r = parseInt(swordColor.slice(1, 3), 16);
+        const g = parseInt(swordColor.slice(3, 5), 16);
+        const b = parseInt(swordColor.slice(5, 7), 16);
+        
+        // RGB zu HSL konvertieren (vereinfachte Formel)
+        const max = Math.max(r, g, b) / 255;
+        const min = Math.min(r, g, b) / 255;
+        const l = (max + min) / 2;
+        
+        let h;
+        if (max === min) {
+          h = 0;
+        } else if (max === r / 255) {
+          h = 60 * (0 + (g / 255 - b / 255) / (max - min));
+        } else if (max === g / 255) {
+          h = 60 * (2 + (b / 255 - r / 255) / (max - min));
+        } else {
+          h = 60 * (4 + (r / 255 - g / 255) / (max - min));
+        }
+        
+        if (h < 0) h += 360;
+        
+        // Verschiebe den Farbton um 30-60 Grad
+        const shift = 30 + Math.floor(Math.random() * 30);
+        let newH = h + (Math.random() > 0.5 ? shift : -shift);
+        if (newH < 0) newH += 360;
+        if (newH >= 360) newH -= 360;
+        
+        // Vereinfachte HSL zu RGB Konvertierung
+        const hue2rgb = (p: number, q: number, t: number) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        
+        const s = max === 0 ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        
+        const newR = Math.round(hue2rgb(p, q, (newH / 360 + 1/3) % 1) * 255);
+        const newG = Math.round(hue2rgb(p, q, (newH / 360) % 1) * 255);
+        const newB = Math.round(hue2rgb(p, q, (newH / 360 - 1/3) % 1) * 255);
+        
+        bgColor = `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+      }
+      break;
+      
+    case 3: // Zufällige Akzentfarbe, die gut zum Schwert passt
+    default:
+      {
+        // Filtere Akzentfarben, die gut zur Schwertfarbe passen
+        const swordColorHex = swordColor.slice(1); // Entferne #
+        const swordR = parseInt(swordColorHex.slice(0, 2), 16);
+        const swordG = parseInt(swordColorHex.slice(2, 4), 16);
+        const swordB = parseInt(swordColorHex.slice(4, 6), 16);
+        
+        // Wähle Farben, die einen gewissen Kontrast haben
+        const compatibleColors = accentColors.filter(color => {
+          const colorHex = color.slice(1); // Entferne #
+          const r = parseInt(colorHex.slice(0, 2), 16);
+          const g = parseInt(colorHex.slice(2, 4), 16);
+          const b = parseInt(colorHex.slice(4, 6), 16);
+          
+          // Berechne Farbdifferenz (vereinfacht)
+          const diff = Math.abs(r - swordR) + Math.abs(g - swordG) + Math.abs(b - swordB);
+          return diff > 150; // Mindestens eine gewisse Differenz
+        });
+        
+        if (compatibleColors.length > 0) {
+          bgColor = compatibleColors[Math.floor(Math.random() * compatibleColors.length)];
+        } else {
+          // Fallback auf Komplementärfarbe
+          bgColor = getComplementaryColor(swordColor);
+        }
+      }
+      break;
+  }
+  
+  return { swordColor, bgColor };
+}
+
 export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
   const { currentLevel, chargeLevel, glitchLevel } = usePowerUpStore();
@@ -514,6 +647,8 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
   const [glowIntensity, setGlowIntensity] = useState(0);
   const [baseColor, setBaseColor] = useState(baseColors[0]);
   const [bgColor, setBgColor] = useState<string>(getComplementaryColor(baseColors[0]));
+  const [lastColorChangeTime, setLastColorChangeTime] = useState<number>(Date.now());
+  const [colorStability, setColorStability] = useState<number>(2000); // Minimale Zeit für Farbstabilität
   const [coloredTiles, setColoredTiles] = useState<Array<{x: number, y: number, color: string}>>([]);
   const [glitchChars, setGlitchChars] = useState<Array<{x: number, y: number, char: string}>>([]);
   const [caveBackground, setCaveBackground] = useState<string[][]>([]);
@@ -532,7 +667,8 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
     unicodeGlitch: null,
     colorChange: null,
     background: null,
-    veins: null
+    veins: null,
+    tileColors: null // Neuer Timer speziell für Tile-Umfärbungen
   });
   
   // Aktives Level (aus PowerUp-Store oder Props)
@@ -546,7 +682,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
   const clearAllIntervals = () => {
     Object.keys(intervalsRef.current).forEach(key => {
       if (intervalsRef.current[key]) {
-        clearInterval(intervalsRef.current[key]!);
+        clearInterval(intervalsRef.current[key] as NodeJS.Timeout);
         intervalsRef.current[key] = null;
       }
     });
@@ -592,17 +728,20 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
     const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
     setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
     
-    // Hintergrund ab und zu neu generieren
+    // Background regeneration - NOCH HÄUFIGERE UPDATES
     intervalsRef.current.background = setInterval(() => {
-      if (Math.random() > 0.9) { // 10% Chance
+      if (Math.random() > 0.5) { // 50% chance instead of 40%
         setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+        
+        // Debug log for background update
+        console.log(`%c[BACKGROUND] Background updated`, 'color: #00AA55; font-weight: bold;');
       }
-    }, 5000);
+    }, 2000); // 2 seconds (reduziert von 3)
     
-    // Äderchen-Glitch-Effekt
+    // Äderchen-Glitch-Effekt - HÄUFIGER
     intervalsRef.current.veins = setInterval(() => {
       // Häufigkeit der Glitches basierend auf glitchLevel
-      const glitchChance = 0.8 - (glitchLevel * 0.1); // 0.8, 0.7, 0.6, 0.5
+      const glitchChance = 0.7 - (glitchLevel * 0.1); // 0.7, 0.6, 0.5, 0.4 (erhöht)
       
       if (Math.random() > glitchChance) { // Chance für Glitch steigt mit glitchLevel
         // Generiere neue Äderchen für Glitch-Effekt
@@ -613,7 +752,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
           setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
         }, 100);
       }
-    }, 2000 - (glitchLevel * 300));
+    }, 1500 - (glitchLevel * 300)); // Schneller (reduziert von 2000)
     
     // Aufräumen beim Unmounten
     return () => {
@@ -633,24 +772,42 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       setGlowIntensity(randomIntensity);
     }, Math.floor(Math.random() * 100) + 100);
     
-    // Farbwechsel-Effekt
+    // Color change effect - MAXIMALE WAHRSCHEINLICHKEIT
     intervalsRef.current.colorChange = setInterval(() => {
-      // Gelegentlich Basis-Farbe ändern (basierend auf glitchLevel)
-      const colorChangeChance = 0.95 - (glitchLevel * 0.05); // 0.95, 0.9, 0.85, 0.8
-      if (Math.random() > colorChangeChance) {
-        const randomColorIndex = Math.floor(Math.random() * baseColors.length);
-        const newBaseColor = baseColors[randomColorIndex];
-        setBaseColor(newBaseColor);
-        
-        // Aktualisiere die Hintergrundfarbe als Komplementärfarbe
-        setBgColor(getComplementaryColor(newBaseColor));
-      }
+      const now = Date.now();
+      const timeSinceLastChange = now - lastColorChangeTime;
       
-      // Zufällige Tiles mit Akzentfarben einfärben
+      // Nur Farbwechsel erlauben, wenn die minimale Stabilitätszeit überschritten ist
+      if (timeSinceLastChange >= colorStability) {
+        // Extrem hohe Wahrscheinlichkeit für Farbwechsel
+        const colorChangeChance = 0.15 - (glitchLevel * 0.03); // 0.15, 0.12, 0.09, 0.06 - extrem hohe Chance
+        if (Math.random() > colorChangeChance) {
+          // Erzeuge eine harmonische Farbkombination
+          const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
+          
+          // Setze die neuen Farben
+          setBaseColor(swordColor);
+          setBgColor(newBgColor);
+          
+          // Aktualisiere den Zeitstempel für den letzten Farbwechsel
+          setLastColorChangeTime(now);
+          
+          // Setze eine neue zufällige Stabilitätszeit (0.5-2 Sekunden) - stark verkürzt
+          setColorStability(Math.floor(Math.random() * 1500) + 500);
+          
+          // Console log for debugging
+          console.log(`%c[COLOR_CHANGE] New color: ${swordColor}, BG: ${newBgColor}, Stability: ${colorStability}ms`, 'color: #00FCA6; font-weight: bold;');
+        }
+      }
+    }, Math.floor(Math.random() * 80) + 80); // 80-160ms für extrem häufige Updates
+    
+    // SEPARATER TIMER FÜR TILE-UMFÄRBUNGEN
+    intervalsRef.current.tileColors = setInterval(() => {
+      // Zufällige Tiles mit Akzentfarben einfärben - STARK VERBESSERT
       const newColoredTiles: Array<{x: number, y: number, color: string}> = [];
       
-      // Anzahl der Cluster basierend auf glitchLevel
-      const numClusters = Math.floor(Math.random() * 2) + (colorEffectIntensity[glitchLevel as keyof typeof colorEffectIntensity] || 1);
+      // Anzahl der Cluster basierend auf glitchLevel - DEUTLICH ERHÖHT
+      const numClusters = Math.floor(Math.random() * 4) + 3 + (colorEffectIntensity[glitchLevel as keyof typeof colorEffectIntensity] || 2);
       
       for (let i = 0; i < numClusters; i++) {
         // Wähle eine zufällige Position und Clustergröße
@@ -659,8 +816,8 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
         const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
         const basePos = swordPositions[randomPosIndex];
         
-        // Clustergröße: 1-5 zusammenhängende Tiles, größer bei höherem glitchLevel
-        const clusterSize = Math.floor(Math.random() * (3 + glitchLevel)) + 1;
+        // Clustergröße: 2-6 zusammenhängende Tiles, größer bei höherem glitchLevel
+        const clusterSize = Math.floor(Math.random() * 5) + 2; // Mindestens 2, maximal 6 Tiles
         
         // Generiere Cluster
         const cluster = generateCluster(
@@ -690,7 +847,12 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       }
       
       setColoredTiles(newColoredTiles);
-    }, Math.floor(Math.random() * 100) + 150);
+      
+      // Debug-Log für Tile-Umfärbungen
+      if (newColoredTiles.length > 0) {
+        console.log(`%c[TILES] Colored tiles: ${newColoredTiles.length} in ${numClusters} clusters`, 'color: #FF3EC8; font-weight: bold;');
+      }
+    }, Math.floor(Math.random() * 60) + 80); // 80-140ms für extrem häufige Updates
     
     // DOS-Style Glitch-Effekte
     intervalsRef.current.glitch = setInterval(() => {
@@ -726,6 +888,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
     return () => {
       if (intervalsRef.current.glow) clearInterval(intervalsRef.current.glow);
       if (intervalsRef.current.colorChange) clearInterval(intervalsRef.current.colorChange);
+      if (intervalsRef.current.tileColors) clearInterval(intervalsRef.current.tileColors);
       if (intervalsRef.current.glitch) clearInterval(intervalsRef.current.glitch);
     };
   }, [centeredSwordLines, glitchLevel]);
@@ -755,18 +918,35 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
         };
         
         // 1. Vibration basierend auf chargeLevel
-        if (Math.random() < currentVibration) {
-          effect.offset = getRandomOffset(currentVibration);
+        // Bei Level 2 und 3 immer eine Vibration anwenden, nur Stärke variieren
+        if (chargeLevel >= 2 || Math.random() < currentVibration) {
+          const intensityFactor = chargeLevel === 2 ? (Math.random() * 0.4 + 0.6) : 1.0; // 60-100% bei Level 2
+          effect.offset = getRandomOffset(currentVibration * intensityFactor);
         }
         
         // 2. Glitch-Effekt basierend auf chargeLevel
-        if (Math.random() < currentGlitchFreq) {
+        // Bei Level 2 höhere Wahrscheinlichkeit für Glitch-Effekte
+        if ((chargeLevel === 2 && Math.random() < currentGlitchFreq * 1.5) || 
+            (chargeLevel !== 2 && Math.random() < currentGlitchFreq)) {
           effect.char = currentGlitchChars[Math.floor(Math.random() * currentGlitchChars.length)];
         }
         
         // 3. Farbeffekt basierend auf chargeLevel
         if (Math.random() < currentColorFreq) {
           effect.color = accentColors[Math.floor(Math.random() * accentColors.length)];
+        }
+        
+        // Bei Level 2 immer mindestens einen Effekt anwenden
+        if (chargeLevel === 2 && !effect.offset && !effect.char && !effect.color) {
+          // Wähle zufällig einen Effekt
+          const randomEffect = Math.floor(Math.random() * 3);
+          if (randomEffect === 0) {
+            effect.offset = getRandomOffset(currentVibration * 0.7);
+          } else if (randomEffect === 1) {
+            effect.char = currentGlitchChars[Math.floor(Math.random() * currentGlitchChars.length)];
+          } else {
+            effect.color = accentColors[Math.floor(Math.random() * accentColors.length)];
+          }
         }
         
         // Nur hinzufügen, wenn mindestens ein Effekt angewendet wurde
@@ -778,7 +958,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       setEdgeEffects(newEdgeEffects);
       
       // Bei höheren Charge-Leveln schnellere Aktualisierung
-      const updateSpeed = chargeLevel === 3 ? 50 : (chargeLevel === 2 ? 80 : 120);
+      const updateSpeed = chargeLevel === 3 ? 50 : (chargeLevel === 2 ? 70 : 120); // Level 2: 80ms -> 70ms
       
       // Nach kurzer Zeit zurücksetzen für Flacker-Effekt
       if (chargeLevel > 1) {
@@ -799,13 +979,51 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
               return effect;
             });
             setEdgeEffects(flickerEffects);
+          } else if (chargeLevel === 2) {
+            // Bei Charge-Level 2 einfaches Flackern statt komplettem Reset
+            // Behalte 30-70% der Effekte bei und ändere sie leicht
+            const reducedEffects = newEdgeEffects.filter(() => Math.random() > 0.3).map(effect => {
+              // 40% Chance, dass sich der Effekt ändert
+              if (Math.random() > 0.6) {
+                return {
+                  ...effect,
+                  char: Math.random() > 0.8 ? currentGlitchChars[Math.floor(Math.random() * currentGlitchChars.length)] : effect.char,
+                  color: Math.random() > 0.8 ? accentColors[Math.floor(Math.random() * accentColors.length)] : effect.color,
+                  offset: Math.random() > 0.7 ? getRandomOffset(currentVibration * 0.7) : effect.offset
+                };
+              }
+              return effect;
+            });
+            
+            // Füge immer einige neue Effekte hinzu, um das Zucken zu verstärken
+            const numNewEffects = Math.floor(Math.random() * 5) + 3; // 3-7 neue Effekte
+            for (let i = 0; i < numNewEffects; i++) {
+              if (edgePositions.length === 0) continue;
+              
+              const randomPosIndex = Math.floor(Math.random() * edgePositions.length);
+              const pos = edgePositions[randomPosIndex];
+              
+              const newEffect: {x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}} = {
+                x: pos.x,
+                y: pos.y
+              };
+              
+              // Zufällige Effekte anwenden
+              if (Math.random() > 0.5) newEffect.offset = getRandomOffset(currentVibration);
+              if (Math.random() > 0.6) newEffect.char = currentGlitchChars[Math.floor(Math.random() * currentGlitchChars.length)];
+              if (Math.random() > 0.7) newEffect.color = accentColors[Math.floor(Math.random() * accentColors.length)];
+              
+              reducedEffects.push(newEffect);
+            }
+            
+            setEdgeEffects(reducedEffects);
           } else {
-            // Bei Charge-Level 1-2 einfacher Reset
+            // Bei Charge-Level 1 einfacher Reset
             setEdgeEffects([]);
           }
         }, updateSpeed / 2);
       }
-    }, chargeLevel === 3 ? 100 : (chargeLevel === 2 ? 150 : 200));
+    }, chargeLevel === 3 ? 100 : (chargeLevel === 2 ? 120 : 200)); // Level 2: 150ms -> 120ms
     
     // Aufräumen beim Unmounten oder wenn sich die Abhängigkeiten ändern
     return () => {
@@ -813,63 +1031,57 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
     };
   }, [centeredSwordLines, chargeLevel]);
   
-  // Unicode-Glitch-Effekte basierend auf glitchLevel
+  // Unicode-Glitch-Effekte (verbessert)
   useEffect(() => {
-    // Wenn glitchLevel 0 ist, keine Glitch-Effekte anwenden
-    if (glitchLevel === 0) {
-      setUnicodeGlitches([]);
-      if (intervalsRef.current.unicodeGlitch) {
-        clearInterval(intervalsRef.current.unicodeGlitch);
-        intervalsRef.current.unicodeGlitch = null;
-      }
-      return;
-    }
-    
-    const swordPositions = getSwordPositions();
-    
-    // Unicode-Glitch-Effekte
-    intervalsRef.current.unicodeGlitch = setInterval(() => {
-      // Aktuelle Glitch-Intensität und -Häufigkeit basierend auf glitchLevel
-      const currentGlitchIntensity = glitchIntensity[glitchLevel as keyof typeof glitchIntensity] || 0;
-      const currentGlitchFreq = glitchFrequency[glitchLevel as keyof typeof glitchFrequency] || 0;
-      
-      if (Math.random() < currentGlitchFreq) {
-        const newGlitches: Array<{x: number, y: number, char: string}> = [];
+    if (glitchLevel > 0) {
+      // Unicode-Glitch-Effekte
+      intervalsRef.current.unicodeGlitch = setInterval(() => {
+        // Wahrscheinlichkeit für Unicode-Glitches basierend auf glitchLevel
+        const glitchChance = 0.7 - (glitchLevel * 0.1); // 0.7, 0.6, 0.5, 0.4
         
-        // Anzahl der Glitches basierend auf Level und Intensität
-        const numGlitches = Math.floor(Math.random() * (glitchLevel * 3)) + glitchLevel * 2;
-        
-        // Verfügbare Glitch-Zeichen für dieses Level
-        const availableGlitchChars = unicodeGlitchChars[glitchLevel as keyof typeof unicodeGlitchChars] || [];
-        
-        for (let i = 0; i < numGlitches; i++) {
-          // Wähle eine zufällige Position aus den Schwert-Positionen
-          if (swordPositions.length === 0) continue;
+        if (Math.random() > glitchChance) { // Chance steigt mit glitchLevel
+          const swordPositions = getSwordPositions();
+          const newUnicodeGlitches: Array<{x: number, y: number, char: string}> = [];
           
-          const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
-          const pos = swordPositions[randomPosIndex];
+          // Anzahl der Glitches basierend auf glitchLevel
+          const numGlitches = Math.floor(Math.random() * glitchLevel * 3) + glitchLevel;
           
-          newGlitches.push({
-            x: pos.x,
-            y: pos.y,
-            char: availableGlitchChars[Math.floor(Math.random() * availableGlitchChars.length)]
-          });
+          for (let i = 0; i < numGlitches; i++) {
+            if (swordPositions.length === 0) continue;
+            
+            const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
+            const pos = swordPositions[randomPosIndex];
+            
+            // Wähle ein Unicode-Glitch-Zeichen basierend auf glitchLevel
+            const glitchChars = unicodeGlitchChars[glitchLevel as keyof typeof unicodeGlitchChars] || unicodeGlitchChars[1];
+            const glitchChar = glitchChars[Math.floor(Math.random() * glitchChars.length)];
+            
+            newUnicodeGlitches.push({
+              x: pos.x,
+              y: pos.y,
+              char: glitchChar
+            });
+          }
+          
+          setUnicodeGlitches(newUnicodeGlitches);
+          
+          // Glitches nach kurzer Zeit zurücksetzen
+          setTimeout(() => {
+            setUnicodeGlitches([]);
+          }, 100 + (glitchLevel * 20)); // Dauer steigt mit glitchLevel
+          
+          // Debug-Log für Unicode-Glitches
+          console.log(`%c[GLITCH] Unicode glitches: ${numGlitches}`, 'color: #FF3EC8; font-weight: bold;');
         }
-        
-        setUnicodeGlitches(newGlitches);
-        
-        // Glitches nach kurzer Zeit zurücksetzen (Dauer abhängig vom Level)
-        setTimeout(() => {
-          setUnicodeGlitches([]);
-        }, 100 - (glitchLevel * 15));
-      }
-    }, 300 - (glitchLevel * 50));
-    
-    // Aufräumen beim Unmounten oder wenn sich die Abhängigkeiten ändern
-    return () => {
-      if (intervalsRef.current.unicodeGlitch) clearInterval(intervalsRef.current.unicodeGlitch);
-    };
-  }, [centeredSwordLines, glitchLevel]);
+      }, 500 - (glitchLevel * 50)); // Frequency increases with glitchLevel: 500, 450, 400, 350ms
+      
+      return () => {
+        if (intervalsRef.current.unicodeGlitch) clearInterval(intervalsRef.current.unicodeGlitch);
+      };
+    } else {
+      setUnicodeGlitches([]);
+    }
+  }, [glitchLevel]);
   
   // Füge einen useEffect hinzu, um Blur-Effekte clientseitig zu generieren
   useEffect(() => {
@@ -995,7 +1207,7 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
       className="relative flex items-center justify-center w-full h-full overflow-hidden"
       style={{ 
         backgroundColor,
-        transition: glitchLevel >= 2 ? 'background-color 0.3s ease' : 'background-color 1s ease',
+        transition: 'background-color 0.05s ease', // Extrem schnelle Übergänge für alle Level
         position: 'absolute',
         top: 0,
         left: 0,
@@ -1095,7 +1307,8 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
           letterSpacing: '0.1em',
           textAlign: 'center',
           width: '100%',
-          lineHeight: '1.2'
+          lineHeight: '1.2',
+          transition: 'color 0.1s ease' // Extrem schneller Farbübergang für das Schwert
         }}
       >
         {centeredSwordLines.map((line, y) => (
