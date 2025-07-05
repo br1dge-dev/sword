@@ -503,4 +503,230 @@ export function generateColoredVeins(
   }
   
   return veins;
+}
+
+/**
+ * Generiert einen Beat-reaktiven Hintergrund mit dynamischen Mustern
+ * @param width Breite des Hintergrunds
+ * @param height Höhe des Hintergrunds
+ * @param beatEnergy Energie des aktuellen Beats (0-1)
+ * @returns 2D-Array mit Hintergrund-Zeichen
+ */
+export function generateBeatReactiveBackground(width: number, height: number, beatEnergy: number = 0): string[][] {
+  // Debug-Log für Funktionsaufruf
+  console.log(`%c[BACKGROUND_EFFECT_DEBUG] generateBeatReactiveBackground aufgerufen mit beatEnergy=${beatEnergy.toFixed(2)}`, 
+             'color: #00AA55; background-color: #222222; font-weight: bold;');
+  
+  const background: string[][] = [];
+  
+  // Zeitstempel für dynamische Muster
+  const timestamp = Date.now();
+  
+  // Beat-Energie für visuelle Effekte nutzen
+  // Höhere Energie = intensivere Muster
+  const energyFactor = Math.max(0.3, beatEnergy * 1.5); // Verstärkter Energiefaktor (1.5x)
+  
+  // Musterparameter basierend auf Beat-Energie
+  const patternType = Math.floor(beatEnergy * 5) % 5; // 0-4 basierend auf Energie
+  
+  // Wellenparameter basierend auf Beat-Energie
+  const waveAmplitude = Math.floor(height / (8 + Math.random() * 4)) * energyFactor * 1.2; // Verstärkte Amplitude
+  const waveFrequency = (0.05 + (Math.random() * 0.05)) * energyFactor * 1.2; // Verstärkte Frequenz
+  const noiseScale = (0.08 + (Math.random() * 0.08)) * energyFactor;
+  const patternScale = (0.2 + (Math.random() * 0.3)) * energyFactor;
+  
+  // Zufällige Rotation/Verschiebung für diese Generation
+  const rotationAngle = Math.random() * Math.PI * 2 * energyFactor; // 0-360 Grad, skaliert mit Energie
+  const offsetX = Math.floor(Math.random() * width * energyFactor);
+  const offsetY = Math.floor(Math.random() * height * energyFactor);
+  
+  // Zeichensätze mit unterschiedlicher Intensität je nach Beat-Energie
+  const charSets = [
+    // Set 1: Dünne Linien und Punkte (niedrige Energie)
+    {
+      light: ['·', ':', '.', '˙', '°', ' '],
+      medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '│', '─', '┬', '┴', '┼'],
+      dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '┃', '━', '╸', '╹', '╺', '╻']
+    },
+    // Set 2: Blockige Texturen (mittlere Energie)
+    {
+      light: ['·', ':', '.', '˙', '°', ' '],
+      medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '┤', '├', '┬', '┴'],
+      dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻']
+    },
+    // Set 3: Geometrische Formen (mittlere-hohe Energie)
+    {
+      light: ['·', ':', '.', '˙', '°', ' '],
+      medium: ['◇', '◆', '◊', '◈', '◦', '◎', '○', '◌'],
+      dense: ['◊', '◈', '◎', '◉', '◍', '◐', '◑', '◒', '◓', '◔', '◕']
+    },
+    // Set 4: Technische Zeichen (hohe Energie)
+    {
+      light: ['⌐', '¬', '⌙', '⌖', '·', ':', '.'],
+      medium: ['⌘', '⌂', '⌤', '⌧', '⌨', '⌫', '⎋', '⌖', '⌗', '⌚', '⌛'],
+      dense: ['⎔', '⎕', '⎖', '⎗', '⎘', '⎙', '⎚', '⎛', '⎜', '⎝', '⎞', '⎟', '⎠', '⎡', '⎢']
+    },
+    // Set 5: Mischung aus komplexen Zeichen (sehr hohe Energie)
+    {
+      light: ['·', ':', '.', '˙', '°', '╱', '╲', '◦', '⌐'],
+      medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '◇', '◆', '⌘', '⎔', '│', '─', '┬', '┴'],
+      dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '◎', '◉', '◍', '⎕', '⎖', '⎗']
+    }
+  ];
+  
+  // Wähle Zeichensatz basierend auf Beat-Energie
+  const selectedCharSet = charSets[patternType];
+  
+  // Generiere Basis-Muster für verschiedene Regionen
+  const generatePattern = (x: number, y: number, type: string): string => {
+    // Transformiere Koordinaten für Rotation und Verschiebung
+    const rotX = Math.cos(rotationAngle) * x - Math.sin(rotationAngle) * y;
+    const rotY = Math.sin(rotationAngle) * x + Math.cos(rotationAngle) * y;
+    const tx = (rotX + offsetX) % width;
+    const ty = (rotY + offsetY) % height;
+    
+    // Verschiedene Mustertypen basierend auf Beat-Energie
+    switch(patternType) {
+      case 0: // Wellenförmiges Muster mit feinen Linien
+        if (Math.sin(tx * patternScale) * Math.cos(ty * patternScale) > 0.3 - (beatEnergy * 0.3)) { // Verstärkte Reaktion
+          return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
+        }
+        break;
+      case 1: // Konzentrische Kreise mit feinen Linien
+        const dist = Math.sqrt(Math.pow((tx - width/2) / width, 2) + Math.pow((ty - height/2) / height, 2));
+        if (Math.abs(Math.sin(dist * 20 * energyFactor * 1.2)) > 0.7 - (beatEnergy * 0.4)) { // Verstärkte Reaktion
+          return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
+        }
+        break;
+      case 2: // Schachbrettmuster mit feinen Variationen
+        if ((Math.floor(tx * patternScale * (1 + beatEnergy * 0.5)) + Math.floor(ty * patternScale * (1 + beatEnergy * 0.5))) % 2 === 0) { // Verstärkte Reaktion
+          return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
+        }
+        break;
+      case 3: // Spiralmuster mit komplexen Zeichen
+        const angle = Math.atan2(ty - height/2, tx - width/2);
+        const dist2 = Math.sqrt(Math.pow(tx - width/2, 2) + Math.pow(ty - height/2, 2));
+        if (Math.abs(Math.sin(angle * 5 * energyFactor * 1.3 + dist2 * 0.2)) > 0.7 - (beatEnergy * 0.4)) { // Verstärkte Reaktion
+          return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
+        }
+        break;
+      case 4: // Fraktales Muster mit feinen Zeichen
+        if (((tx & ty) % 3 === 0) || ((tx * ty) % (7 - Math.floor(beatEnergy * 5)) === 0)) { // Verstärkte Reaktion
+          return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
+        }
+        break;
+    }
+    
+    // Fallback auf Standardzeichen aus caveBgPatterns mit Präferenz für feine Zeichen
+    const patternY = y % caveBgPatterns.length;
+    const patternX = x % caveBgPatterns[patternY].length;
+    const baseChar = caveBgPatterns[patternY][patternX];
+    
+    // Ersetze blockige Zeichen durch feinere Alternativen
+    if (baseChar === '█' || baseChar === '▓') {
+      return selectedCharSet.dense[Math.floor(Math.random() * selectedCharSet.dense.length)];
+    } else if (baseChar === '▒') {
+      return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
+    } else if (baseChar === '░') {
+      return selectedCharSet.light[Math.floor(Math.random() * selectedCharSet.light.length)];
+    }
+    
+    return baseChar;
+  };
+  
+  // Initialisiere den Hintergrund mit rhythmischen Mustern
+  for (let y = 0; y < height; y++) {
+    background[y] = [];
+    
+    // Erzeuge Welleneffekt für die vertikale Position
+    const baseWaveY = Math.sin(y * waveFrequency) * waveAmplitude;
+    
+    for (let x = 0; x < width; x++) {
+      // Erzeuge Welleneffekt für die horizontale Position
+      const waveX = Math.sin((x + y) * waveFrequency * 0.7) * waveAmplitude;
+      const waveY = baseWaveY + Math.cos(x * waveFrequency * 0.5) * (waveAmplitude / 2);
+      
+      // Kombiniere Wellen für einen dynamischen Effekt
+      const noiseValue = Math.abs(Math.sin(x * noiseScale) * Math.cos(y * noiseScale));
+      
+      // Bestimme Region basierend auf Wellenwerten und Mustern
+      const regionValue = (noiseValue + Math.abs(waveX / width) + Math.abs(waveY / height)) / 3;
+      
+      // Basismuster für diese Position
+      const baseChar = generatePattern(x, y, 'base');
+      
+      // Wähle Zeichensatz basierend auf Region und Beat-Energie
+      let charSet;
+      if (regionValue < 0.3 - (beatEnergy * 0.15)) { // Verstärkte Reaktion
+        charSet = selectedCharSet.light;
+      } else if (regionValue < 0.7 - (beatEnergy * 0.25)) { // Verstärkte Reaktion
+        charSet = selectedCharSet.medium;
+      } else {
+        charSet = selectedCharSet.dense;
+      }
+      
+      // Füge Beat-reaktive rhythmische Variation hinzu
+      const beatFactor = timestamp * 0.0001 + (beatEnergy * 0.15); // Verstärkter Faktor
+      if ((x + y) % 7 === 0 || Math.sin((x * y) * 0.01 + beatFactor) > 0.7 - (beatEnergy * 0.4)) { // Verstärkte Reaktion
+        // Spezielles Muster an rhythmischen Positionen
+        background[y][x] = charSet[Math.floor(Math.random() * charSet.length)];
+      } else if ((x * y) % 11 === 0 || Math.cos((x - y) * 0.03 + beatFactor) > 0.8 - (beatEnergy * 0.4)) { // Verstärkte Reaktion
+        // Sekundäres rhythmisches Muster
+        background[y][x] = charSet[Math.floor(Math.random() * charSet.length)];
+      } else if (Math.random() < 0.7 - (beatEnergy * 0.3)) { // Verstärkte Reaktion
+        // Grundmuster mit hoher Wahrscheinlichkeit
+        background[y][x] = baseChar;
+      } else {
+        // Zufälliges Zeichen aus dem ausgewählten Set
+        background[y][x] = charSet[Math.floor(Math.random() * charSet.length)];
+      }
+    }
+  }
+  
+  // Füge einige kleinere Felsformationen hinzu - mit feinen Zeichen statt Blöcken
+  const numFormations = Math.floor((width * height) / 150) + 2 + Math.floor(beatEnergy * 8); // Verstärkte Reaktion
+  const formationChars = ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '┃', '━', '╸', '╹', '╺', '╻'];
+  
+  for (let i = 0; i < numFormations; i++) {
+    const formationX = Math.floor(Math.random() * width);
+    const formationY = Math.floor(Math.random() * height);
+    const formationSize = Math.floor(Math.random() * 5 * (1 + beatEnergy * 1.5)) + 2; // Verstärkte Reaktion
+    
+    const formation = generateCluster(formationX, formationY, formationSize, width, height);
+    
+    formation.forEach(pos => {
+      if (pos.y < height && pos.x < width) {
+        // Feine Zeichen für Formationen statt '▒'
+        background[pos.y][pos.x] = formationChars[Math.floor(Math.random() * formationChars.length)];
+      }
+    });
+  }
+  
+  // Füge Beat-reaktive "Explosionen" hinzu
+  if (beatEnergy > 0.2) { // Niedrigerer Schwellenwert für mehr Explosionen
+    const numExplosions = Math.floor(beatEnergy * 5) + 1; // Mehr Explosionen
+    
+    for (let i = 0; i < numExplosions; i++) {
+      const explosionX = Math.floor(Math.random() * width);
+      const explosionY = Math.floor(Math.random() * height);
+      const explosionSize = Math.floor(beatEnergy * 12) + 3; // Größere Explosionen
+      
+      for (let y = Math.max(0, explosionY - explosionSize); y < Math.min(height, explosionY + explosionSize); y++) {
+        for (let x = Math.max(0, explosionX - explosionSize); x < Math.min(width, explosionX + explosionSize); x++) {
+          const distance = Math.sqrt(Math.pow(x - explosionX, 2) + Math.pow(y - explosionY, 2));
+          
+          if (distance < explosionSize * beatEnergy * 1.2) { // Verstärkte Reaktion
+            // Wähle ein Zeichen basierend auf der Entfernung vom Zentrum
+            const charSet = distance < explosionSize * 0.3 ? 
+                            selectedCharSet.dense : 
+                            (distance < explosionSize * 0.6 ? selectedCharSet.medium : selectedCharSet.light);
+            
+            background[y][x] = charSet[Math.floor(Math.random() * charSet.length)];
+          }
+        }
+      }
+    }
+  }
+  
+  return background;
 } 
