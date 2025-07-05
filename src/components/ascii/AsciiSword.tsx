@@ -1042,13 +1042,15 @@ export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
                   const vein = coloredVeins.find(v => v.x === x && v.y === y);
                   
                   // Stil für dieses Zeichen
-                  const style = vein ? {
+                  const style: React.CSSProperties = vein ? {
                     color: vein.color,
                     textShadow: `0 0 ${3 + glitchLevel}px ${vein.color}`,
                     display: 'inline-block',
-                    filter: `contrast(${1.1 + (glitchLevel * 0.1)})`
+                    filter: `contrast(${1.1 + (glitchLevel * 0.1)})`,
+                    transform: ''
                   } : { 
-                    display: 'inline-block'
+                    display: 'inline-block',
+                    transform: ''
                   };
                   
                   // Prüfe, ob dieses Zeichen in der Liste der verschwommenen Zeichen ist
