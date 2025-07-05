@@ -21,11 +21,11 @@ export default function HomePage() {
         </div>
       </div>
       
-      {/* Seitliche Buttons */}
+      {/* Seitliche Buttons und Progress Bars */}
       <SideButtons />
       
-      {/* Music Player (unten rechts) */}
-      <div className="fixed right-[12%] bottom-8 z-10">
+      {/* Music Player (oben rechts, exakt auf gleicher Höhe wie der CLEANSE-Button) */}
+      <div className="fixed right-[12%] top-1/2 -translate-y-1/2 z-10">
         <MusicPlayer />
       </div>
     </main>

@@ -11,12 +11,21 @@ interface MusicPlayerProps {
   className?: string;
 }
 
+// Verfügbare Tracks
+const tracks = [
+  { src: "/music/gr1ftsword.mp3", name: "GR1FTSWORD" },
+  { src: "/music/flashword.mp3", name: "FLASHWORD" },
+  { src: "/music/funksword.mp3", name: "FUNKSWORD" },
+  { src: "/music/atarisword.mp3", name: "ATARISWORD" }
+];
+
 export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(0.5);
   const [error, setError] = useState<string | null>(null);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   
   // Aktualisiere den Fortschritt während der Wiedergabe
   useEffect(() => {
@@ -74,6 +83,42 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
     setIsPlaying(!isPlaying);
   };
   
+  // Zum nächsten Track wechseln
+  const nextTrack = () => {
+    const wasPlaying = isPlaying;
+    
+    // Pausiere den aktuellen Track, falls er abgespielt wird
+    if (wasPlaying && audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+    
+    // Wechsle zum nächsten Track (oder zurück zum ersten)
+    const nextIndex = (currentTrackIndex + 1) % tracks.length;
+    setCurrentTrackIndex(nextIndex);
+    
+    // Setze den Fortschritt zurück
+    setProgress(0);
+    
+    // Spiele den neuen Track ab, wenn der vorherige abgespielt wurde
+    setTimeout(() => {
+      if (wasPlaying && audioRef.current) {
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(true);
+              setError(null);
+            })
+            .catch(err => {
+              console.error("Fehler beim Abspielen:", err);
+              setError("Wiedergabe nicht möglich");
+            });
+        }
+      }
+    }, 100);
+  };
+  
   // Lautstärke ändern
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(e.target.value);
@@ -117,12 +162,15 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
     return tiles;
   };
 
+  // Aktueller Track
+  const currentTrack = tracks[currentTrackIndex];
+
   return (
     <div className={`flex flex-col ${className}`}>
       {/* Audio-Element (unsichtbar) */}
       <audio 
         ref={audioRef} 
-        src="/music/gr1ftsword.mp3" 
+        src={currentTrack.src}
         preload="metadata"
         onCanPlayThrough={() => setError(null)}
       />
@@ -134,7 +182,7 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
                textShadow: '0 0 1px #3EE6FF',
                letterSpacing: '0.05em'
              }}>
-          MUSIC
+          {currentTrack.name}
         </div>
         
         {/* Fortschrittsbalken und Play/Pause-Button */}
@@ -184,6 +232,34 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
                   <div className="absolute top-0 left-0 w-2 h-3 bg-[#3EE6FF] clip-triangle"></div>
                 </>
               )}
+              
+              {/* Glüheffekt */}
+              <div className="absolute inset-0 opacity-70"
+                   style={{ 
+                     boxShadow: '0 0 3px rgba(62,230,255,0.8)',
+                     animation: 'pulse 1.5s infinite alternate'
+                   }}>
+              </div>
+            </div>
+          </button>
+          
+          {/* Next-Button */}
+          <button
+            onClick={nextTrack}
+            className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF]"
+            style={{ 
+              boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(62,230,255,0.3)',
+              imageRendering: 'pixelated',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
+              backgroundSize: '4px 4px'
+            }}
+          >
+            {/* Next-Icon (Pixel-Art-Stil) */}
+            <div className="relative w-3 h-3">
+              {/* Zwei Dreiecke für Next-Symbol */}
+              <div className="absolute top-0 left-0 w-1 h-3 bg-[#3EE6FF] clip-triangle"></div>
+              <div className="absolute top-0 left-2 w-1 h-3 bg-[#3EE6FF] clip-triangle"></div>
+              <div className="absolute top-0 left-3 w-[2px] h-3 bg-[#3EE6FF]"></div>
               
               {/* Glüheffekt */}
               <div className="absolute inset-0 opacity-70"
