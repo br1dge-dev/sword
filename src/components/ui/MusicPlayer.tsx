@@ -38,7 +38,7 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
   // Beat-Erkennung
   const { setBeatDetected, setBeatEnergy } = usePowerUpStore();
   const lastVolumeRef = useRef<number>(0);
-  const beatThresholdRef = useRef<number>(0.025); // Niedriger Schwellenwert für Beat-Erkennung
+  const beatThresholdRef = useRef<number>(0.015); // Noch niedrigerer Schwellenwert für Beat-Erkennung
   const beatCooldownRef = useRef<boolean>(false);
   const lastBeatTimeRef = useRef<number>(0);
   const beatDetectionRunningRef = useRef<boolean>(false);
@@ -130,6 +130,10 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
     let energyIndex = 0;
     let frameCount = 0;
     
+    // Künstliche Beat-Erzeugung, wenn keine natürlichen Beats erkannt werden
+    let forcedBeatTimer = 0;
+    const forcedBeatInterval = 700; // Erzwinge einen Beat alle 700ms, wenn keine natürlichen erkannt werden
+    
     console.log("%c[AUDIO_DEBUG] Beat detection gestartet mit bufferLength: " + bufferLength, "color: #44AAFF; font-weight: bold;");
     beatDetectionRunningRef.current = true;
     
@@ -171,19 +175,37 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
                    'color: #44AAFF; font-weight: bold;');
       }
       
-      // Beat-Erkennung mit niedrigen Schwellenwerten
-      if (!beatCooldownRef.current && 
-          ((volumeDelta > beatThresholdRef.current && bassVolume > 0.03) || 
-           (energyVariation > 1.02 && bassVolume > 0.04) || 
-           (bassVolume > 0.1 && volumeDelta > 0.015) || 
-           // Notfall-Bedingung: Erzeuge künstliche Beats, wenn längere Zeit kein Beat erkannt wurde
-           (Date.now() - lastBeatTimeRef.current > 800 && bassVolume > 0.08))) {   
-        
+      // Erhöhe den Timer für erzwungene Beats
+      forcedBeatTimer += 1;
+      
+      // Beat-Erkennung mit EXTREM niedrigen Schwellenwerten
+      let beatDetected = false;
+      
+      if (!beatCooldownRef.current) {
+        // Natürliche Beat-Erkennung mit sehr niedrigen Schwellenwerten
+        if ((volumeDelta > beatThresholdRef.current && bassVolume > 0.02) || // Niedrigere Schwellenwerte
+            (energyVariation > 1.01 && bassVolume > 0.03) ||  // Niedrigere Schwellenwerte
+            (bassVolume > 0.08 && volumeDelta > 0.01) ||      // Niedrigere Schwellenwerte
+            // Notfall-Bedingung: Erzeuge künstliche Beats, wenn längere Zeit kein Beat erkannt wurde
+            (Date.now() - lastBeatTimeRef.current > 800 && bassVolume > 0.05)) {
+          
+          beatDetected = true;
+        }
+        // Erzwungene Beat-Erkennung, wenn zu lange kein Beat erkannt wurde
+        else if (forcedBeatTimer >= forcedBeatInterval / (1000 / 60)) { // Umrechnung auf Frames bei ca. 60fps
+          beatDetected = true;
+          console.log(`%c[BEAT_FORCED] Erzwungener Beat nach ${forcedBeatTimer} Frames`, 'color: #FF3EC8; font-weight: bold;');
+          forcedBeatTimer = 0;
+        }
+      }
+      
+      if (beatDetected) {
         // Beat erkannt
         setBeatDetected(true);
         beatCooldownRef.current = true;
         const now = Date.now();
         lastBeatTimeRef.current = now;
+        forcedBeatTimer = 0; // Timer zurücksetzen
         
         // Beat-Feedback in der Konsole
         console.log(`%c[BEAT_DETECTED] Beat erkannt! Energie: ${bassVolume.toFixed(2)}, Delta: ${volumeDelta.toFixed(2)}, Variation: ${energyVariation.toFixed(2)}`, 
@@ -213,7 +235,7 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
         setTimeout(() => {
           beatCooldownRef.current = false;
           console.log(`%c[BEAT_COOLDOWN] Beat-Cooldown beendet, bereit für nächsten Beat`, 'color: #FF3EC8; font-weight: bold;');
-        }, 120); // Kürzerer Cooldown
+        }, 100); // Noch kürzerer Cooldown (100ms)
       }
       
       // Aktuelles Volumen für nächsten Vergleich speichern

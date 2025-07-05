@@ -151,36 +151,48 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
     const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
     setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
     
-    // Keine automatischen Hintergrundaktualisierungen mehr
-    console.log(`%c[BACKGROUND_INIT] Initial background generated, waiting for beat events`, 'color: #00AA55; font-weight: bold;');
+    // Debug-Log für die Initialisierung
+    console.log(`%c[BACKGROUND_INIT] Initial background generated`, 'color: #00AA55; font-weight: bold;');
     
-    // WORKAROUND: Füge einen Timer hinzu, der regelmäßig den Hintergrund aktualisiert
-    // Dies ist ein Fallback für den Fall, dass die Beat-Events nicht korrekt funktionieren
+    // WORKAROUND: Seltener Fallback-Timer für Hintergrundaktualisierung (nur alle 15 Sekunden)
+    // Dieser Timer dient nur als Notfall-Fallback, wenn keine Beats erkannt werden
     intervalsRef.current.background = setInterval(() => {
-      console.log(`%c[BACKGROUND_WORKAROUND] Aktualisiere Hintergrund durch Timer-Fallback...`, 
-                 'color: #00AA55; background-color: #222222; font-weight: bold;');
+      // Prüfe, ob kürzlich ein Beat erkannt wurde (in den letzten 5 Sekunden)
+      const timeSinceLastBeat = Date.now() - lastBeatTimeRef.current;
       
-      // Generiere neuen Beat-reaktiven Hintergrund
-      const newBackground = generateBeatReactiveBackground(bgWidth, bgHeight, usePowerUpStore.getState().beatEnergy);
-      setCaveBackground(newBackground);
-      
-      // Generiere neue Adern
-      const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
-      const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
-      const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins);
-      setColoredVeins(newVeins);
-      
-      // Wähle eine zufällige Akzentfarbe
-      const randomColor = accentColors[Math.floor(Math.random() * accentColors.length)];
-      setBaseColor(randomColor);
-      setBgColor(getComplementaryColor(randomColor));
-      
-    }, 1000); // Aktualisiere alle 1 Sekunde als Fallback
-    
-    // Aufräumen beim Unmounten
+      // Nur aktualisieren, wenn länger als 5 Sekunden kein Beat erkannt wurde
+      if (timeSinceLastBeat > 5000) {
+        console.log(`%c[BACKGROUND_WORKAROUND] Aktualisiere Hintergrund durch Timer-Fallback (${Math.floor(timeSinceLastBeat/1000)}s seit letztem Beat)...`, 
+                   'color: #00AA55; background-color: #222222; font-weight: bold;');
+        
+        // Verwende statischen Hintergrund statt Beat-reaktivem Hintergrund
+        const newBackground = generateCaveBackground(bgWidth, bgHeight);
+        setCaveBackground(newBackground);
+        
+        // Generiere neue Adern
+        const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
+        const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
+        const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins);
+        setColoredVeins(newVeins);
+        
+        // Wähle eine zufällige Akzentfarbe
+        const randomColor = accentColors[Math.floor(Math.random() * accentColors.length)];
+        setBaseColor(randomColor);
+        setBgColor(getComplementaryColor(randomColor));
+      } else {
+        console.log(`%c[BACKGROUND_WORKAROUND] Timer-Fallback übersprungen, letzter Beat vor ${Math.floor(timeSinceLastBeat/1000)}s`, 
+                   'color: #00AA55; background-color: #222222; font-weight: bold;');
+      }
+    }, 15000); // Längeres Intervall (15 Sekunden statt 5 Sekunden)
+
     return () => {
-      if (intervalsRef.current.background) clearInterval(intervalsRef.current.background);
-      if (intervalsRef.current.veins) clearInterval(intervalsRef.current.veins);
+      // Intervall beim Unmounten aufräumen
+      if (intervalsRef.current.background) {
+        clearInterval(intervalsRef.current.background);
+      }
+      if (intervalsRef.current.veins) {
+        clearInterval(intervalsRef.current.veins);
+      }
     };
   }, [glitchLevel]);
   
@@ -200,12 +212,11 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
       // Automatische Farbwechsel sind jetzt komplett deaktiviert
       // Farbwechsel werden nur noch durch Beats ausgelöst
       console.log(`%c[COLOR_CHANGE_DEBUG] Automatische Farbwechsel deaktiviert, warte auf Beat-Events`, 'color: #00FCA6; font-weight: bold;');
-    }, 3000); // Nur alle 3 Sekunden loggen, um Konsole nicht zu überfluten
+    }, 3000);
     
     // SEPARATER TIMER FÜR TILE-UMFÄRBUNGEN
     intervalsRef.current.tileColors = setInterval(() => {
-      // Reduzierte Häufigkeit der automatischen Tile-Umfärbungen
-      // Nur noch gelegentlich Tiles einfärben, damit Beat-Reaktionen besser sichtbar sind
+      // Automatische Tile-Umfärbungen aktiviert
       if (Math.random() > 0.7) { // 70% Chance, nichts zu tun
         // Zufällige Tiles mit Akzentfarben einfärben - STARK REDUZIERT
         const newColoredTiles: Array<{x: number, y: number, color: string}> = [];
@@ -257,11 +268,11 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
           console.log(`%c[TILES_AUTO] Auto colored tiles: ${newColoredTiles.length} in ${numClusters} clusters`, 'color: #FF3EC8; font-weight: bold;');
         }
       }
-    }, Math.floor(Math.random() * 200) + 400); // 400-600ms für seltenere Updates (vorher 80-140ms)
+    }, Math.floor(Math.random() * 200) + 400);
     
     // Glitch-Effekte für das Schwert
     intervalsRef.current.glitch = setInterval(() => {
-      // Reduzierte Häufigkeit der automatischen Glitch-Effekte
+      // Automatische Glitch-Effekte aktiviert
       if (Math.random() > 0.7) { // 70% Chance, nichts zu tun
         // Generiere Glitch-Zeichen - REDUZIERT
         const newGlitches: Array<{x: number, y: number, char: string}> = [];
@@ -292,7 +303,7 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
         // Debug-Log für automatische Glitches
         console.log(`%c[GLITCH_AUTO] Auto glitches: ${numGlitches}`, 'color: #FF3EC8; font-weight: bold;');
       }
-    }, Math.floor(Math.random() * 400) + 400); // Längere Intervalle für seltenere Glitches (vorher 200-400ms)
+    }, Math.floor(Math.random() * 400) + 400);
     
     // Edge-Glitch-Effekte
     intervalsRef.current.edge = setInterval(() => {
@@ -390,6 +401,7 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
       // Wahrscheinlichkeit für Unicode-Glitches basierend auf glitchLevel
       const glitchChance = 0.7 - (glitchLevel * 0.1); // 0.7, 0.6, 0.5, 0.4
       
+      // Automatische Unicode-Glitch-Effekte aktiviert
       if (Math.random() > glitchChance) { // Chance steigt mit glitchLevel
         const swordPositions = getSwordPositions();
         const newUnicodeGlitches: Array<{x: number, y: number, char: string}> = [];
@@ -501,10 +513,11 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
     console.log(`%c[BEAT_DEBUG] Beat-Status geändert: ${beatDetected ? "ERKANNT" : "KEIN BEAT"}, Energie: ${beatEnergy.toFixed(2)}`, 
                'color: #FF3EC8; font-weight: bold;');
     
-    // Füge einen Debug-Log hinzu, der bei jedem Render ausgeführt wird
+    // Debug-Log für jeden Render
     console.log(`%c[BEAT_DEBUG] Render mit beatDetected=${beatDetected}, beatEnergy=${beatEnergy.toFixed(2)}, glitchLevel=${glitchLevel}`, 
                'color: #FF3EC8; background-color: #222222; font-weight: bold;');
     
+    // Beat-Reaktion aktiviert - Farbänderungen bei Beats
     if (beatDetected) {
       // Beat wurde erkannt - Hintergrundfarbe ändern
       const now = Date.now();
@@ -527,11 +540,21 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
       const bgWidth = 120;
       const bgHeight = 80;
       
-      // Generiere neuen Beat-reaktiven Hintergrund bei jedem Beat
-      const newBackground = generateBeatReactiveBackground(bgWidth, bgHeight, beatEnergy);
-      console.log(`%c[BEAT_DEBUG] Neuer Hintergrund generiert: ${newBackground.length}x${newBackground[0]?.length || 0} Zeichen`, 
+      console.log(`%c[BEAT_BACKGROUND] Beat erkannt! Generiere Beat-reaktiven Hintergrund mit Energie: ${beatEnergy.toFixed(2)}`, 
                  'color: #FF3EC8; background-color: #222222; font-weight: bold;');
-      setCaveBackground(newBackground);
+      
+      try {
+        // Generiere neuen Beat-reaktiven Hintergrund bei jedem Beat
+        const newBackground = generateBeatReactiveBackground(bgWidth, bgHeight, beatEnergy);
+        console.log(`%c[BEAT_DEBUG] Neuer Hintergrund generiert: ${newBackground.length}x${newBackground[0]?.length || 0} Zeichen`, 
+                   'color: #FF3EC8; background-color: #222222; font-weight: bold;');
+        setCaveBackground(newBackground);
+      } catch (error) {
+        console.error(`%c[BEAT_ERROR] Fehler beim Generieren des Beat-reaktiven Hintergrunds: ${error}`, 
+                     'color: red; font-weight: bold;');
+        // Fallback auf normalen Hintergrund
+        setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+      }
       
       // Generiere neue Adern bei jedem Beat
       const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
@@ -552,14 +575,14 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
         const newColoredTiles: Array<{x: number, y: number, color: string}> = [];
         
         // Anzahl der Cluster basierend auf Beat-Energie
-        const numClusters = Math.floor(beatEnergy * 10) + 2; // 2-12 Cluster je nach Beat-Energie
+        const numClusters = Math.floor(beatEnergy * 15) + 3; // Mehr Cluster (3-18)
         
         for (let i = 0; i < numClusters; i++) {
           const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
           const basePos = swordPositions[randomPosIndex];
           
           // Clustergröße basierend auf Beat-Energie
-          const clusterSize = Math.floor(beatEnergy * 5) + 2; // 2-7 Tiles je nach Beat-Energie
+          const clusterSize = Math.floor(beatEnergy * 8) + 2; // 2-10 Tiles je nach Beat-Energie
           
           // Generiere Cluster
           const cluster = generateCluster(
@@ -588,28 +611,29 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
         }
         
         setColoredTiles(newColoredTiles);
-        console.log(`%c[TILES_AUTO] Auto colored tiles: ${newColoredTiles.length} in ${numClusters} clusters`, 'color: #FF3EC8; font-weight: bold;');
+        console.log(`%c[TILES] Colored tiles: ${newColoredTiles.length} in ${numClusters} clusters`, 'color: #FF3EC8; font-weight: bold;');
       }
       
       console.log(`%c[BEAT_BACKGROUND] Beat triggered background pattern change! Energy: ${beatEnergy.toFixed(2)}`, 'color: #FF3EC8; font-weight: bold;');
     }
-  }, [beatDetected]); // Nur von beatDetected abhängig machen, nicht von beatEnergy oder glitchLevel
+  }, [beatDetected]); // Nur von beatDetected abhängig machen, nicht von beatEnergy
   
   // Beat-Energie-Reaktion - Intensität der Effekte anpassen
   useEffect(() => {
-    if (beatEnergy > 0.1) {
+    // Beat-Energie-Reaktion aktiviert
+    if (beatEnergy > 0.05) { // Niedrigerer Schwellenwert (vorher 0.1)
       // Glow-Intensität basierend auf Beat-Energie anpassen
       setGlowIntensity(Math.min(0.3 + beatEnergy * 0.7, 1.0));
       
       console.log(`%c[BEAT_ENERGY] Energy level: ${beatEnergy.toFixed(2)}, Glow: ${glowIntensity.toFixed(2)}`, 
                  'color: #FFFF00; font-weight: bold;');
       
-      // Bei starken Beats (Energie > 0.4) zusätzliche Effekte auslösen
-      if (beatEnergy > 0.4) {
+      // Bei starken Beats (Energie > 0.3) zusätzliche Effekte auslösen (vorher 0.4)
+      if (beatEnergy > 0.3) {
         // Generiere zusätzliche Glitches bei starken Beats
         const swordPositions = getSwordPositions();
         if (swordPositions.length > 0) {
-          const numGlitches = Math.floor(beatEnergy * 10); // 4-10 Glitches je nach Energie
+          const numGlitches = Math.floor(beatEnergy * 12); // 4-12 Glitches je nach Energie
           const newGlitches = [];
           
           for (let i = 0; i < numGlitches; i++) {
@@ -630,12 +654,15 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
             setGlitchChars([]);
           }, 100);
           
-          console.log(`%c[BEAT_GLITCH] High energy beat (${beatEnergy.toFixed(2)}) triggered ${numGlitches} glitches!`, 
+          console.log(`%c[GLITCH] Unicode glitches: ${numGlitches}`, 
                      'color: #FF3EC8; font-weight: bold;');
         }
       }
+    } else {
+      // Konstante Glow-Intensität bei niedriger Beat-Energie
+      setGlowIntensity(0.5);
     }
-  }, [beatEnergy]);
+  }, [beatEnergy]); // Nur von beatEnergy abhängig machen
   
   // Aufräumen aller Intervalle beim Unmounten
   useEffect(() => {
