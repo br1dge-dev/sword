@@ -10,7 +10,6 @@ import CleanseButton from './CleanseButton';
 import ForgeProgressBar from './ForgeProgressBar';
 import ChargeProgressBar from './ChargeProgressBar';
 import GlitchProgressBar from './GlitchProgressBar';
-import { useFlashStore } from '@/store/flashStore';
 import { usePowerUpStore } from '@/store/powerUpStore';
 
 interface SideButtonsProps {
@@ -18,7 +17,6 @@ interface SideButtonsProps {
 }
 
 export default function SideButtons({ className = '' }: SideButtonsProps) {
-  const { startFlash } = useFlashStore();
   const { resetAllEffects } = usePowerUpStore();
   
   // Zustandsvariablen für Fehlerbehandlung
@@ -27,16 +25,13 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
   // Handler für den CLEANSE-Button
   const handleCleanse = useCallback(() => {
     try {
-      // Flash-Effekt starten
-      startFlash();
-      
       // Alle Fortschritte zurücksetzen
       resetAllEffects();
     } catch (error) {
       console.error("Fehler beim Ausführen der Cleanse-Aktion:", error);
       handleError();
     }
-  }, [startFlash, resetAllEffects]);
+  }, [resetAllEffects]);
   
   // Fehlerbehandlung
   const handleError = useCallback(() => {

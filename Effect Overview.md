@@ -8,8 +8,6 @@ Die visuellen Effekte sind hauptsächlich in folgenden Dateien implementiert:
 
 - **src/components/ascii/AsciiSword.tsx**: Hauptkomponente für das ASCII-Schwert mit allen visuellen Effekten
 - **src/store/powerUpStore.ts**: Zustandsverwaltung für Level, Charge- und Glitch-Effekte
-- **src/store/flashStore.ts**: Zustandsverwaltung für den Flash-Effekt
-- **src/components/layout/FlashWrapper.tsx**: Komponente für den Invertierungs-Effekt
 - **src/components/ui/ChargeProgressBar.tsx**: Komponente für die Charge-Fortschrittsanzeige
 - **src/components/ui/GlitchProgressBar.tsx**: Komponente für die Glitch-Fortschrittsanzeige
 - **src/app/page.tsx**: Enthält die Effekt-Tracking-Logik und Kategorisierung
@@ -20,7 +18,6 @@ Die visuellen Effekte sind hauptsächlich in folgenden Dateien implementiert:
   - `currentLevel`: Schwert-Level (1-3)
   - `chargeLevel`: Aufladungs-Level (1-3)
   - `glitchLevel`: Glitch-Level (1-3)
-  - `isFlashing`: Flash-Effekt-Status (true/false)
 
 - **Bibliotheken**:
   - `zustand`: Für Zustandsverwaltung
@@ -83,11 +80,6 @@ Die visuellen Effekte sind hauptsächlich in folgenden Dateien implementiert:
   - Prozentsatz transparenter Zeichen: 0,3% * glitchLevel
   - Transparenz: 70-100%
   - Aktualisiert alle 400ms
-
-- **Flash-Effekt**:
-  - Invertiert die gesamte Anwendung
-  - Dauer: 3 Sekunden
-  - Implementiert in FlashWrapper.tsx
 
 ## Auflade-Effekte
 
