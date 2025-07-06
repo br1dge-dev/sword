@@ -27,10 +27,6 @@ interface PowerUpState {
   glitchProgress: number;
   isGlitchComplete: boolean;
   
-  // Beat-Informationen
-  beatDetected: boolean;
-  beatEnergy: number;
-  
   // Aktionen
   startPowerUp: () => void;
   increaseChargeLevel: () => void;
@@ -44,13 +40,6 @@ interface PowerUpState {
   
   // Hilfsfunktion zum Zurücksetzen aller Effekte
   resetAllEffects: () => void;
-  
-  // Setter-Funktionen
-  setCurrentLevel: (level: number) => void;
-  setChargeLevel: (level: number) => void;
-  setGlitchLevel: (level: number) => void;
-  setBeatDetected: (detected: boolean) => void;
-  setBeatEnergy: (energy: number) => void;
 }
 
 // Erstelle den Store mit Persistenz
@@ -69,8 +58,6 @@ export const usePowerUpStore = create<PowerUpState>()(
       maxGlitchLevel: 3,
       glitchProgress: 0,
       isGlitchComplete: false,
-      beatDetected: false,
-      beatEnergy: 0,
       
       startPowerUp: () => {
         set((state) => {
@@ -186,24 +173,9 @@ export const usePowerUpStore = create<PowerUpState>()(
           chargeProgress: 0,
           isChargeComplete: false,
           glitchProgress: 0,
-          isGlitchComplete: false,
-          beatDetected: false,
-          beatEnergy: 0
+          isGlitchComplete: false
         });
-      },
-      
-      // Setter-Funktionen
-      setCurrentLevel: (level) => set({ currentLevel: level }),
-      setChargeLevel: (level) => set({ chargeLevel: level }),
-      setGlitchLevel: (level) => set({ glitchLevel: level }),
-      setBeatDetected: (detected) => {
-        console.log(`%c[STORE_DEBUG] setBeatDetected aufgerufen mit: ${detected}`, 
-                   'color: #44AAFF; background-color: #222222; font-weight: bold;');
-        set({ beatDetected: detected });
-        console.log(`%c[STORE_DEBUG] Neuer beatDetected-Wert im Store: ${usePowerUpStore.getState().beatDetected}`, 
-                   'color: #44AAFF; background-color: #222222; font-weight: bold;');
-      },
-      setBeatEnergy: (energy) => set({ beatEnergy: energy })
+      }
     }),
     {
       name: 'sword-power-up-storage', // Name für localStorage
@@ -217,9 +189,7 @@ export const usePowerUpStore = create<PowerUpState>()(
         chargeProgress: state.chargeProgress,
         isChargeComplete: state.isChargeComplete,
         glitchProgress: state.glitchProgress,
-        isGlitchComplete: state.isGlitchComplete,
-        beatDetected: state.beatDetected,
-        beatEnergy: state.beatEnergy
+        isGlitchComplete: state.isGlitchComplete
       })
     }
   )
