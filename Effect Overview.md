@@ -213,5 +213,5 @@ The visual effects are mainly implemented in the following files:
    - Implemented rate limiting (max once per second per effect type)
    - Consistent color coding by effect type
    - Detailed information about effect parameters
-   - Logging of both successful and skipped effects
+   - Logging of both successful and skipped effects 
    - Simplified overview summary to reduce memory usage 
