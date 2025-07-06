@@ -12,6 +12,7 @@ import MusicPlayer from '@/components/ui/MusicPlayer';
 import AudioVisualizer from '@/components/ui/AudioVisualizer';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import { usePowerUpStore } from '@/store/powerUpStore';
+import { useAudioReactionStore } from '@/store/audioReactionStore';
 import { useEffect, useState } from "react";
 
 export default function HomePage() {

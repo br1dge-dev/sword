@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AudioAnalyzer, AudioAnalyzerOptions, BeatDetectionResult } from '../lib/audio/audioAnalyzer';
+import { useAudioReactionStore } from '@/store/audioReactionStore';
 
 interface UseAudioAnalyzerOptions extends AudioAnalyzerOptions {
   autoStart?: boolean;
@@ -36,6 +37,9 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   const [beatInfo, setBeatInfo] = useState<BeatDetectionResult | null>(null);
   const [error, setError] = useState<Error | null>(null);
   
+  // Audio-Reaction-Store
+  const { updateEnergy, triggerBeat } = useAudioReactionStore();
+  
   // Reset beat detection after a short delay
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | null = null;
@@ -70,9 +74,11 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
         onBeat: (time) => {
           console.log(`Beat detected at time: ${time}`);
           setBeatDetected(true);
+          triggerBeat(); // Aktualisiere den globalen Store
         },
         onEnergy: (e) => {
           setEnergy(e);
+          updateEnergy(e); // Aktualisiere den globalen Store
         },
         ...defaultOptions
       };
@@ -86,7 +92,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       // Wir räumen den globalen Analyzer nicht auf, da er von anderen Komponenten verwendet werden könnte
       analyzerRef.current = null;
     };
-  }, []);
+  }, [updateEnergy, triggerBeat, options]);
   
   const initialize = async (audioElement: HTMLAudioElement) => {
     try {
