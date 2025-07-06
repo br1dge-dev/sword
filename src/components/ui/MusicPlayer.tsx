@@ -30,7 +30,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
   const [volume, setVolume] = useState(0.5);
   const [error, setError] = useState<string | null>(null);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
-  const [tempo, setTempo] = useState<number | null>(null);
   const [showAnalyzerInfo, setShowAnalyzerInfo] = useState(false);
   const [analyzerInitialized, setAnalyzerInitialized] = useState(false);
   
@@ -39,8 +38,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     initialize,
     start,
     stop,
-    detectTempo,
-    guessBeat,
     isInitialized,
     isAnalyzing,
     energy,
@@ -169,7 +166,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     
     // Setze den Fortschritt zurück
     setProgress(0);
-    setTempo(null);
     
     // Spiele den neuen Track ab, wenn der vorherige abgespielt wurde
     setTimeout(() => {
@@ -207,19 +203,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     
     if (audioRef.current && audioRef.current.duration) {
       audioRef.current.currentTime = (newProgress / 100) * audioRef.current.duration;
-    }
-  };
-  
-  // BPM erkennen
-  const handleDetectTempo = async () => {
-    try {
-      const detectedTempo = await detectTempo();
-      setTempo(detectedTempo);
-      console.log('Detected tempo:', detectedTempo);
-    } catch (err) {
-      console.error('Failed to detect tempo:', err);
-      // Wir setzen keinen Fehler mehr, da das die Benutzererfahrung nicht beeinträchtigen soll
-      // setError('Tempo-Erkennung fehlgeschlagen');
     }
   };
   
@@ -271,7 +254,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
                letterSpacing: '0.05em'
              }}>
           <div>{currentTrack.name}</div>
-          {tempo && <div className="text-[10px]">{Math.round(tempo)} BPM</div>}
         </div>
         
         <div className="flex items-center gap-2">
@@ -346,20 +328,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
                    }}>
               </div>
             </div>
-          </button>
-          
-          <button
-            onClick={handleDetectTempo}
-            title="BPM erkennen"
-            className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF] text-[8px] font-mono text-[#3EE6FF]"
-            style={{ 
-              boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(62,230,255,0.3)',
-              imageRendering: 'pixelated',
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
-              backgroundSize: '4px 4px'
-            }}
-          >
-            BPM
           </button>
         </div>
         
