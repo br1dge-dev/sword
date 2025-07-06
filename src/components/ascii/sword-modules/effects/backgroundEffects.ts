@@ -45,6 +45,7 @@ export function generateCaveBackground(width: number, height: number): string[][
   const offsetY = Math.floor(Math.random() * height);
   
   // Überarbeitete Zeichensätze mit mehr feinen Linien und weniger Blöcken
+  // Entfernung komplexer Symbole wie Uhren, Sanduhren, etc.
   const charSets = [
     // Set 1: Dünne Linien und Punkte (BEVORZUGT)
     {
@@ -64,10 +65,10 @@ export function generateCaveBackground(width: number, height: number): string[][
       medium: ['◇', '◆', '◊', '◈', '◦', '◎', '○', '◌'],
       dense: ['◊', '◈', '◎', '◉', '◍', '◐', '◑', '◒', '◓', '◔', '◕']
     },
-    // Set 4: Technische Zeichen (BEVORZUGT)
+    // Set 4: Technische Zeichen (OHNE KOMPLEXE SYMBOLE)
     {
       light: ['⌐', '¬', '⌙', '⌖', '·', ':', '.'],
-      medium: ['⌘', '⌂', '⌤', '⌧', '⌨', '⌫', '⎋', '⌖', '⌗', '⌚', '⌛'],
+      medium: ['⌘', '⌂', '⌤', '⌧', '⌗', '╱', '╲', '┌', '┐', '└', '┘'],
       dense: ['⎔', '⎕', '⎖', '⎗', '⎘', '⎙', '⎚', '⎛', '⎜', '⎝', '⎞', '⎟', '⎠', '⎡', '⎢']
     },
     // Set 5: Mischung aus feinen Zeichen (BEVORZUGT)
@@ -107,7 +108,7 @@ export function generateCaveBackground(width: number, height: number): string[][
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
-      case 3: // Spiralmuster mit komplexen Zeichen
+      case 3: // Spiralmuster mit einfachen Zeichen
         const angle = Math.atan2(ty - height/2, tx - width/2);
         const dist2 = Math.sqrt(Math.pow(tx - width/2, 2) + Math.pow(ty - height/2, 2));
         if (Math.abs(Math.sin(angle * 5 + dist2 * 0.2)) > 0.7) {

@@ -37,12 +37,13 @@ export default function HomePage() {
     setAudioEnergy(energy);
   };
 
-  // Add effect logging
+  // Add effect logging with reduced frequency
   useEffect(() => {
     // Store original methods
     const originalSetInterval = window.setInterval;
     const originalClearInterval = window.clearInterval;
     const originalSetTimeout = window.setTimeout;
+    const originalConsoleLog = console.log;
     
     // Tracking objects for all effects
     const effectIntervals: Record<string, { id: number, timing: number, description: string, category: string }> = {};
@@ -59,10 +60,12 @@ export default function HomePage() {
       audio: { name: "AUDIO", color: "#BB44FF" }
     };
     
-    // Counter for effect occurrences
+    // Counter for effect occurrences and rate limiting
     const effectCounts: Record<string, number> = {};
+    const effectLastLogged: Record<string, number> = {};
+    const logRateLimit = 1000; // Only log once per second for each effect type
     
-    // Helper function for logging
+    // Helper function for logging with rate limiting
     const logEffect = (type: string, category: string, description: string, timing: number) => {
       // Skip veins logs
       if (category === effectCategories.veins.name) return;
@@ -71,17 +74,31 @@ export default function HomePage() {
       const effectKey = `${category}-${description}`;
       effectCounts[effectKey] = (effectCounts[effectKey] || 0) + 1;
       
-      // Determine color code
-      let colorCode = "#FFFFFF";
-      Object.values(effectCategories).forEach(cat => {
-        if (cat.name === category) colorCode = cat.color;
-      });
+      // Check if we should log this effect (first occurrence or rate-limited)
+      const now = Date.now();
+      const lastLogged = effectLastLogged[effectKey] || 0;
+      const isFirstOccurrence = effectCounts[effectKey] === 1;
+      const isRateLimited = now - lastLogged >= logRateLimit;
       
-      console.log(`%c[${category}] ${description} (${timing}ms) #${effectCounts[effectKey]}`, 
-                 `color: ${colorCode}; font-weight: bold;`);
+      if (isFirstOccurrence || isRateLimited) {
+        // Update last logged timestamp
+        effectLastLogged[effectKey] = now;
+        
+        // Determine color code
+        let colorCode = "#FFFFFF";
+        Object.values(effectCategories).forEach(cat => {
+          if (cat.name === category) colorCode = cat.color;
+        });
+        
+        // Call original log directly to avoid recursion
+        originalConsoleLog.apply(console, [
+          `%c[${category}] ${description} (${timing}ms) #${effectCounts[effectKey]}`, 
+          `color: ${colorCode}; font-weight: bold;`
+        ]);
+      }
     };
     
-    // setInterval overriden
+    // setInterval overriden with reduced logging
     window.setInterval = function(callback: TimerHandler, timeout?: number, ...args: any[]): number {
       // Original-Interval erstellen
       const intervalId = originalSetInterval(callback, timeout, ...args);
@@ -139,7 +156,7 @@ export default function HomePage() {
         category: category
       };
       
-      // Output to console (only if not veins)
+      // Output to console with rate limiting (only if not veins)
       if (category !== effectCategories.veins.name) {
         logEffect("START", category, effectType, timeout || 0);
       }
@@ -152,7 +169,7 @@ export default function HomePage() {
       return originalClearInterval(intervalId);
     } as typeof window.clearInterval;
     
-    // setTimeout overriden
+    // setTimeout overriden with reduced logging
     window.setTimeout = function(callback: TimerHandler, timeout?: number, ...args: any[]): number {
       // Original-Timeout erstellen
       const timeoutId = originalSetTimeout(callback, timeout, ...args);
@@ -184,7 +201,7 @@ export default function HomePage() {
         category = effectCategories.audio.name;
       }
       
-      // Only track relevant timeouts
+      // Only track and log relevant timeouts with rate limiting
       if (category && category !== effectCategories.veins.name) {
         effectTimeouts[timeoutId] = {
           id: timeoutId,
@@ -199,8 +216,7 @@ export default function HomePage() {
       return timeoutId;
     } as typeof window.setTimeout;
     
-    // Override console.log for special debug logs
-    const originalConsoleLog = console.log;
+    // Override console.log for special debug logs with rate limiting
     console.log = function(...args: any[]) {
       // Check if this is a call from our own logging function to avoid recursion
       const stack = new Error().stack || "";
@@ -213,7 +229,7 @@ export default function HomePage() {
       originalConsoleLog.apply(console, args);
       
       // Check if it's a debug log
-      if (args.length >= 2 && typeof args[0] === 'string') {
+      if (args.length >= 1 && typeof args[0] === 'string') {
         const logMessage = args[0];
         
         if (logMessage.includes('[COLOR_CHANGE]')) {
@@ -236,49 +252,27 @@ export default function HomePage() {
       }
     };
     
-    // Output summary of effects after 2 seconds
+    // Output summary of effects after 2 seconds - simplified to reduce memory usage
     originalSetTimeout(() => {
-      console.log("%c=== EFFECTS OVERVIEW ===", "color: white; background: #222; font-size: 16px; font-weight: bold; padding: 5px 10px;");
+      originalConsoleLog("%c=== EFFECTS OVERVIEW ===", "color: white; background: #222; font-size: 16px; font-weight: bold; padding: 5px 10px;");
       
-      // Group by category
-      const categorizedEffects: Record<string, { description: string, timing: number, count: number }[]> = {};
+      // Group by category - simplified to just count occurrences
+      const categoryCounts: Record<string, number> = {};
       
-      // Group intervals
+      // Count effects by category
       Object.values(effectIntervals).forEach(effect => {
         if (effect.category === effectCategories.veins.name) return;
-        
-        if (!categorizedEffects[effect.category]) {
-          categorizedEffects[effect.category] = [];
-        }
-        
-        const effectKey = `${effect.category}-${effect.description}`;
-        const count = effectCounts[effectKey] || 0;
-        
-        // Check if this effect has already been added
-        const existingEffect = categorizedEffects[effect.category].find(e => e.description === effect.description);
-        if (!existingEffect) {
-          categorizedEffects[effect.category].push({
-            description: effect.description,
-            timing: effect.timing,
-            count: count
-          });
-        } else {
-          // Update the counter
-          existingEffect.count = count;
-        }
+        categoryCounts[effect.category] = (categoryCounts[effect.category] || 0) + 1;
       });
       
       // Output by category
-      Object.keys(categorizedEffects).forEach(category => {
+      Object.keys(categoryCounts).forEach(category => {
         let colorCode = "#FFFFFF";
         Object.values(effectCategories).forEach(cat => {
           if (cat.name === category) colorCode = cat.color;
         });
         
-        console.log(`%c${category}:`, `color: ${colorCode}; font-weight: bold;`);
-        categorizedEffects[category].forEach(effect => {
-          console.log(`  - ${effect.description}: ${effect.timing}ms (occurred ${effect.count}x)`);
-        });
+        originalConsoleLog(`%c${category}: ${categoryCounts[category]} effects registered`, `color: ${colorCode}; font-weight: bold;`);
       });
       
       // Cleanup of console.log override

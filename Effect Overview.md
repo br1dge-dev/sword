@@ -7,10 +7,11 @@ This document provides an overview of all visual effects in the sword applicatio
 The visual effects are mainly implemented in the following files:
 
 - **src/components/ascii/sword-modules/AsciiSwordModular.tsx**: Main component for the ASCII sword with all visual effects
+- **src/components/ascii/sword-modules/effects/backgroundEffects.ts**: Background generation and veins effects
 - **src/store/powerUpStore.ts**: State management for level, charge, and glitch effects
 - **src/components/ui/ChargeProgressBar.tsx**: Component for the charge progress display
 - **src/components/ui/GlitchProgressBar.tsx**: Component for the glitch progress display
-- **src/app/page.tsx**: Contains the effect tracking logic and categorization
+- **src/app/page.tsx**: Contains the effect tracking logic and categorization with rate-limited logging
 
 ## Dependencies
 
@@ -29,6 +30,7 @@ The visual effects are mainly implemented in the following files:
 - **Background Pattern Update**: 
   - Fixed interval of 10 seconds
   - Full pattern regeneration with new random parameters
+  - Uses simplified character sets without complex symbols (no clocks, hourglasses, etc.)
   - Logged with timestamp as `[BACKGROUND] Scheduled pattern update (10s interval)`
 
 ### Veins Effect
@@ -158,6 +160,8 @@ The visual effects are mainly implemented in the following files:
 
 ### Logging System
 - **Timestamp Format**: HH:MM:SS in ISO format
+- **Rate Limiting**: Each effect type is logged at most once per second (1000ms)
+- **First Occurrence**: Always logs the first occurrence of each effect type
 - **Color Coding**:
   - Background Updates: Green (#00AA55)
   - Veins Updates: Blue (#44AAFF)
@@ -175,6 +179,7 @@ The visual effects are mainly implemented in the following files:
   - Count of applied effects
   - Parameter values (intensity, duration, etc.)
   - Probability calculations when relevant
+  - Occurrence counter (e.g., #1, #2, etc.)
 
 ### State Management
 - **PowerUpStore**:
@@ -196,6 +201,7 @@ The visual effects are mainly implemented in the following files:
    - Fixed interval of 5s for temporary glitch patterns
    - Removed blur effects from background layer
    - Added detailed logging for all background events
+   - Removed complex symbols (clocks, hourglasses, keyboards) from background
 
 3. **Color Effects Improvements**:
    - Base color change intervals now depend on glitchLevel (7s, 5s, 3s)
@@ -204,6 +210,8 @@ The visual effects are mainly implemented in the following files:
 
 4. **Logging System**:
    - Added timestamps to all logs
+   - Implemented rate limiting (max once per second per effect type)
    - Consistent color coding by effect type
    - Detailed information about effect parameters
-   - Logging of both successful and skipped effects 
+   - Logging of both successful and skipped effects
+   - Simplified overview summary to reduce memory usage 
