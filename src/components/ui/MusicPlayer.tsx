@@ -239,7 +239,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
   const currentTrack = tracks[currentTrackIndex];
 
   return (
-    <div className={`flex flex-col items-start ${className}`}>
+    <div className={`flex flex-col ${className}`}>
       <audio 
         ref={audioRef} 
         src={currentTrack.src}

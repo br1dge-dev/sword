@@ -51,7 +51,7 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
   }, [resetAllEffects]);
   
   return (
-    <div className={`flex flex-col items-start ${className}`}>
+    <div className={`flex flex-col ${className}`}>
       <CleanseButton 
         onClick={handleCleanse}
         cooldown={3000}

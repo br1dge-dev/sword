@@ -10,6 +10,7 @@ import AsciiSword from '@/components/ascii/AsciiSword';
 import SideButtons from '@/components/ui/SideButtons';
 import MusicPlayer from '@/components/ui/MusicPlayer';
 import AudioVisualizer from '@/components/ui/AudioVisualizer';
+import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import { usePowerUpStore } from '@/store/powerUpStore';
 import { useEffect, useState } from "react";
 
@@ -296,8 +297,8 @@ export default function HomePage() {
         </div>
       </div>
       
-      {/* UI-Elemente auf der linken Seite */}
-      <div className="fixed left-[10%] top-1/2 -translate-y-1/2 z-10 flex flex-col items-start gap-6">
+      {/* UI-Elemente auf der linken Seite - nur auf größeren Bildschirmen sichtbar */}
+      <div className="fixed left-[10%] top-1/2 -translate-y-1/2 z-10 hidden sm:flex flex-col items-start gap-6">
         <SideButtons />
         <MusicPlayer 
           onBeat={handleBeat} 
@@ -306,6 +307,16 @@ export default function HomePage() {
         <AudioVisualizer 
           energy={audioEnergy} 
           beatDetected={beatDetected} 
+        />
+      </div>
+      
+      {/* Mobiles Overlay - nur auf kleinen Bildschirmen sichtbar */}
+      <div className="sm:hidden">
+        <MobileControlsOverlay
+          audioEnergy={audioEnergy}
+          beatDetected={beatDetected}
+          onBeat={handleBeat}
+          onEnergyChange={handleEnergyChange}
         />
       </div>
     </main>

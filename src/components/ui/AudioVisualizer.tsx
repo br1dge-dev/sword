@@ -45,7 +45,7 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
   const activeBars = calculateActiveBars();
   
   return (
-    <div className={`flex flex-col items-start ${className}`}>
+    <div className={`flex flex-col ${className}`}>
       <div className="text-xs font-bold font-press-start-2p text-[#3EE6FF] mb-1">
         AUDIO SYNC
       </div>
