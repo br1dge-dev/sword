@@ -1,0 +1,101 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from 'react';
+
+interface AudioVisualizerProps {
+  energy: number;
+  beatDetected: boolean;
+  className?: string;
+}
+
+export default function AudioVisualizer({ energy, beatDetected, className = '' }: AudioVisualizerProps) {
+  const [visualBeatActive, setVisualBeatActive] = useState(false);
+  const lastEnergyRef = useRef(energy);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastUpdateTimeRef = useRef(0);
+  
+  // Optimierte Aktualisierung des Energy-Werts
+  useEffect(() => {
+    // Empfindlicher auf Energieänderungen reagieren
+    if (Math.abs(energy - lastEnergyRef.current) > 0.02) {
+      lastEnergyRef.current = energy;
+    }
+  }, [energy]);
+  
+  // Effekt für Beat-Animation
+  useEffect(() => {
+    if (beatDetected) {
+      setVisualBeatActive(true);
+      const timeout = setTimeout(() => {
+        setVisualBeatActive(false);
+      }, 150); // Animation für 150ms
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [beatDetected]);
+  
+  // Berechne die Anzahl der aktiven Balken basierend auf der Energie
+  const calculateActiveBars = () => {
+    const maxBars = 16;
+    // Verstärke den Energiewert, um die Visualisierung empfindlicher zu machen
+    const amplifiedEnergy = Math.min(1, lastEnergyRef.current * 1.8);
+    return Math.max(1, Math.floor(amplifiedEnergy * maxBars));
+  };
+  
+  const activeBars = calculateActiveBars();
+  
+  return (
+    <div className={`flex flex-col items-start ${className}`}>
+      <div className="text-xs font-bold font-press-start-2p text-[#3EE6FF] mb-1">
+        AUDIO SYNC
+      </div>
+      
+      {/* Visualisierungs-Container */}
+      <div 
+        className="h-6 border border-gray-700 bg-gray-900 flex items-end p-0.5 overflow-hidden"
+        style={{ 
+          boxShadow: visualBeatActive 
+            ? 'inset 0 0 8px rgba(62,230,255,0.8), 0 0 12px rgba(62,230,255,0.4)' 
+            : 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
+          transition: 'box-shadow 0.1s ease-out',
+          width: '12rem'
+        }}
+      >
+        {/* Visualisierungs-Balken - Nutze die volle Breite */}
+        {Array.from({ length: 12 }).map((_, index) => {
+          const isActive = index < Math.ceil(activeBars / 16 * 12);
+          const height = 20 - Math.abs(index - 6) * 1.2; // Höhere Balken in der Mitte
+          
+          return (
+            <div
+              key={index}
+              className={`flex-1 mx-[1px] transition-all duration-150 ${isActive ? 'bg-[#3EE6FF]' : 'bg-gray-800'}`}
+              style={{
+                height: `${Math.max(3, (height / 20) * 100)}%`,
+                transform: visualBeatActive && isActive ? 'scaleY(1.4)' : 'scaleY(1)',
+                boxShadow: isActive 
+                  ? 'inset 0 0 3px rgba(62,230,255,0.8)' 
+                  : 'none'
+              }}
+            />
+          );
+        })}
+      </div>
+      
+      {/* Beat-Indikator */}
+      <div className="flex justify-between w-full mt-1">
+        <div 
+          className={`w-2 h-2 rounded-full transition-all duration-150 ${visualBeatActive ? 'bg-[#3EE6FF]' : 'bg-gray-700'}`}
+          style={{
+            boxShadow: visualBeatActive 
+              ? '0 0 8px rgba(62,230,255,0.8)' 
+              : 'none'
+          }}
+        />
+        <div className="text-[8px] font-mono text-gray-500">
+          E: {(lastEnergyRef.current * 1.8).toFixed(2)}
+        </div>
+      </div>
+    </div>
+  );
+} 

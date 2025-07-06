@@ -9,13 +9,34 @@
 import AsciiSword from '@/components/ascii/AsciiSword';
 import SideButtons from '@/components/ui/SideButtons';
 import MusicPlayer from '@/components/ui/MusicPlayer';
+import AudioVisualizer from '@/components/ui/AudioVisualizer';
 import { usePowerUpStore } from '@/store/powerUpStore';
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function HomePage() {
   // Base level setting (will be overridden by PowerUp)
   const baseSwordLevel = 1;
   
+  // Audio analysis state
+  const [audioEnergy, setAudioEnergy] = useState(0);
+  const [beatDetected, setBeatDetected] = useState(false);
+  
+  // Handle beat detection
+  const handleBeat = () => {
+    console.log('Beat detected in main component!');
+    setBeatDetected(true);
+    
+    // Reset beat detection after a short delay
+    setTimeout(() => {
+      setBeatDetected(false);
+    }, 100);
+  };
+  
+  // Handle energy changes
+  const handleEnergyChange = (energy: number) => {
+    setAudioEnergy(energy);
+  };
+
   // Add effect logging
   useEffect(() => {
     // Store original methods
@@ -34,7 +55,8 @@ export default function HomePage() {
       veins: { name: "VEINS", color: "#44AAFF" },
       charge: { name: "CHARGE", color: "#FFFF00" },
       glitch: { name: "GLITCH", color: "#FF3EC8" },
-      vibration: { name: "VIBRATION", color: "#FF8800" }
+      vibration: { name: "VIBRATION", color: "#FF8800" },
+      audio: { name: "AUDIO", color: "#BB44FF" }
     };
     
     // Counter for effect occurrences
@@ -104,6 +126,9 @@ export default function HomePage() {
           effectType = "Background effect";
           category = effectCategories.background.name;
         }
+      } else if (stackTrace.includes("AudioAnalyzer") || stackTrace.includes("useAudioAnalyzer")) {
+        effectType = "Audio analysis";
+        category = effectCategories.audio.name;
       }
       
       // Store effect in tracking object
@@ -154,6 +179,9 @@ export default function HomePage() {
           effectType = "Unicode glitch reset";
           category = effectCategories.glitch.name;
         }
+      } else if (stackTrace.includes("AudioAnalyzer") || stackTrace.includes("useAudioAnalyzer") || stackTrace.includes("AudioVisualizer")) {
+        effectType = "Audio visualization update";
+        category = effectCategories.audio.name;
       }
       
       // Only track relevant timeouts
@@ -202,6 +230,8 @@ export default function HomePage() {
           if (glitchMatch && glitchMatch[1]) {
             logEffect("DEBUG", effectCategories.glitch.name, `Unicode glitches: ${glitchMatch[1]}`, 0);
           }
+        } else if (logMessage.includes('Beat detected')) {
+          logEffect("DEBUG", effectCategories.audio.name, "Beat detected", 0);
         }
       }
     };
@@ -272,12 +302,17 @@ export default function HomePage() {
         </div>
       </div>
       
-      {/* Seitliche Buttons und Progress Bars */}
-      <SideButtons />
-      
-      {/* Music Player (oben rechts, exakt auf gleicher Höhe wie der CLEANSE-Button) */}
-      <div className="fixed right-[12%] top-1/2 -translate-y-1/2 z-10">
-        <MusicPlayer />
+      {/* UI-Elemente auf der linken Seite */}
+      <div className="fixed left-[10%] top-1/2 -translate-y-1/2 z-10 flex flex-col items-start gap-6">
+        <SideButtons />
+        <MusicPlayer 
+          onBeat={handleBeat} 
+          onEnergyChange={handleEnergyChange} 
+        />
+        <AudioVisualizer 
+          energy={audioEnergy} 
+          beatDetected={beatDetected} 
+        />
       </div>
     </main>
   );

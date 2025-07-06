@@ -4,11 +4,15 @@
  * MusicPlayer Component
  * 
  * Ein einfacher Musik-Player im Retro-Stil, der zum Design der Anwendung passt.
+ * Integriert mit Audio-Analyse für Beat-Erkennung.
  */
 import React, { useState, useRef, useEffect } from 'react';
+import { useAudioAnalyzer } from '../../hooks/useAudioAnalyzer';
 
 interface MusicPlayerProps {
   className?: string;
+  onBeat?: () => void;
+  onEnergyChange?: (energy: number) => void;
 }
 
 // Verfügbare Tracks
@@ -19,13 +23,79 @@ const tracks = [
   { src: "/music/atarisword.mp3", name: "ATARISWORD" }
 ];
 
-export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
+export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: MusicPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(0.5);
   const [error, setError] = useState<string | null>(null);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [tempo, setTempo] = useState<number | null>(null);
+  const [showAnalyzerInfo, setShowAnalyzerInfo] = useState(false);
+  const [analyzerInitialized, setAnalyzerInitialized] = useState(false);
+  
+  // Audio-Analyzer Hook
+  const {
+    initialize,
+    start,
+    stop,
+    detectTempo,
+    guessBeat,
+    isInitialized,
+    isAnalyzing,
+    energy,
+    beatDetected,
+    beatInfo,
+    error: analyzerError
+  } = useAudioAnalyzer({
+    energyThreshold: 0.4,
+    analyzeInterval: 200, // 200ms zwischen Analysen (5 FPS) für bessere Performance
+    onBeat: () => {
+      console.log('Beat callback triggered from analyzer');
+      onBeat?.();
+    },
+    onEnergy: (e) => {
+      onEnergyChange?.(e);
+    }
+  });
+  
+  // Initialisiere Audio-Analyzer, wenn Audio-Element verfügbar ist
+  useEffect(() => {
+    // Nur einmal initialisieren
+    if (audioRef.current && !analyzerInitialized) {
+      setAnalyzerInitialized(true);
+      
+      initialize(audioRef.current)
+        .then(() => {
+          console.log('Audio analyzer initialized with audio element');
+        })
+        .catch(err => {
+          console.error('Failed to initialize audio analyzer:', err);
+          // Wir setzen keinen Fehler mehr, da das die Benutzererfahrung nicht beeinträchtigen soll
+          // setError('Analyzer-Fehler');
+        });
+    }
+  }, [audioRef.current, initialize, analyzerInitialized]);
+  
+  // Starte/Stoppe Analyzer basierend auf Wiedergabestatus
+  useEffect(() => {
+    if (isInitialized) {
+      if (isPlaying && !isAnalyzing) {
+        start();
+        console.log('Starting audio analysis');
+      } else if (!isPlaying && isAnalyzing) {
+        stop();
+        console.log('Stopping audio analysis');
+      }
+    }
+  }, [isPlaying, isInitialized, isAnalyzing, start, stop]);
+  
+  // Reagiere auf Beat-Erkennung mit visueller Anzeige
+  useEffect(() => {
+    if (beatDetected) {
+      console.log('Beat detected!');
+    }
+  }, [beatDetected]);
   
   // Aktualisiere den Fortschritt während der Wiedergabe
   useEffect(() => {
@@ -99,6 +169,7 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
     
     // Setze den Fortschritt zurück
     setProgress(0);
+    setTempo(null);
     
     // Spiele den neuen Track ab, wenn der vorherige abgespielt wurde
     setTimeout(() => {
@@ -139,6 +210,19 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
     }
   };
   
+  // BPM erkennen
+  const handleDetectTempo = async () => {
+    try {
+      const detectedTempo = await detectTempo();
+      setTempo(detectedTempo);
+      console.log('Detected tempo:', detectedTempo);
+    } catch (err) {
+      console.error('Failed to detect tempo:', err);
+      // Wir setzen keinen Fehler mehr, da das die Benutzererfahrung nicht beeinträchtigen soll
+      // setError('Tempo-Erkennung fehlgeschlagen');
+    }
+  };
+  
   // Fortschrittsbalken-Tiles generieren
   const renderProgressTiles = () => {
     const totalTiles = 10;
@@ -147,13 +231,19 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
     for (let i = 0; i < totalTiles; i++) {
       const tileProgress = (i + 1) / totalTiles * 100;
       const isActive = tileProgress <= progress;
+      const isBeatActive = beatDetected && isActive;
       
       tiles.push(
         <div 
           key={i}
-          className={`h-full w-[10%] ${isActive ? 'bg-[#3EE6FF]' : 'bg-gray-800'} border-r border-gray-900 last:border-r-0`}
+          className={`h-full w-[10%] ${isActive ? 'bg-[#3EE6FF]' : 'bg-gray-800'} border-r border-gray-900 last:border-r-0 transition-all duration-100`}
           style={{
-            boxShadow: isActive ? 'inset 0 0 3px rgba(62,230,255,0.8)' : 'none'
+            boxShadow: isBeatActive 
+              ? 'inset 0 0 8px rgba(62,230,255,1)' 
+              : isActive 
+                ? 'inset 0 0 3px rgba(62,230,255,0.8)' 
+                : 'none',
+            transform: isBeatActive ? 'scaleY(1.1)' : 'scaleY(1)'
           }}
         />
       );
@@ -166,8 +256,7 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
   const currentTrack = tracks[currentTrackIndex];
 
   return (
-    <div className={`flex flex-col ${className}`}>
-      {/* Audio-Element (unsichtbar) */}
+    <div className={`flex flex-col items-start ${className}`}>
       <audio 
         ref={audioRef} 
         src={currentTrack.src}
@@ -175,19 +264,17 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
         onCanPlayThrough={() => setError(null)}
       />
       
-      <div className="flex flex-col">
-        {/* Überschrift "MUSIC" im Pixel-Font-Stil, linksbündig */}
-        <div className="mb-1 text-xs font-bold font-press-start-2p text-left text-[#3EE6FF]" 
+      <div className="flex flex-col w-full">
+        <div className="mb-1 text-xs font-bold font-press-start-2p text-[#3EE6FF] flex justify-between items-center" 
              style={{ 
                textShadow: '0 0 1px #3EE6FF',
                letterSpacing: '0.05em'
              }}>
-          {currentTrack.name}
+          <div>{currentTrack.name}</div>
+          {tempo && <div className="text-[10px]">{Math.round(tempo)} BPM</div>}
         </div>
         
-        {/* Fortschrittsbalken und Play/Pause-Button */}
         <div className="flex items-center gap-2">
-          {/* Fortschrittsbalken mit Tiles (dient jetzt auch als Lautstärkeregler) */}
           <div className="relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex"
                style={{ 
                  boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
@@ -195,7 +282,6 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
                }}>
             {renderProgressTiles()}
             
-            {/* Unsichtbarer Range-Input für Scrubbing und Lautstärke */}
             <input 
               type="range" 
               min="0" 
@@ -207,7 +293,6 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
             />
           </div>
           
-          {/* Play/Pause-Button */}
           <button
             onClick={togglePlay}
             className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF]"
@@ -218,22 +303,18 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
               backgroundSize: '4px 4px'
             }}
           >
-            {/* Play/Pause-Icon (Pixel-Art-Stil) */}
             <div className="relative w-3 h-3">
               {isPlaying ? (
                 <>
-                  {/* Pause-Icon */}
                   <div className="absolute top-0 left-0 w-1 h-3 bg-[#3EE6FF]"></div>
                   <div className="absolute top-0 left-2 w-1 h-3 bg-[#3EE6FF]"></div>
                 </>
               ) : (
                 <>
-                  {/* Play-Icon */}
                   <div className="absolute top-0 left-0 w-2 h-3 bg-[#3EE6FF] clip-triangle"></div>
                 </>
               )}
               
-              {/* Glüheffekt */}
               <div className="absolute inset-0 opacity-70"
                    style={{ 
                      boxShadow: '0 0 3px rgba(62,230,255,0.8)',
@@ -243,7 +324,6 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
             </div>
           </button>
           
-          {/* Next-Button */}
           <button
             onClick={nextTrack}
             className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF]"
@@ -254,14 +334,11 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
               backgroundSize: '4px 4px'
             }}
           >
-            {/* Next-Icon (Pixel-Art-Stil) */}
             <div className="relative w-3 h-3">
-              {/* Zwei Dreiecke für Next-Symbol */}
               <div className="absolute top-0 left-0 w-1 h-3 bg-[#3EE6FF] clip-triangle"></div>
               <div className="absolute top-0 left-2 w-1 h-3 bg-[#3EE6FF] clip-triangle"></div>
               <div className="absolute top-0 left-3 w-[2px] h-3 bg-[#3EE6FF]"></div>
               
-              {/* Glüheffekt */}
               <div className="absolute inset-0 opacity-70"
                    style={{ 
                      boxShadow: '0 0 3px rgba(62,230,255,0.8)',
@@ -270,12 +347,37 @@ export default function MusicPlayer({ className = '' }: MusicPlayerProps) {
               </div>
             </div>
           </button>
+          
+          <button
+            onClick={handleDetectTempo}
+            title="BPM erkennen"
+            className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF] text-[8px] font-mono text-[#3EE6FF]"
+            style={{ 
+              boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(62,230,255,0.3)',
+              imageRendering: 'pixelated',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
+              backgroundSize: '4px 4px'
+            }}
+          >
+            BPM
+          </button>
         </div>
         
-        {/* Fehleranzeige (nur wenn ein Fehler vorliegt) */}
         {error && (
-          <div className="mt-1 text-[10px] text-left opacity-80 font-mono text-[#FF3EC8]">
+          <div className="mt-1 text-[10px] opacity-80 font-mono text-[#FF3EC8]">
             {error}
+          </div>
+        )}
+        
+        {showAnalyzerInfo && (
+          <div className="mt-2 text-[8px] font-mono text-gray-400 border border-gray-800 p-1 w-full">
+            <div>Energy: {energy.toFixed(3)}</div>
+            {beatInfo && (
+              <>
+                <div>BPM: {beatInfo.bpm}</div>
+                <div>Offset: {beatInfo.offset.toFixed(2)}s</div>
+              </>
+            )}
           </div>
         )}
       </div>

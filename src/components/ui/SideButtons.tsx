@@ -51,27 +51,17 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
   }, [resetAllEffects]);
   
   return (
-    <>
-      {/* Linke Seite mit allen Buttons und Progress-Bars */}
-      <div className={`fixed left-[12%] top-1/2 -translate-y-1/2 flex flex-col gap-4 z-10 ${className}`}>
-        {/* CLEANSE Button */}
-        <CleanseButton 
-          onClick={handleCleanse}
-          cooldown={3000} // 3 Sekunden Cooldown für CLEANSE
-        />
-        
-        {/* Alle Progress-Bars */}
-        <div className="flex flex-col gap-5 mt-4">
-          {/* Forge-Fortschrittsbalken */}
-          <ForgeProgressBar />
-          
-          {/* Charge-Fortschrittsbalken */}
-          <ChargeProgressBar />
-          
-          {/* Glitch-Fortschrittsbalken */}
-          <GlitchProgressBar />
-        </div>
+    <div className={`flex flex-col items-start ${className}`}>
+      <CleanseButton 
+        onClick={handleCleanse}
+        cooldown={3000}
+      />
+      
+      <div className="flex flex-col gap-4 mt-4">
+        <ForgeProgressBar />
+        <ChargeProgressBar />
+        <GlitchProgressBar />
       </div>
-    </>
+    </div>
   );
 } 
