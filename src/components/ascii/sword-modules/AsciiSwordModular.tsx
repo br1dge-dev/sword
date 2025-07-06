@@ -46,7 +46,7 @@ import {
 } from './utils/swordUtils';
 
 // Importiere Effekt-Generatoren
-import { generateCaveBackground, generateColoredVeins, generateBeatReactiveBackground } from './effects/backgroundEffects';
+import { generateCaveBackground, generateColoredVeins } from './effects/backgroundEffects';
 import { generateHarmonicColorPair } from './effects/colorEffects';
 import {
   generateEdgeGlitches,
@@ -59,7 +59,7 @@ import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects
 
 export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
-  const { currentLevel, chargeLevel, glitchLevel, beatDetected, beatEnergy } = usePowerUpStore();
+  const { currentLevel, chargeLevel, glitchLevel } = usePowerUpStore();
   
   // Zustände für visuelle Effekte
   const [glowIntensity, setGlowIntensity] = useState(0);
@@ -76,11 +76,6 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
   const [blurredChars, setBlurredChars] = useState<Array<{x: number, y: number}>>([]);
   const [skewedChars, setSkewedChars] = useState<Array<{x: number, y: number, angle: number}>>([]);
   const [fadedChars, setFadedChars] = useState<Array<{x: number, y: number, opacity: number}>>([]);
-  
-  // Beat-Reaktion
-  const [beatColorActive, setBeatColorActive] = useState<boolean>(false);
-  const [beatColor, setBeatColor] = useState<string>('#FF3EC8'); // Default Beat-Farbe
-  const lastBeatTimeRef = useRef<number>(0);
   
   // Refs für Intervalle, um Speicherlecks zu vermeiden
   const intervalsRef = useRef<IntervalRefs>({
@@ -143,56 +138,66 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
     const bgWidth = 120;
     const bgHeight = 80;
     
-    // Generiere den Höhlenhintergrund einmalig
-    setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+    // Logging-Funktion mit Zeitstempel
+    const logWithTimestamp = (message: string, color: string) => {
+      const timestamp = new Date().toISOString().substr(11, 8); // HH:MM:SS
+      console.log(`%c[${timestamp}] ${message}`, `color: ${color}; font-weight: bold;`);
+    };
     
-    // Generiere farbige Äderchen basierend auf glitchLevel einmalig
+    // Generiere den Höhlenhintergrund
+    setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+    logWithTimestamp('[BACKGROUND] Initial background generated', '#00AA55');
+    
+    // Generiere farbige Äderchen basierend auf glitchLevel
     const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
     const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
     setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
+    logWithTimestamp('[VEINS] Initial veins generated', '#44AAFF');
     
-    // Debug-Log für die Initialisierung
-    console.log(`%c[BACKGROUND_INIT] Initial background generated`, 'color: #00AA55; font-weight: bold;');
-    
-    // WORKAROUND: Seltener Fallback-Timer für Hintergrundaktualisierung (nur alle 15 Sekunden)
-    // Dieser Timer dient nur als Notfall-Fallback, wenn keine Beats erkannt werden
+    // 1. Komplette Hintergrundmuster-Neuberechnung alle 10 Sekunden (vorher 3 Sekunden)
     intervalsRef.current.background = setInterval(() => {
-      // Prüfe, ob kürzlich ein Beat erkannt wurde (in den letzten 5 Sekunden)
-      const timeSinceLastBeat = Date.now() - lastBeatTimeRef.current;
+      setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+      logWithTimestamp('[BACKGROUND] Scheduled pattern update (10s interval)', '#00AA55');
+    }, 10000);
+    
+    // 2. Wellenförmige Aktualisierung der Adern alle 4 Sekunden
+    const veinsUpdateInterval = setInterval(() => {
+      setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
+      logWithTimestamp('[VEINS] Scheduled wave pattern update (4s interval)', '#44AAFF');
+    }, 4000);
+    
+    // 3. Temporäre Glitch-Effekte mit anschließendem Musterwechsel alle 5 Sekunden
+    const glitchPatternInterval = setInterval(() => {
+      // Temporäre Glitch-Effekte mit garantiert anderen Mustern
+      const tempBackground = generateCaveBackground(bgWidth, bgHeight);
+      setCaveBackground(tempBackground);
+      logWithTimestamp('[BACKGROUND] Temporary glitch pattern applied (5s interval)', '#FF3EC8');
       
-      // Nur aktualisieren, wenn länger als 5 Sekunden kein Beat erkannt wurde
-      if (timeSinceLastBeat > 5000) {
-        console.log(`%c[BACKGROUND_WORKAROUND] Aktualisiere Hintergrund durch Timer-Fallback (${Math.floor(timeSinceLastBeat/1000)}s seit letztem Beat)...`, 
-                   'color: #00AA55; background-color: #222222; font-weight: bold;');
-        
-        // Verwende statischen Hintergrund statt Beat-reaktivem Hintergrund
-        const newBackground = generateCaveBackground(bgWidth, bgHeight);
-        setCaveBackground(newBackground);
-        
-        // Generiere neue Adern
-        const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
-        const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
-        const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins);
-        setColoredVeins(newVeins);
-        
-        // Wähle eine zufällige Akzentfarbe
-        const randomColor = accentColors[Math.floor(Math.random() * accentColors.length)];
-        setBaseColor(randomColor);
-        setBgColor(getComplementaryColor(randomColor));
+      // Zurück zu einem neuen Muster nach kurzer Zeit
+      setTimeout(() => {
+        setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+        logWithTimestamp('[BACKGROUND] Post-glitch new pattern generated', '#FF3EC8');
+      }, 120);
+    }, 5000);
+    
+    // Zusätzliche Äderchen-Animation für fließende Bewegungen
+    intervalsRef.current.veins = setInterval(() => {
+      // Subtile Aktualisierungen der Adern für fließende Bewegung
+      if (Math.random() > 0.4) {
+        setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
+        logWithTimestamp('[VEINS] Random subtle update (60% chance)', '#44AAFF');
       } else {
-        console.log(`%c[BACKGROUND_WORKAROUND] Timer-Fallback übersprungen, letzter Beat vor ${Math.floor(timeSinceLastBeat/1000)}s`, 
-                   'color: #00AA55; background-color: #222222; font-weight: bold;');
+        logWithTimestamp('[VEINS] Random update skipped (40% chance)', '#44AAFF');
       }
-    }, 15000); // Längeres Intervall (15 Sekunden statt 5 Sekunden)
-
+    }, 1200 - (glitchLevel * 200)); // Schnellere Updates bei höheren Glitch-Levels
+    
+    // Aufräumen beim Unmounten
     return () => {
-      // Intervall beim Unmounten aufräumen
-      if (intervalsRef.current.background) {
-        clearInterval(intervalsRef.current.background);
-      }
-      if (intervalsRef.current.veins) {
-        clearInterval(intervalsRef.current.veins);
-      }
+      if (intervalsRef.current.background) clearInterval(intervalsRef.current.background);
+      if (intervalsRef.current.veins) clearInterval(intervalsRef.current.veins);
+      clearInterval(veinsUpdateInterval);
+      clearInterval(glitchPatternInterval);
+      logWithTimestamp('[CLEANUP] All background intervals cleared', '#FFFFFF');
     };
   }, [glitchLevel]);
   
@@ -200,84 +205,112 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
   useEffect(() => {
     const swordPositions = getSwordPositions();
     
+    // Logging-Funktion mit Zeitstempel
+    const logWithTimestamp = (message: string, color: string) => {
+      const timestamp = new Date().toISOString().substr(11, 8); // HH:MM:SS
+      console.log(`%c[${timestamp}] ${message}`, `color: ${color}; font-weight: bold;`);
+    };
+    
     // Aggressiver Puls-Effekt
     intervalsRef.current.glow = setInterval(() => {
       // Zufällige Intensität zwischen 0.3 und 1.0
       const randomIntensity = Math.random() * 0.7 + 0.3;
       setGlowIntensity(randomIntensity);
+      logWithTimestamp(`[GLOW] Intensity updated to ${randomIntensity.toFixed(2)}`, '#FFFF00');
     }, Math.floor(Math.random() * 100) + 100);
     
     // Color change effect - MAXIMALE WAHRSCHEINLICHKEIT
     intervalsRef.current.colorChange = setInterval(() => {
-      // Automatische Farbwechsel sind jetzt komplett deaktiviert
-      // Farbwechsel werden nur noch durch Beats ausgelöst
-      console.log(`%c[COLOR_CHANGE_DEBUG] Automatische Farbwechsel deaktiviert, warte auf Beat-Events`, 'color: #00FCA6; font-weight: bold;');
-    }, 3000);
+      const now = Date.now();
+      const timeSinceLastChange = now - lastColorChangeTime;
+      
+      // Nur Farbwechsel erlauben, wenn die minimale Stabilitätszeit überschritten ist
+      if (timeSinceLastChange >= colorStability) {
+        // Extrem hohe Wahrscheinlichkeit für Farbwechsel - noch weiter erhöht
+        const colorChangeChance = 0.12 - (glitchLevel * 0.03); // 0.12, 0.09, 0.06, 0.03 - extrem hohe Chance
+        if (Math.random() > colorChangeChance) {
+          // Erzeuge eine harmonische Farbkombination
+          const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
+          
+          // Setze die neuen Farben
+          setBaseColor(swordColor);
+          setBgColor(newBgColor);
+          
+          // Aktualisiere den Zeitstempel für den letzten Farbwechsel
+          setLastColorChangeTime(now);
+          
+          // Setze eine neue zufällige Stabilitätszeit (0.3-1.5 Sekunden) - noch stärker verkürzt
+          setColorStability(Math.floor(Math.random() * 1200) + 300);
+          
+          logWithTimestamp(`[COLOR_CHANGE] New color: ${swordColor}, BG: ${newBgColor}, Stability: ${colorStability}ms`, '#00FCA6');
+        } else {
+          logWithTimestamp(`[COLOR_CHANGE] Change skipped (${(colorChangeChance * 100).toFixed(0)}% chance)`, '#00FCA6');
+        }
+      } else {
+        logWithTimestamp(`[COLOR_CHANGE] Waiting for stability (${timeSinceLastChange}/${colorStability}ms)`, '#00FCA6');
+      }
+    }, glitchLevel === 3 ? 3000 : (glitchLevel === 2 ? 5000 : 7000)); // Neue Intervalle basierend auf glitchLevel
     
     // SEPARATER TIMER FÜR TILE-UMFÄRBUNGEN
     intervalsRef.current.tileColors = setInterval(() => {
-      // Automatische Tile-Umfärbungen aktiviert
-      if (Math.random() > 0.7) { // 70% Chance, nichts zu tun
-        // Zufällige Tiles mit Akzentfarben einfärben - STARK REDUZIERT
-        const newColoredTiles: Array<{x: number, y: number, color: string}> = [];
+      // Zufällige Tiles mit Akzentfarben einfärben - STARK VERBESSERT
+      const newColoredTiles: Array<{x: number, y: number, color: string}> = [];
+      
+      // Anzahl der Cluster basierend auf glitchLevel - DEUTLICH ERHÖHT
+      const numClusters = Math.floor(Math.random() * 4) + 3 + (colorEffectIntensity[glitchLevel as keyof typeof colorEffectIntensity] || 2) + 2; // +2 für mehr Cluster
+      
+      for (let i = 0; i < numClusters; i++) {
+        // Wähle eine zufällige Position und Clustergröße
+        if (swordPositions.length === 0) continue;
         
-        // Anzahl der Cluster basierend auf glitchLevel - DEUTLICH REDUZIERT
-        const numClusters = Math.floor(Math.random() * 2) + 1; // Nur 1-2 Cluster
+        const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
+        const basePos = swordPositions[randomPosIndex];
         
-        for (let i = 0; i < numClusters; i++) {
-          // Wähle eine zufällige Position und Clustergröße
-          if (swordPositions.length === 0) continue;
-          
-          const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
-          const basePos = swordPositions[randomPosIndex];
-          
-          // Clustergröße: 2-4 zusammenhängende Tiles, kleiner als vorher
-          const clusterSize = Math.floor(Math.random() * 3) + 2; // Mindestens 2, maximal 4 Tiles
-          
-          // Generiere Cluster
-          const cluster = generateCluster(
-            basePos.x, 
-            basePos.y, 
-            clusterSize,
-            20, // maxWidth
-            centeredSwordLines.length // maxHeight - verwende die tatsächliche Höhe des Schwerts
-          );
-          
-          // Wähle eine zufällige Akzentfarbe für dieses Cluster
-          const accentColor = accentColors[Math.floor(Math.random() * accentColors.length)];
-          
-          // Füge alle Positionen im Cluster hinzu
-          cluster.forEach((pos: {x: number, y: number}) => {
-            // Prüfe, ob an dieser Position tatsächlich ein Schwert-Tile ist
-            if (centeredSwordLines[pos.y] && 
-                centeredSwordLines[pos.y][pos.x] && 
-                centeredSwordLines[pos.y][pos.x] !== ' ') {
-              newColoredTiles.push({
-                x: pos.x,
-                y: pos.y,
-                color: accentColor
-              });
-            }
-          });
-        }
+        // Clustergröße: 2-8 zusammenhängende Tiles, größer bei höherem glitchLevel
+        const clusterSize = Math.floor(Math.random() * 7) + 2; // Mindestens 2, maximal 8 Tiles
         
-        setColoredTiles(newColoredTiles);
+        // Generiere Cluster
+        const cluster = generateCluster(
+          basePos.x, 
+          basePos.y, 
+          clusterSize,
+          20, // maxWidth
+          centeredSwordLines.length // maxHeight - verwende die tatsächliche Höhe des Schwerts
+        );
         
-        // Debug-Log für Tile-Umfärbungen
-        if (newColoredTiles.length > 0) {
-          console.log(`%c[TILES_AUTO] Auto colored tiles: ${newColoredTiles.length} in ${numClusters} clusters`, 'color: #FF3EC8; font-weight: bold;');
-        }
+        // Wähle eine zufällige Akzentfarbe für dieses Cluster
+        const accentColor = accentColors[Math.floor(Math.random() * accentColors.length)];
+        
+        // Füge alle Positionen im Cluster hinzu
+        cluster.forEach((pos: {x: number, y: number}) => {
+          // Prüfe, ob an dieser Position tatsächlich ein Schwert-Tile ist
+          if (centeredSwordLines[pos.y] && 
+              centeredSwordLines[pos.y][pos.x] && 
+              centeredSwordLines[pos.y][pos.x] !== ' ') {
+            newColoredTiles.push({
+              x: pos.x,
+              y: pos.y,
+              color: accentColor
+            });
+          }
+        });
       }
-    }, Math.floor(Math.random() * 200) + 400);
+      
+      setColoredTiles(newColoredTiles);
+      
+      // Debug-Log für Tile-Umfärbungen
+      if (newColoredTiles.length > 0) {
+        logWithTimestamp(`[TILES] Colored tiles: ${newColoredTiles.length} in ${numClusters} clusters`, '#FF3EC8');
+      }
+    }, 2000);
     
     // Glitch-Effekte für das Schwert
     intervalsRef.current.glitch = setInterval(() => {
-      // Automatische Glitch-Effekte aktiviert
-      if (Math.random() > 0.7) { // 70% Chance, nichts zu tun
-        // Generiere Glitch-Zeichen - REDUZIERT
+      if (Math.random() > 0.5) { // 50% Chance für Glitch
+        // Generiere Glitch-Zeichen - MEHR GLITCHES
         const newGlitches: Array<{x: number, y: number, char: string}> = [];
-        // 1-5 Glitches gleichzeitig (reduziert)
-        const numGlitches = Math.floor(Math.random() * 5) + 1;
+        // 2-10 Glitches gleichzeitig (erhöht)
+        const numGlitches = Math.floor(Math.random() * 9) + 2;
         
         for (let i = 0; i < numGlitches; i++) {
           // Wähle eine zufällige Position aus den Schwert-Positionen
@@ -294,16 +327,17 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
         }
         
         setGlitchChars(newGlitches);
+        logWithTimestamp(`[GLITCH] Applied ${numGlitches} glitch characters`, '#FF5500');
         
         // Glitches nach kurzer Zeit zurücksetzen
         setTimeout(() => {
           setGlitchChars([]);
+          logWithTimestamp(`[GLITCH] Reset glitch characters after 80ms`, '#FF5500');
         }, 80); // Noch kürzere Dauer für aggressiveren Effekt
-        
-        // Debug-Log für automatische Glitches
-        console.log(`%c[GLITCH_AUTO] Auto glitches: ${numGlitches}`, 'color: #FF3EC8; font-weight: bold;');
+      } else {
+        logWithTimestamp(`[GLITCH] Skipped (50% chance)`, '#FF5500');
       }
-    }, Math.floor(Math.random() * 400) + 400);
+    }, Math.floor(Math.random() * 200) + 200); // Zufällige Intervalle für natürlicheren Effekt
     
     // Edge-Glitch-Effekte
     intervalsRef.current.edge = setInterval(() => {
@@ -311,132 +345,149 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
       const edgePositions = getEdgePositions();
       if (edgePositions.length === 0) return;
       
-      // Aktuelle Level-Werte abrufen (basierend auf chargeLevel)
-      const currentVibration = vibrationIntensity[chargeLevel as keyof typeof vibrationIntensity] || vibrationIntensity[1];
-      const currentGlitchFreq = glitchFrequency[chargeLevel as keyof typeof glitchFrequency] || glitchFrequency[1];
-      const currentColorFreq = colorEffectFrequency[chargeLevel as keyof typeof colorEffectFrequency] || colorEffectFrequency[1];
-      const currentGlitchChars = edgeGlitchChars[chargeLevel as keyof typeof edgeGlitchChars] || edgeGlitchChars[1];
-      
+      // Neue Edge-Effekte basierend auf chargeLevel
       const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}> = [];
       
-      // Für jede dünne Linie Effekte anwenden
+      // Intensität basierend auf chargeLevel
+      const vibrationChance = vibrationIntensity[chargeLevel as keyof typeof vibrationIntensity] || 0.2;
+      const glitchChance = glitchFrequency[chargeLevel as keyof typeof glitchFrequency] || 0.1;
+      const colorChance = colorEffectFrequency[chargeLevel as keyof typeof colorEffectFrequency] || 0.15;
+      
+      // Multiplier für Level 2 (erhöht die Chance um 50%)
+      const glitchMultiplier = chargeLevel === 2 ? 1.5 : 1;
+      
+      // Garantiere mindestens einen Effekt bei Level 2 oder höher
+      let hasAppliedEffect = false;
+      
+      // Durchlaufe alle Kantenpositionen
       edgePositions.forEach(pos => {
-        const effect: {x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}} = {
-          x: pos.x,
-          y: pos.y
-        };
-        
-        // 1. Vibration basierend auf chargeLevel
-        // Bei Level 2 und 3 immer eine Vibration anwenden, nur Stärke variieren
-        if (chargeLevel >= 2 || Math.random() < currentVibration) {
-          const intensityFactor = chargeLevel === 2 ? (Math.random() * 0.4 + 0.6) : 1.0; // 60-100% bei Level 2
-          effect.offset = getRandomOffset(currentVibration * intensityFactor);
-        }
-        
-        // 2. Glitch-Effekt basierend auf chargeLevel
-        // Bei Level 2 höhere Wahrscheinlichkeit für Glitch-Effekte
-        if ((chargeLevel === 2 && Math.random() < currentGlitchFreq * 1.5) || 
-            (chargeLevel !== 2 && Math.random() < currentGlitchFreq)) {
-          effect.char = currentGlitchChars[Math.floor(Math.random() * currentGlitchChars.length)];
-        }
-        
-        // 3. Farbeffekt basierend auf chargeLevel
-        if (Math.random() < currentColorFreq) {
-          effect.color = accentColors[Math.floor(Math.random() * accentColors.length)];
-        }
-        
-        // Bei Level 2 immer mindestens einen Effekt anwenden
-        if (chargeLevel === 2 && !effect.offset && !effect.char && !effect.color) {
-          // Wähle zufällig einen Effekt
-          const randomEffect = Math.floor(Math.random() * 3);
-          if (randomEffect === 0) {
-            effect.offset = getRandomOffset(currentVibration * 0.7);
-          } else if (randomEffect === 1) {
-            effect.char = currentGlitchChars[Math.floor(Math.random() * currentGlitchChars.length)];
-          } else {
-            effect.color = accentColors[Math.floor(Math.random() * accentColors.length)];
-          }
-        }
-        
-        // Nur hinzufügen, wenn mindestens ein Effekt angewendet wurde
-        if (effect.offset || effect.char || effect.color) {
-          newEdgeEffects.push(effect);
-        }
-      });
-      
-      setEdgeEffects(newEdgeEffects);
-      
-      // Bei höheren Charge-Leveln schnellere Aktualisierung
-      const updateSpeed = chargeLevel === 3 ? 50 : (chargeLevel === 2 ? 70 : 120); // Level 2: 80ms -> 70ms
-      
-      // Nach kurzer Zeit zurücksetzen für Flacker-Effekt
-      if (chargeLevel > 1) {
-        setTimeout(() => {
-          // Bei Charge-Level 3 komplexere Flacker-Muster
-          if (chargeLevel === 3 && Math.random() > 0.5) {
-            // Neuer Satz von Effekten statt komplettem Reset
-            const flickerEffects = newEdgeEffects.map(effect => {
-              // 50% Chance, dass sich der Effekt ändert
-              if (Math.random() > 0.5) {
-                return {
-                  ...effect,
-                  char: Math.random() > 0.7 ? currentGlitchChars[Math.floor(Math.random() * currentGlitchChars.length)] : effect.char,
-                  color: Math.random() > 0.7 ? accentColors[Math.floor(Math.random() * accentColors.length)] : effect.color,
-                  offset: Math.random() > 0.5 ? getRandomOffset(currentVibration) : effect.offset
-                };
-              }
-              return effect;
-            });
-            setEdgeEffects(flickerEffects);
-          } else {
-            // Bei anderen Levels einfacher Reset
-            setEdgeEffects([]);
-          }
-        }, updateSpeed / 2);
-      }
-    }, chargeLevel === 3 ? 100 : (chargeLevel === 2 ? 120 : 200)); // Schnellere Updates bei höheren Levels
-    
-    // Unicode-Glitch-Effekte
-    intervalsRef.current.unicodeGlitch = setInterval(() => {
-      // Wahrscheinlichkeit für Unicode-Glitches basierend auf glitchLevel
-      const glitchChance = 0.7 - (glitchLevel * 0.1); // 0.7, 0.6, 0.5, 0.4
-      
-      // Automatische Unicode-Glitch-Effekte aktiviert
-      if (Math.random() > glitchChance) { // Chance steigt mit glitchLevel
-        const swordPositions = getSwordPositions();
-        const newUnicodeGlitches: Array<{x: number, y: number, char: string}> = [];
-        
-        // Anzahl der Glitches basierend auf glitchLevel
-        const numGlitches = Math.floor(Math.random() * glitchLevel * 3) + glitchLevel + 1; // +1 für mehr Glitches
-        
-        for (let i = 0; i < numGlitches; i++) {
-          if (swordPositions.length === 0) continue;
+        // Vibrations-Effekt (Verschiebung)
+        if (Math.random() < vibrationChance) {
+          const offsetX = Math.random() < 0.5 ? -1 : 1;
+          const offsetY = Math.random() < 0.5 ? -1 : 1;
           
-          const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
-          const pos = swordPositions[randomPosIndex];
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            offset: { x: offsetX, y: offsetY }
+          });
           
-          // Wähle ein Unicode-Glitch-Zeichen basierend auf glitchLevel
-          const glitchChars = unicodeGlitchChars[glitchLevel as keyof typeof unicodeGlitchChars] || unicodeGlitchChars[1];
-          const glitchChar = glitchChars[Math.floor(Math.random() * glitchChars.length)];
+          hasAppliedEffect = true;
+        }
+        
+        // Glitch-Effekt (Zeichenersetzung)
+        if (Math.random() < glitchChance * glitchMultiplier) {
+          // Korrekte Typbehandlung für edgeGlitchChars
+          const glitchCharSet = Math.floor(Math.random() * edgeGlitchChars[1].length);
+          const glitchChar = edgeGlitchChars[1][glitchCharSet];
           
-          newUnicodeGlitches.push({
+          newEdgeEffects.push({
             x: pos.x,
             y: pos.y,
             char: glitchChar
           });
+          
+          hasAppliedEffect = true;
         }
         
-        setUnicodeGlitches(newUnicodeGlitches);
+        // Farb-Effekt
+        if (Math.random() < colorChance) {
+          const colorIndex = Math.floor(Math.random() * accentColors.length);
+          const edgeColor = accentColors[colorIndex];
+          
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            color: edgeColor
+          });
+          
+          hasAppliedEffect = true;
+        }
+      });
+      
+      // Bei Level 2: Garantiere mindestens einen Effekt, wenn keiner angewendet wurde
+      if (chargeLevel >= 2 && !hasAppliedEffect && edgePositions.length > 0) {
+        const randomPos = edgePositions[Math.floor(Math.random() * edgePositions.length)];
+        const effectType = Math.random();
         
-        // Glitches nach kurzer Zeit zurücksetzen
+        if (effectType < 0.33) {
+          // Vibrations-Effekt
+          newEdgeEffects.push({
+            x: randomPos.x,
+            y: randomPos.y,
+            offset: { x: Math.random() < 0.5 ? -1 : 1, y: Math.random() < 0.5 ? -1 : 1 }
+          });
+        } else if (effectType < 0.66) {
+          // Glitch-Effekt
+          // Korrekte Typbehandlung für edgeGlitchChars
+          const glitchCharSet = Math.floor(Math.random() * edgeGlitchChars[1].length);
+          const glitchChar = edgeGlitchChars[1][glitchCharSet];
+          
+          newEdgeEffects.push({
+            x: randomPos.x,
+            y: randomPos.y,
+            char: glitchChar
+          });
+          
+          hasAppliedEffect = true;
+        } else {
+          // Farb-Effekt
+          newEdgeEffects.push({
+            x: randomPos.x,
+            y: randomPos.y,
+            color: accentColors[Math.floor(Math.random() * accentColors.length)]
+          });
+        }
+        
+        logWithTimestamp(`[EDGE] Guaranteed effect applied at level ${chargeLevel}`, '#00CCFF');
+      }
+      
+      // Setze die neuen Edge-Effekte
+      setEdgeEffects(newEdgeEffects);
+      
+      // Logging für Edge-Effekte
+      if (newEdgeEffects.length > 0) {
+        const vibrationCount = newEdgeEffects.filter(e => e.offset).length;
+        const glitchCount = newEdgeEffects.filter(e => e.char).length;
+        const colorCount = newEdgeEffects.filter(e => e.color).length;
+        
+        logWithTimestamp(
+          `[EDGE] Applied ${newEdgeEffects.length} effects (${vibrationCount} vibrations, ${glitchCount} glitches, ${colorCount} colors)`,
+          '#00CCFF'
+        );
+      } else {
+        logWithTimestamp(`[EDGE] No effects applied this cycle`, '#00CCFF');
+      }
+      
+    }, chargeLevel === 1 ? 200 : chargeLevel === 2 ? 70 : 100); // Schnellere Updates für höhere Levels
+    
+    // Unicode-Glitch-Effekte
+    intervalsRef.current.unicodeGlitch = setInterval(() => {
+      // Wahrscheinlichkeit für Unicode-Glitches basierend auf glitchLevel
+      const glitchChance = 0.3 + (glitchLevel * 0.1); // 30%, 40%, 50%, 60%
+      
+      if (Math.random() < glitchChance) {
+        // Anzahl der Glitches basierend auf glitchLevel
+        const numGlitches = glitchLevel * 3 + glitchLevel; // 4, 8, 12
+        
+        // Generiere Unicode-Glitches
+        const newUnicodeGlitches = generateUnicodeGlitches(
+          swordPositions,
+          numGlitches
+        );
+        
+        setUnicodeGlitches(newUnicodeGlitches);
+        logWithTimestamp(`[UNICODE] Applied ${newUnicodeGlitches.length} unicode glitches`, '#FF00FF');
+        
+        // Zurücksetzen nach kurzer Zeit
         setTimeout(() => {
           setUnicodeGlitches([]);
-        }, 100 + (glitchLevel * 20)); // Dauer steigt mit glitchLevel
-        
-        // Debug-Log für Unicode-Glitches
-        console.log(`%c[GLITCH] Unicode glitches: ${numGlitches}`, 'color: #FF3EC8; font-weight: bold;');
+          logWithTimestamp(`[UNICODE] Reset unicode glitches`, '#FF00FF');
+        }, 100 + (glitchLevel * 20)); // Längere Dauer bei höherem glitchLevel
+      } else {
+        logWithTimestamp(`[UNICODE] Skipped (${Math.round((1-glitchChance)*100)}% chance)`, '#FF00FF');
       }
-    }, 500 - (glitchLevel * 50)); // Frequency increases with glitchLevel: 500, 450, 400, 350ms
+    }, 500 - (glitchLevel * 50)); // Schnellere Updates bei höherem glitchLevel
     
     // Aufräumen beim Unmounten oder bei Änderungen
     return () => {
@@ -507,163 +558,6 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
     }
   }, [glitchLevel]);
   
-  // Beat-Reaktion - Hintergrundfarbe im Rhythmus ändern
-  useEffect(() => {
-    // Debug-Logging für Beat-Detektion
-    console.log(`%c[BEAT_DEBUG] Beat-Status geändert: ${beatDetected ? "ERKANNT" : "KEIN BEAT"}, Energie: ${beatEnergy.toFixed(2)}`, 
-               'color: #FF3EC8; font-weight: bold;');
-    
-    // Debug-Log für jeden Render
-    console.log(`%c[BEAT_DEBUG] Render mit beatDetected=${beatDetected}, beatEnergy=${beatEnergy.toFixed(2)}, glitchLevel=${glitchLevel}`, 
-               'color: #FF3EC8; background-color: #222222; font-weight: bold;');
-    
-    // Beat-Reaktion aktiviert - Farbänderungen bei Beats
-    if (beatDetected) {
-      // Beat wurde erkannt - Hintergrundfarbe ändern
-      const now = Date.now();
-      lastBeatTimeRef.current = now;
-      
-      // Wähle eine zufällige Akzentfarbe für den Beat
-      const randomBeatColor = accentColors[Math.floor(Math.random() * accentColors.length)];
-      setBeatColor(randomBeatColor);
-      setBeatColorActive(true);
-      
-      // Beat-Farbe nach kurzer Zeit zurücksetzen
-      setTimeout(() => {
-        setBeatColorActive(false);
-      }, 150); // Kurze Dauer für schnellen Farbwechsel
-      
-      // Debug-Log für Beat-Reaktion
-      console.log(`%c[BEAT_COLOR] Beat detected! Hintergrundfarbe geändert: ${randomBeatColor}`, 'color: #FF3EC8; font-weight: bold;');
-      
-      // Zusätzlich zum Farbwechsel auch das Hintergrundmuster bei jedem Beat ändern
-      const bgWidth = 120;
-      const bgHeight = 80;
-      
-      console.log(`%c[BEAT_BACKGROUND] Beat erkannt! Generiere Beat-reaktiven Hintergrund mit Energie: ${beatEnergy.toFixed(2)}`, 
-                 'color: #FF3EC8; background-color: #222222; font-weight: bold;');
-      
-      try {
-        // Generiere neuen Beat-reaktiven Hintergrund bei jedem Beat
-        const newBackground = generateBeatReactiveBackground(bgWidth, bgHeight, beatEnergy);
-        console.log(`%c[BEAT_DEBUG] Neuer Hintergrund generiert: ${newBackground.length}x${newBackground[0]?.length || 0} Zeichen`, 
-                   'color: #FF3EC8; background-color: #222222; font-weight: bold;');
-        setCaveBackground(newBackground);
-      } catch (error) {
-        console.error(`%c[BEAT_ERROR] Fehler beim Generieren des Beat-reaktiven Hintergrunds: ${error}`, 
-                     'color: red; font-weight: bold;');
-        // Fallback auf normalen Hintergrund
-        setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
-      }
-      
-      // Generiere neue Adern bei jedem Beat
-      const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
-      const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
-      const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins);
-      console.log(`%c[BEAT_DEBUG] Neue Adern generiert: ${newVeins.length} Adern`, 
-                 'color: #FF3EC8; background-color: #222222; font-weight: bold;');
-      setColoredVeins(newVeins);
-      
-      // Setze auch die Basis-Farbe bei jedem Beat
-      setBaseColor(randomBeatColor);
-      setBgColor(getComplementaryColor(randomBeatColor));
-      setLastColorChangeTime(now);
-      
-      // Generiere auch Beat-reaktive Tile-Umfärbungen
-      const swordPositions = getSwordPositions();
-      if (swordPositions.length > 0) {
-        const newColoredTiles: Array<{x: number, y: number, color: string}> = [];
-        
-        // Anzahl der Cluster basierend auf Beat-Energie
-        const numClusters = Math.floor(beatEnergy * 15) + 3; // Mehr Cluster (3-18)
-        
-        for (let i = 0; i < numClusters; i++) {
-          const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
-          const basePos = swordPositions[randomPosIndex];
-          
-          // Clustergröße basierend auf Beat-Energie
-          const clusterSize = Math.floor(beatEnergy * 8) + 2; // 2-10 Tiles je nach Beat-Energie
-          
-          // Generiere Cluster
-          const cluster = generateCluster(
-            basePos.x, 
-            basePos.y, 
-            clusterSize,
-            20, // maxWidth
-            centeredSwordLines.length // maxHeight
-          );
-          
-          // Verwende die Beat-Farbe oder eine zufällige Akzentfarbe
-          const tileColor = Math.random() > 0.5 ? randomBeatColor : accentColors[Math.floor(Math.random() * accentColors.length)];
-          
-          // Füge alle Positionen im Cluster hinzu
-          cluster.forEach((pos: {x: number, y: number}) => {
-            if (centeredSwordLines[pos.y] && 
-                centeredSwordLines[pos.y][pos.x] && 
-                centeredSwordLines[pos.y][pos.x] !== ' ') {
-              newColoredTiles.push({
-                x: pos.x,
-                y: pos.y,
-                color: tileColor
-              });
-            }
-          });
-        }
-        
-        setColoredTiles(newColoredTiles);
-        console.log(`%c[TILES] Colored tiles: ${newColoredTiles.length} in ${numClusters} clusters`, 'color: #FF3EC8; font-weight: bold;');
-      }
-      
-      console.log(`%c[BEAT_BACKGROUND] Beat triggered background pattern change! Energy: ${beatEnergy.toFixed(2)}`, 'color: #FF3EC8; font-weight: bold;');
-    }
-  }, [beatDetected]); // Nur von beatDetected abhängig machen, nicht von beatEnergy
-  
-  // Beat-Energie-Reaktion - Intensität der Effekte anpassen
-  useEffect(() => {
-    // Beat-Energie-Reaktion aktiviert
-    if (beatEnergy > 0.05) { // Niedrigerer Schwellenwert (vorher 0.1)
-      // Glow-Intensität basierend auf Beat-Energie anpassen
-      setGlowIntensity(Math.min(0.3 + beatEnergy * 0.7, 1.0));
-      
-      console.log(`%c[BEAT_ENERGY] Energy level: ${beatEnergy.toFixed(2)}, Glow: ${glowIntensity.toFixed(2)}`, 
-                 'color: #FFFF00; font-weight: bold;');
-      
-      // Bei starken Beats (Energie > 0.3) zusätzliche Effekte auslösen (vorher 0.4)
-      if (beatEnergy > 0.3) {
-        // Generiere zusätzliche Glitches bei starken Beats
-        const swordPositions = getSwordPositions();
-        if (swordPositions.length > 0) {
-          const numGlitches = Math.floor(beatEnergy * 12); // 4-12 Glitches je nach Energie
-          const newGlitches = [];
-          
-          for (let i = 0; i < numGlitches; i++) {
-            const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
-            const pos = swordPositions[randomPosIndex];
-            
-            newGlitches.push({
-              x: pos.x,
-              y: pos.y,
-              char: glitchSymbols[Math.floor(Math.random() * glitchSymbols.length)]
-            });
-          }
-          
-          setGlitchChars(newGlitches);
-          
-          // Glitches nach kurzer Zeit zurücksetzen
-          setTimeout(() => {
-            setGlitchChars([]);
-          }, 100);
-          
-          console.log(`%c[GLITCH] Unicode glitches: ${numGlitches}`, 
-                     'color: #FF3EC8; font-weight: bold;');
-        }
-      }
-    } else {
-      // Konstante Glow-Intensität bei niedriger Beat-Energie
-      setGlowIntensity(0.5);
-    }
-  }, [beatEnergy]); // Nur von beatEnergy abhängig machen
-  
   // Aufräumen aller Intervalle beim Unmounten
   useEffect(() => {
     return () => {
@@ -675,10 +569,10 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
   const shadowSize = Math.floor(glowIntensity * 20);
   const textShadow = `0 0 ${shadowSize + (glitchLevel * 2)}px ${baseColor}`;
   
-  // Hintergrundfarbe (dunklere Version der Komplementärfarbe oder Beat-Farbe)
-  const backgroundColor = beatColorActive ? beatColor : getDarkerColor(bgColor);
+  // Hintergrundfarbe (dunklere Version der Komplementärfarbe)
+  const backgroundColor = getDarkerColor(bgColor);
   // Hellere Version der Komplementärfarbe für den Höhlenhintergrund
-  const lighterBgColor = beatColorActive ? beatColor : getLighterColor(bgColor);
+  const lighterBgColor = getLighterColor(bgColor);
   
   return (
     <div 
@@ -742,8 +636,6 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
                     display: 'inline-block',
                     transform: ''
                   };
-                  
-                  // Entfernt: Blur-Effekt für Hintergrund-Zeichen
                   
                   // Prüfe, ob dieses Zeichen verzerrt werden soll
                   const skewEffect = skewedChars.find(c => c.x === x && c.y === y);
