@@ -24,6 +24,8 @@ interface UseAudioAnalyzerReturn {
 
 // Globaler Analyzer für die gesamte Anwendung
 let globalAnalyzer: AudioAnalyzer | null = null;
+// Flag, um zu verfolgen, ob wir bereits eine Meldung über die Verwendung des globalen Analyzers ausgegeben haben
+let globalAnalyzerLoggedOnce = false;
 
 export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAnalyzerReturn {
   const analyzerRef = useRef<AudioAnalyzer | null>(null);
@@ -38,7 +40,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   const [error, setError] = useState<Error | null>(null);
   
   // Audio-Reaction-Store
-  const { updateEnergy, triggerBeat } = useAudioReactionStore();
+  const { updateEnergy, triggerBeat, setAudioActive } = useAudioReactionStore();
   
   // Reset beat detection after a short delay
   useEffect(() => {
@@ -62,13 +64,19 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     // Standard-Analyseintervall für bessere Performance
     const defaultOptions = {
       analyzeInterval: 100, // 100ms zwischen Analysen (10 FPS)
+      energyThreshold: 0.25, // Niedrigerer Schwellenwert für bessere Beat-Erkennung
       ...options
     };
     
     // Verwende den globalen Analyzer, wenn er existiert
     if (globalAnalyzer) {
       analyzerRef.current = globalAnalyzer;
-      console.log('Using existing global audio analyzer');
+      
+      // Log nur einmal pro Komponente
+      if (!globalAnalyzerLoggedOnce) {
+        console.log('Using existing global audio analyzer');
+        globalAnalyzerLoggedOnce = true;
+      }
     } else {
       const analyzerOptions: AudioAnalyzerOptions = {
         onBeat: (time) => {
@@ -79,6 +87,24 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
         onEnergy: (e) => {
           setEnergy(e);
           updateEnergy(e); // Aktualisiere den globalen Store
+          
+          // Wenn Energie über 0.1 liegt, setzen wir Audio als aktiv
+          if (e > 0.1) {
+            setAudioActive(true);
+          }
+          
+          // Wenn Energie über dem Schwellenwert liegt, könnte es ein Beat sein
+          if (e > (analyzerOptions.energyThreshold || 0.25)) {
+            const now = Date.now();
+            const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
+            
+            // Mindestens 200ms zwischen Beats
+            if (timeSinceLastBeat > 200) {
+              console.log(`Energy-based beat detected: ${e.toFixed(2)}`);
+              setBeatDetected(true);
+              triggerBeat();
+            }
+          }
         },
         ...defaultOptions
       };
@@ -92,7 +118,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       // Wir räumen den globalen Analyzer nicht auf, da er von anderen Komponenten verwendet werden könnte
       analyzerRef.current = null;
     };
-  }, [updateEnergy, triggerBeat, options]);
+  }, [updateEnergy, triggerBeat, setAudioActive, options]);
   
   const initialize = async (audioElement: HTMLAudioElement) => {
     try {

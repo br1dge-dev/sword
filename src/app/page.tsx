@@ -39,6 +39,13 @@ export default function HomePage() {
     setAudioEnergy(energy);
   };
 
+  // Setze Audio als aktiv, wenn die Komponente geladen wird
+  useEffect(() => {
+    const { setAudioActive } = useAudioReactionStore.getState();
+    // Starte mit inaktivem Audio, damit Fallback-Animation aktiviert wird
+    setAudioActive(false);
+  }, []);
+
   // Add effect logging with reduced frequency
   useEffect(() => {
     // Store original methods

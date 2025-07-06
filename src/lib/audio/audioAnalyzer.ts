@@ -28,6 +28,7 @@ export class AudioAnalyzer {
   private animationFrameId: number | null = null;
   private frequencyData: Uint8Array | null = null;
   private lastAnalyzeTime: number = 0;
+  private lastBeatTime: number = 0; // Zeit des letzten erkannten Beats
   private options: AudioAnalyzerOptions = {
     beatSensitivity: 1.5,
     energyThreshold: 0.3,
@@ -161,6 +162,7 @@ export class AudioAnalyzer {
       // Detect beat based on energy threshold
       if (energy > this.options.energyThreshold!) {
         console.log(`Beat detected! Energy: ${energy.toFixed(2)}`);
+        this.lastBeatTime = now; // Aktualisiere die Zeit des letzten Beats
         this.options.onBeat?.(this.audioContext!.currentTime);
       }
       
@@ -249,5 +251,10 @@ export class AudioAnalyzer {
     this.frequencyData = null;
     
     console.log('Audio analyzer disposed');
+  }
+
+  // Neue Methode zum Abrufen der Zeit des letzten Beats
+  public getLastBeatTime(): number {
+    return this.lastBeatTime;
   }
 } 

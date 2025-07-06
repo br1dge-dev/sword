@@ -65,6 +65,12 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       initialize(audioRef.current)
         .then(() => {
           console.log('Audio analyzer initialized with audio element');
+          
+          // Starte die Analyse sofort, wenn das Audio-Element bereit ist
+          if (isInitialized && !isAnalyzing) {
+            start();
+            console.log('Auto-starting audio analysis after initialization');
+          }
         })
         .catch(err => {
           console.error('Failed to initialize audio analyzer:', err);
@@ -72,7 +78,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
           // setError('Analyzer-Fehler');
         });
     }
-  }, [audioRef.current, initialize, analyzerInitialized]);
+  }, [audioRef.current, initialize, analyzerInitialized, isInitialized, isAnalyzing, start]);
   
   // Starte/Stoppe Analyzer basierend auf Wiedergabestatus
   useEffect(() => {

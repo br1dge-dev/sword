@@ -8,7 +8,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
-import { useAudioReactionStore, useBeatReset } from '@/store/audioReactionStore';
+import { useAudioReactionStore, useBeatReset, useFallbackAnimation } from '@/store/audioReactionStore';
 
 // Importiere Typen
 import {
@@ -67,6 +67,9 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
   
   // Automatisches Beat-Reset aktivieren
   useBeatReset(100);
+  
+  // Fallback-Animation aktivieren, wenn keine Audio-Reaktivität vorhanden ist
+  useFallbackAnimation();
   
   // Zustände für visuelle Effekte
   const [glowIntensity, setGlowIntensity] = useState(0);
