@@ -91,6 +91,17 @@ export function generateCaveBackground(width: number, height: number): string[][
   // Wähle Zeichensatz für diese Generation
   const selectedCharSet = charSets[patternType];
   
+  // Bestimme, ob wir auf einem großen Viewport sind (> 1280px)
+  const isLargeViewport = adjustedWidth >= 180;
+  
+  // Berechne die Zentrumsposition
+  const centerX = adjustedWidth / 2;
+  
+  // Parameter für die Dichtegradierung
+  const fadeStartPercent = isLargeViewport ? 0.3 : 0.45; // Bei großen Viewports früher mit dem Ausblenden beginnen
+  const fadeStart = centerX * fadeStartPercent;
+  const fadeWidth = centerX - fadeStart;
+  
   // Generiere Basis-Muster für verschiedene Regionen
   const generatePattern = (x: number, y: number, type: string): string => {
     // Transformiere Koordinaten für Rotation und Verschiebung
@@ -156,6 +167,31 @@ export function generateCaveBackground(width: number, height: number): string[][
     const baseWaveY = Math.sin(y * waveFrequency) * waveAmplitude;
     
     for (let x = 0; x < adjustedWidth; x++) {
+      // Berechne Abstand vom Zentrum (für Dichtegradierung)
+      const distFromCenter = Math.abs(x - centerX);
+      
+      // Berechne Wahrscheinlichkeit für leeren Raum basierend auf Abstand vom Zentrum
+      let emptyProbability = 0;
+      
+      if (isLargeViewport && distFromCenter > fadeStart) {
+        // Lineare Zunahme der Wahrscheinlichkeit für Leerraum von fadeStart bis centerX
+        emptyProbability = Math.min(0.95, (distFromCenter - fadeStart) / fadeWidth);
+        
+        // Exponentieller Anstieg für natürlicheren Übergang
+        emptyProbability = Math.pow(emptyProbability, 1.5);
+        
+        // Wenn wir nahe am Rand sind, erhöhe die Wahrscheinlichkeit noch mehr
+        if (distFromCenter > centerX * 0.9) {
+          emptyProbability = Math.min(0.98, emptyProbability * 1.2);
+        }
+      }
+      
+      // Wenn die Zufallszahl unter der Wahrscheinlichkeit liegt, setze leeren Raum
+      if (Math.random() < emptyProbability) {
+        background[y][x] = ' ';
+        continue;
+      }
+      
       // Erzeuge Welleneffekt für die horizontale Position
       const waveX = Math.sin((x + y) * waveFrequency * 0.7) * waveAmplitude;
       const waveY = baseWaveY + Math.cos(x * waveFrequency * 0.5) * (waveAmplitude / 2);
@@ -177,6 +213,16 @@ export function generateCaveBackground(width: number, height: number): string[][
         charSet = selectedCharSet.medium;
       } else {
         charSet = selectedCharSet.dense;
+      }
+      
+      // Bei großen Viewports: Zusätzliche Ausdünnung basierend auf Abstand vom Zentrum
+      if (isLargeViewport && distFromCenter > fadeStart) {
+        // Je weiter vom Zentrum entfernt, desto höhere Wahrscheinlichkeit für leichte Zeichen
+        const lightCharProbability = Math.min(0.8, (distFromCenter - fadeStart) / fadeWidth);
+        
+        if (Math.random() < lightCharProbability) {
+          charSet = selectedCharSet.light;
+        }
       }
       
       // Füge rhythmische Variation hinzu
@@ -201,7 +247,17 @@ export function generateCaveBackground(width: number, height: number): string[][
   const formationChars = ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '┃', '━', '╸', '╹', '╺', '╻'];
   
   for (let i = 0; i < numFormations; i++) {
-    const formationX = Math.floor(Math.random() * adjustedWidth);
+    // Bei großen Viewports: Formationen eher in der Mitte platzieren
+    let formationX;
+    if (isLargeViewport) {
+      // Berechne einen Bereich um die Mitte herum (±60% vom Zentrum)
+      const minX = Math.floor(centerX * 0.4);
+      const maxX = Math.floor(centerX * 1.6);
+      formationX = Math.floor(minX + Math.random() * (maxX - minX));
+    } else {
+      formationX = Math.floor(Math.random() * adjustedWidth);
+    }
+    
     const formationY = Math.floor(Math.random() * adjustedHeight);
     const formationSize = Math.floor(Math.random() * 5) + 2; // 2-6 Zeichen große Formationen
     
@@ -221,7 +277,17 @@ export function generateCaveBackground(width: number, height: number): string[][
   const stalagmiteChars = ['╻', '╿', '┃', '│', '╽', '╵'];
   
   for (let i = 0; i < numStalactites; i++) {
-    const stalX = Math.floor(Math.random() * adjustedWidth);
+    // Bei großen Viewports: Stalaktiten eher in der Mitte platzieren
+    let stalX;
+    if (isLargeViewport) {
+      // Berechne einen Bereich um die Mitte herum (±60% vom Zentrum)
+      const minX = Math.floor(centerX * 0.4);
+      const maxX = Math.floor(centerX * 1.6);
+      stalX = Math.floor(minX + Math.random() * (maxX - minX));
+    } else {
+      stalX = Math.floor(Math.random() * adjustedWidth);
+    }
+    
     const isTop = Math.random() < 0.5;
     
     if (isTop) {
@@ -245,11 +311,20 @@ export function generateCaveBackground(width: number, height: number): string[][
   }
   
   // Füge einige kleine "Höhlen" hinzu (Bereiche mit leichter Textur)
-  const numCaves = Math.floor((adjustedWidth * adjustedHeight) / 800); // Weniger Höhlen: eine Höhle pro 800 Pixel
+  const numCaves = Math.floor((adjustedWidth * adjustedHeight) / 800);
   
   for (let i = 0; i < numCaves; i++) {
-    // Zufällige Position für die Höhle
-    const caveX = Math.floor(Math.random() * adjustedWidth);
+    // Bei großen Viewports: Höhlen eher in der Mitte platzieren
+    let caveX;
+    if (isLargeViewport) {
+      // Berechne einen Bereich um die Mitte herum (±60% vom Zentrum)
+      const minX = Math.floor(centerX * 0.4);
+      const maxX = Math.floor(centerX * 1.6);
+      caveX = Math.floor(minX + Math.random() * (maxX - minX));
+    } else {
+      caveX = Math.floor(Math.random() * adjustedWidth);
+    }
+    
     const caveY = Math.floor(Math.random() * adjustedHeight);
     
     // Kleinere Höhlen (3-6 Pixel)
@@ -275,11 +350,20 @@ export function generateCaveBackground(width: number, height: number): string[][
   }
   
   // Füge einige "Risse" im Hintergrund hinzu
-  const numCracks = Math.floor((adjustedWidth * adjustedHeight) / 1000); // Ungefähr ein Riss pro 1000 Pixel
+  const numCracks = Math.floor((adjustedWidth * adjustedHeight) / 1000);
   
   for (let i = 0; i < numCracks; i++) {
-    // Zufälliger Startpunkt für den Riss
-    let x = Math.floor(Math.random() * adjustedWidth);
+    // Bei großen Viewports: Risse eher in der Mitte platzieren
+    let x;
+    if (isLargeViewport) {
+      // Berechne einen Bereich um die Mitte herum (±60% vom Zentrum)
+      const minX = Math.floor(centerX * 0.4);
+      const maxX = Math.floor(centerX * 1.6);
+      x = Math.floor(minX + Math.random() * (maxX - minX));
+    } else {
+      x = Math.floor(Math.random() * adjustedWidth);
+    }
+    
     let y = Math.floor(Math.random() * adjustedHeight);
     
     // Zufällige Länge für den Riss (5-15 Pixel)

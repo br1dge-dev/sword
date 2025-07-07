@@ -86,9 +86,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     const baseWidth = 160;
     const baseHeight = 100;
     
-    // Skaliere basierend auf Bildschirmgröße, begrenzt auf 125%
-    const widthFactor = Math.min(1.25, Math.max(1, viewportWidth / 1024));
-    const heightFactor = Math.min(1.25, Math.max(1, viewportHeight / 768));
+    // Verbesserte Skalierung für verschiedene Bildschirmgrößen
+    // Für große Bildschirme (>1440px) verwenden wir eine aggressivere Skalierung
+    let widthFactor, heightFactor;
+    
+    if (viewportWidth > 1440) {
+      // Für sehr große Bildschirme: Skaliere stärker, aber mit einer Obergrenze
+      widthFactor = Math.min(1.5, Math.max(1, viewportWidth / 960));
+      heightFactor = Math.min(1.5, Math.max(1, viewportHeight / 720));
+    } else {
+      // Für mittlere und kleine Bildschirme: Sanftere Skalierung
+      widthFactor = Math.min(1.25, Math.max(1, viewportWidth / 1024));
+      heightFactor = Math.min(1.25, Math.max(1, viewportHeight / 768));
+    }
     
     return {
       width: Math.floor(baseWidth * widthFactor),
@@ -473,9 +483,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             overflow: 'hidden' // Hinzugefügt, um sicherzustellen, dass Inhalte nicht über den Container hinausragen
           }}
         >
-          <pre className="font-mono text-sm sm:text-base leading-[0.9] whitespace-pre select-none" style={{ width: '100%', height: '100%' }}>
-                          {caveBackground.map((row, y) => (
-              <div key={y} style={{ lineHeight: '0.9', width: '100%' }}>
+          <pre className="font-mono text-sm sm:text-base leading-[0.9] whitespace-pre select-none" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {caveBackground.map((row, y) => (
+              <div key={y} style={{ lineHeight: '0.9', width: '100%', textAlign: 'center' }}>
                 {row.map((char, x) => {
                   // Prüfe, ob an dieser Position eine farbige Ader ist
                   const vein = coloredVeins.find(v => v.x === x && v.y === y);
