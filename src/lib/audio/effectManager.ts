@@ -269,36 +269,9 @@ export class EffectManager {
   // Regelmäßige Speicherbereinigung
   private performMemoryCleanup(): void {
     const now = Date.now();
+    // Nur alle 30 Sekunden prüfen
+    if (now - this.lastMemoryCheck < MEMORY_CLEANUP_INTERVAL) return;
     
-    // Prüfe auf Speichernutzung, falls verfügbar
-    let shouldCleanup = false;
-    
-    // Prüfe, ob genügend Zeit seit der letzten Bereinigung vergangen ist
-    if (now - this.lastMemoryCheck < MEMORY_CLEANUP_INTERVAL) {
-      // Wenn nicht genug Zeit vergangen ist, prüfe auf hohe Speichernutzung
-      if (typeof performance !== 'undefined' && 
-          // @ts-ignore - Chrome-spezifische Erweiterung der Performance-API
-          typeof performance.memory === 'object' && 
-          // @ts-ignore - Chrome-spezifische Erweiterung der Performance-API
-          typeof performance.memory.usedJSHeapSize === 'number') {
-        // Wenn der Heap-Speicher über 500MB liegt, trotzdem bereinigen
-        const memoryThreshold = 500 * 1024 * 1024; // 500MB
-        // @ts-ignore - Chrome-spezifische Erweiterung der Performance-API
-        shouldCleanup = performance.memory.usedJSHeapSize > memoryThreshold;
-        
-        if (shouldCleanup) {
-          // @ts-ignore - Chrome-spezifische Erweiterung der Performance-API
-          console.log(`[MEMORY] High memory usage detected: ${Math.round(performance.memory.usedJSHeapSize / (1024 * 1024))}MB, performing cleanup`);
-        }
-      }
-      
-      // Wenn keine hohe Speichernutzung erkannt wurde, überspringe die Bereinigung
-      if (!shouldCleanup) {
-        return;
-      }
-    }
-    
-    // Aktualisiere den Zeitstempel für die letzte Bereinigung
     this.lastMemoryCheck = now;
     
     // Prüfe auf verwaiste Callbacks (ohne aktive Komponente)
@@ -350,18 +323,6 @@ export class EffectManager {
       
       this.debugLog(`Registry cleanup: removed ${entriesToRemove.length} old registry entries`);
     }
-    
-    // Zusätzliche Speicheroptimierung: Entferne inaktive Effekte
-    // Verwende Array.from, um die Map-Einträge zu iterieren
-    Array.from(this.effects.entries()).forEach(([type, effect]) => {
-      if (!effect.isActive && effect.lastTriggered < now - 60000) { // Inaktiv für mehr als 1 Minute
-        // Setze Intensität auf 0
-        effect.intensity = 0;
-        
-        // Entferne alle temporären Daten
-        effect.activeUntil = 0;
-      }
-    });
   }
 
   // Aktualisiere Effekte basierend auf Audio-Daten

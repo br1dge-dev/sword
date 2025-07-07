@@ -265,29 +265,21 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // Audio-reaktive Farb-Effekte
   useEffect(() => {
-    // Aktualisiere Farben nur, wenn genügend Zeit vergangen ist oder ein starker Beat erkannt wurde
-    const now = Date.now();
-    const timeSinceLastChange = now - lastColorChangeTime;
-    
-    // Nur bei starkem Beat oder nach Ablauf der Stabilität
-    if ((beatDetected && energy > 0.4) || timeSinceLastChange > colorStability) {
-      // Generiere harmonisches Farbpaar
-      const { baseColor: newBaseColor, bgColor: newBgColor } = generateHarmonicColorPair();
+    // Bei hoher Energie oder Beat Farbwechsel auslösen
+    if ((energy > 0.40 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) { // Erhöhter Schwellenwert von 0.25 auf 0.40
+      // Erzeuge eine harmonische Farbkombination
+      const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
       
-      // Setze neue Farben
-      setBaseColor(newBaseColor);
+      // Setze die neuen Farben
+      setBaseColor(swordColor);
       setBgColor(newBgColor);
       
-      // Aktualisiere Zeitstempel
-      setLastColorChangeTime(now);
+      // Aktualisiere den Zeitstempel für den letzten Farbwechsel
+      setLastColorChangeTime(Date.now());
       
-      // Setze neue Stabilität (zwischen 1.5 und 3 Sekunden)
-      const newStability = Math.floor(1500 + Math.random() * 1500);
-      setColorStability(newStability);
-      
-      console.log(`[COLOR] Farben aktualisiert: ${newBaseColor} / ${newBgColor}, nächste Änderung in ${newStability}ms`);
+      console.log(`[${new Date().toLocaleTimeString()}] [COLOR_CHANGE] New color: ${swordColor}, BG: ${newBgColor}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
     }
-  }, [energy, beatDetected, lastColorChangeTime, colorStability]);
+  }, [beatDetected, energy, lastColorChangeTime, colorStability]);
   
   // Audio-reaktive Tile-Effekte
   useEffect(() => {
@@ -410,79 +402,30 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // Audio-reaktive Hintergrund-Effekte
   useEffect(() => {
-    // Reduziere die Häufigkeit der Hintergrund-Updates
-    // Nur bei starken Beats oder niedriger Aktualisierungsfrequenz
-    if ((beatDetected && Math.random() < 0.15) || energy > 0.65) {
-      // Prüfe, ob seit dem letzten Update genügend Zeit vergangen ist
-      const now = Date.now();
-      const lastBgUpdateTime = useRef<number>(0);
-      const minUpdateInterval = 5000; // Mindestens 5 Sekunden zwischen vollständigen Hintergrund-Updates
+    if ((beatDetected && Math.random() < 0.15) || energy > 0.65) { // Reduzierte Wahrscheinlichkeit von 0.3 auf 0.15 und erhöhter Energieschwellenwert von 0.4 auf 0.65
+      // Größe für den Hintergrund dynamisch bestimmen
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       
-      if (now - lastBgUpdateTime.current > minUpdateInterval) {
-        // Größe für den Hintergrund dynamisch bestimmen
-        const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-        
-        // Gelegentlich den Hintergrund aktualisieren
-        const newBackground = generateCaveBackground(bgWidth, bgHeight);
-        setCaveBackground(newBackground);
-        
-        // Aktualisiere den Zeitstempel
-        lastBgUpdateTime.current = now;
-        
-        console.log(`[${new Date().toLocaleTimeString()}] [BACKGROUND] Full background update, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
-      } else {
-        // Bei häufigen Updates nur einen Teil des Hintergrunds aktualisieren
-        // Erstelle eine flache Kopie des aktuellen Hintergrunds
-        const partialUpdate = [...caveBackground];
-        
-        // Wähle einen zufälligen Bereich für das Update
-        const startY = Math.floor(Math.random() * (partialUpdate.length - 10));
-        const endY = Math.min(startY + 10, partialUpdate.length);
-        
-        // Aktualisiere nur diesen Bereich
-        for (let y = startY; y < endY; y++) {
-          if (partialUpdate[y]) {
-            // Generiere eine neue Zeile
-            const { width: bgWidth } = getBackgroundDimensions();
-            const newRow = generateCaveBackground(bgWidth, 1)[0];
-            
-            if (newRow) {
-              partialUpdate[y] = newRow;
-            }
-          }
-        }
-        
-        // Setze den aktualisierten Hintergrund
-        setCaveBackground(partialUpdate);
-        
-        console.log(`[${new Date().toLocaleTimeString()}] [BACKGROUND] Partial background update, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
-      }
+      // Gelegentlich den Hintergrund aktualisieren
+      const newBackground = generateCaveBackground(bgWidth, bgHeight);
+      setCaveBackground(newBackground);
+      
+      console.log(`[${new Date().toLocaleTimeString()}] [BACKGROUND] Background updated, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
     }
-  }, [beatDetected, energy, caveBackground]);
+  }, [beatDetected, energy]);
   
   // Audio-reaktive Adern-Effekte
   useEffect(() => {
-    // Reduziere die Häufigkeit der Adern-Updates
-    if (beatDetected || energy > 0.30) {
-      // Prüfe, ob seit dem letzten Update genügend Zeit vergangen ist
-      const now = Date.now();
-      const lastVeinsUpdateTime = useRef<number>(0);
-      const minUpdateInterval = 2000; // Mindestens 2 Sekunden zwischen Adern-Updates
+    if (beatDetected || energy > 0.30) { // Erhöhter Schwellenwert von 0.15 auf 0.30
+      // Größe für den Hintergrund dynamisch bestimmen
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       
-      if (now - lastVeinsUpdateTime.current > minUpdateInterval) {
-        // Größe für den Hintergrund dynamisch bestimmen
-        const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-        
-        // Mehr Veins bei höherer Energie
-        const numVeins = Math.floor(10 + energy * 30); // Erhöht von 20 auf 30 für mehr Veins
-        const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins);
-        setColoredVeins(newVeins);
-        
-        // Aktualisiere den Zeitstempel
-        lastVeinsUpdateTime.current = now;
-        
-        console.log(`[${new Date().toLocaleTimeString()}] [VEINS] Veins updated: ${numVeins}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
-      }
+      // Mehr Veins bei höherer Energie
+      const numVeins = Math.floor(10 + energy * 30); // Erhöht von 20 auf 30 für mehr Veins
+      const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins);
+      setColoredVeins(newVeins);
+      
+      console.log(`[${new Date().toLocaleTimeString()}] [VEINS] Veins updated: ${numVeins}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
     }
   }, [beatDetected, energy]);
   
