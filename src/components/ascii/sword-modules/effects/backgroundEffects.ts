@@ -2,6 +2,7 @@
  * backgroundEffects.ts
  * 
  * Funktionen zur Generierung von Hintergrundeffekten für die ASCII-Schwert-Komponente
+ * Angepasst für dezentere Effekte, die weniger häufig wechseln
  */
 import { caveBgPatterns, accentColors } from '../constants/swordConstants';
 import { generateCluster } from '../utils/swordUtils';
@@ -13,6 +14,7 @@ export const MAX_VEINS = 300; // Maximale Anzahl von Adern
 
 /**
  * Generiert einen Höhlenhintergrund mit dynamischen Texturen und rhythmischen Mustern
+ * Angepasst für dezentere Effekte mit längerer Stabilität
  * @param width Breite des Hintergrunds
  * @param height Höhe des Hintergrunds
  * @returns 2D-Array mit Hintergrund-Zeichen
@@ -28,8 +30,8 @@ export function generateCaveBackground(width: number, height: number): string[][
   const timestamp = Date.now();
   
   // Zufällige Musterparameter für diese Generation
-  // Bevorzuge feinere Muster (0, 3, 4) gegenüber blockigen Mustern (1, 2)
-  const patternTypeWeights = [0.35, 0.05, 0.05, 0.30, 0.25]; // Höhere Gewichtung für feine Muster
+  // Bevorzuge noch stärker feinere Muster (0, 3, 4) für dezentere Effekte
+  const patternTypeWeights = [0.40, 0.05, 0.05, 0.35, 0.15]; // Höhere Gewichtung für feine Muster
   const patternTypeRand = Math.random();
   let patternType = 0;
   let cumulativeWeight = 0;
@@ -43,46 +45,46 @@ export function generateCaveBackground(width: number, height: number): string[][
     }
   }
   
-  const waveAmplitude = Math.floor(adjustedHeight / (8 + Math.random() * 4)); // Zufällige Amplitude
-  const waveFrequency = 0.05 + (Math.random() * 0.05); // Zufällige Frequenz
-  const noiseScale = 0.08 + (Math.random() * 0.08); // Zufällige Rauschskalierung
-  const patternScale = 0.2 + (Math.random() * 0.3); // Skalierung des Grundmusters
+  // Reduzierte Amplitude und Frequenz für dezentere Effekte
+  const waveAmplitude = Math.floor(adjustedHeight / (10 + Math.random() * 6)); // Reduzierte Amplitude
+  const waveFrequency = 0.03 + (Math.random() * 0.04); // Reduzierte Frequenz
+  const noiseScale = 0.06 + (Math.random() * 0.06); // Reduzierte Rauschskalierung
+  const patternScale = 0.15 + (Math.random() * 0.25); // Reduzierte Skalierung des Grundmusters
   
   // Zufällige Rotation/Verschiebung für diese Generation
   const rotationAngle = Math.random() * Math.PI * 2; // 0-360 Grad
   const offsetX = Math.floor(Math.random() * adjustedWidth);
   const offsetY = Math.floor(Math.random() * adjustedHeight);
   
-  // Überarbeitete Zeichensätze mit mehr feinen Linien und weniger Blöcken
-  // Entfernung komplexer Symbole wie Uhren, Sanduhren, etc.
+  // Überarbeitete Zeichensätze mit noch mehr feinen Linien und weniger Blöcken für dezentere Effekte
   const charSets = [
     // Set 1: Dünne Linien und Punkte (BEVORZUGT)
     {
-      light: ['·', ':', '.', '˙', '°', ' '],
+      light: ['·', ':', '.', '˙', '°', ' ', ' ', ' '], // Mehr Leerzeichen für dezentere Effekte
       medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '│', '─', '┬', '┴', '┼'],
       dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '┃', '━', '╸', '╹', '╺', '╻']
     },
     // Set 2: Blockige Texturen (REDUZIERT)
     {
-      light: ['·', ':', '.', '˙', '°', ' '],
+      light: ['·', ':', '.', '˙', '°', ' ', ' ', ' '],
       medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '┤', '├', '┬', '┴'],
       dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻']
     },
     // Set 3: Geometrische Formen (ANGEPASST)
     {
-      light: ['·', ':', '.', '˙', '°', ' '],
+      light: ['·', ':', '.', '˙', '°', ' ', ' ', ' '],
       medium: ['◇', '◆', '◊', '◈', '◦', '◎', '○', '◌'],
       dense: ['◊', '◈', '◎', '◉', '◍', '◐', '◑', '◒', '◓', '◔', '◕']
     },
     // Set 4: Technische Zeichen (OHNE KOMPLEXE SYMBOLE)
     {
-      light: ['⌐', '¬', '⌙', '⌖', '·', ':', '.'],
+      light: ['⌐', '¬', '⌙', '⌖', '·', ':', '.', ' ', ' '],
       medium: ['⌘', '⌂', '⌤', '⌧', '⌗', '╱', '╲', '┌', '┐', '└', '┘'],
       dense: ['⎔', '⎕', '⎖', '⎗', '⎘', '⎙', '⎚', '⎛', '⎜', '⎝', '⎞', '⎟', '⎠', '⎡', '⎢']
     },
     // Set 5: Mischung aus feinen Zeichen (BEVORZUGT)
     {
-      light: ['·', ':', '.', '˙', '°', '╱', '╲', '◦', '⌐'],
+      light: ['·', ':', '.', '˙', '°', ' ', ' ', ' ', ' '], // Mehr Leerzeichen für dezentere Effekte
       medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '◇', '◆', '⌘', '⎔', '│', '─', '┬', '┴'],
       dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '◎', '◉', '◍', '⎕', '⎖', '⎗']
     }
@@ -97,8 +99,8 @@ export function generateCaveBackground(width: number, height: number): string[][
   // Berechne die Zentrumsposition
   const centerX = adjustedWidth / 2;
   
-  // Parameter für die Dichtegradierung
-  const fadeStartPercent = isLargeViewport ? 0.3 : 0.45; // Bei großen Viewports früher mit dem Ausblenden beginnen
+  // Parameter für die Dichtegradierung - verstärkte Ausdünnung für dezentere Effekte
+  const fadeStartPercent = isLargeViewport ? 0.25 : 0.40; // Früher mit dem Ausblenden beginnen
   const fadeStart = centerX * fadeStartPercent;
   const fadeWidth = centerX - fadeStart;
   
@@ -113,30 +115,30 @@ export function generateCaveBackground(width: number, height: number): string[][
     // Verschiedene Mustertypen
     switch(patternType) {
       case 0: // Wellenförmiges Muster mit feinen Linien
-        if (Math.sin(tx * patternScale) * Math.cos(ty * patternScale) > 0.3) {
+        if (Math.sin(tx * patternScale) * Math.cos(ty * patternScale) > 0.4) { // Erhöhter Schwellenwert für weniger Zeichen
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
       case 1: // Konzentrische Kreise mit feinen Linien statt Blöcken
         const dist = Math.sqrt(Math.pow((tx - adjustedWidth/2) / adjustedWidth, 2) + Math.pow((ty - adjustedHeight/2) / adjustedHeight, 2));
-        if (Math.abs(Math.sin(dist * 20)) > 0.7) {
+        if (Math.abs(Math.sin(dist * 20)) > 0.8) { // Erhöhter Schwellenwert für weniger Zeichen
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
       case 2: // Schachbrettmuster mit feinen Variationen
-        if ((Math.floor(tx * patternScale) + Math.floor(ty * patternScale)) % 2 === 0) {
+        if ((Math.floor(tx * patternScale) + Math.floor(ty * patternScale)) % 3 === 0) { // Geändert von 2 auf 3 für weniger Zeichen
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
       case 3: // Spiralmuster mit einfachen Zeichen
         const angle = Math.atan2(ty - adjustedHeight/2, tx - adjustedWidth/2);
         const dist2 = Math.sqrt(Math.pow(tx - adjustedWidth/2, 2) + Math.pow(ty - adjustedHeight/2, 2));
-        if (Math.abs(Math.sin(angle * 5 + dist2 * 0.2)) > 0.7) {
+        if (Math.abs(Math.sin(angle * 5 + dist2 * 0.2)) > 0.8) { // Erhöhter Schwellenwert für weniger Zeichen
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
       case 4: // Fraktales Muster mit feinen Zeichen
-        if (((tx & ty) % 3 === 0) || ((tx * ty) % 7 === 0)) {
+        if (((tx & ty) % 4 === 0) || ((tx * ty) % 9 === 0)) { // Geändert von 3/7 auf 4/9 für weniger Zeichen
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
@@ -175,16 +177,19 @@ export function generateCaveBackground(width: number, height: number): string[][
       
       if (isLargeViewport && distFromCenter > fadeStart) {
         // Lineare Zunahme der Wahrscheinlichkeit für Leerraum von fadeStart bis centerX
-        emptyProbability = Math.min(0.95, (distFromCenter - fadeStart) / fadeWidth);
+        emptyProbability = Math.min(0.98, (distFromCenter - fadeStart) / fadeWidth);
         
         // Exponentieller Anstieg für natürlicheren Übergang
-        emptyProbability = Math.pow(emptyProbability, 1.5);
+        emptyProbability = Math.pow(emptyProbability, 1.3); // Reduziert von 1.5 für sanfteren Übergang
         
         // Wenn wir nahe am Rand sind, erhöhe die Wahrscheinlichkeit noch mehr
-        if (distFromCenter > centerX * 0.9) {
-          emptyProbability = Math.min(0.98, emptyProbability * 1.2);
+        if (distFromCenter > centerX * 0.85) {
+          emptyProbability = Math.min(0.99, emptyProbability * 1.3);
         }
       }
+      
+      // Erhöhte Grundwahrscheinlichkeit für Leerraum überall für dezentere Effekte
+      emptyProbability = Math.max(emptyProbability, 0.15);
       
       // Wenn die Zufallszahl unter der Wahrscheinlichkeit liegt, setze leeren Raum
       if (Math.random() < emptyProbability) {
@@ -207,9 +212,9 @@ export function generateCaveBackground(width: number, height: number): string[][
       
       // Wähle Zeichensatz basierend auf Region
       let charSet;
-      if (regionValue < 0.3) {
+      if (regionValue < 0.4) { // Erhöht von 0.3 für mehr leichte Zeichen
         charSet = selectedCharSet.light;
-      } else if (regionValue < 0.7) {
+      } else if (regionValue < 0.8) { // Erhöht von 0.7 für weniger dichte Zeichen
         charSet = selectedCharSet.medium;
       } else {
         charSet = selectedCharSet.dense;
@@ -218,21 +223,21 @@ export function generateCaveBackground(width: number, height: number): string[][
       // Bei großen Viewports: Zusätzliche Ausdünnung basierend auf Abstand vom Zentrum
       if (isLargeViewport && distFromCenter > fadeStart) {
         // Je weiter vom Zentrum entfernt, desto höhere Wahrscheinlichkeit für leichte Zeichen
-        const lightCharProbability = Math.min(0.8, (distFromCenter - fadeStart) / fadeWidth);
+        const lightCharProbability = Math.min(0.9, (distFromCenter - fadeStart) / fadeWidth);
         
         if (Math.random() < lightCharProbability) {
           charSet = selectedCharSet.light;
         }
       }
       
-      // Füge rhythmische Variation hinzu
-      if ((x + y) % 7 === 0 || Math.sin((x * y) * 0.01 + (timestamp * 0.0001)) > 0.7) {
+      // Füge rhythmische Variation hinzu - reduzierte Häufigkeit für dezentere Effekte
+      if ((x + y) % 9 === 0 || Math.sin((x * y) * 0.01 + (timestamp * 0.0001)) > 0.8) { // Geändert von 7/0.7 auf 9/0.8
         // Spezielles Muster an rhythmischen Positionen
         background[y][x] = charSet[Math.floor(Math.random() * charSet.length)];
-      } else if ((x * y) % 11 === 0 || Math.cos((x - y) * 0.03) > 0.8) {
+      } else if ((x * y) % 13 === 0 || Math.cos((x - y) * 0.03) > 0.85) { // Geändert von 11/0.8 auf 13/0.85
         // Sekundäres rhythmisches Muster
         background[y][x] = charSet[Math.floor(Math.random() * charSet.length)];
-      } else if (Math.random() < 0.7) {
+      } else if (Math.random() < 0.6) { // Reduziert von 0.7 für weniger Zeichen
         // Grundmuster mit hoher Wahrscheinlichkeit
         background[y][x] = baseChar;
       } else {
@@ -242,8 +247,8 @@ export function generateCaveBackground(width: number, height: number): string[][
     }
   }
   
-  // Füge einige kleinere Felsformationen hinzu - mit feinen Zeichen statt Blöcken
-  const numFormations = Math.floor((adjustedWidth * adjustedHeight) / 150) + 2;
+  // Füge einige kleinere Felsformationen hinzu - reduzierte Anzahl für dezentere Effekte
+  const numFormations = Math.floor((adjustedWidth * adjustedHeight) / 200) + 1; // Reduziert von 150 auf 200
   const formationChars = ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '┃', '━', '╸', '╹', '╺', '╻'];
   
   for (let i = 0; i < numFormations; i++) {
@@ -261,7 +266,13 @@ export function generateCaveBackground(width: number, height: number): string[][
     const formationY = Math.floor(Math.random() * adjustedHeight);
     const formationSize = Math.floor(Math.random() * 5) + 2; // 2-6 Zeichen große Formationen
     
-    const formation = generateCluster(formationX, formationY, formationSize, adjustedWidth, adjustedHeight);
+    const formation = generateCluster(
+      formationX, 
+      formationY, 
+      formationSize, 
+      adjustedWidth, 
+      adjustedHeight
+    );
     
     formation.forEach(pos => {
       if (pos.y < adjustedHeight && pos.x < adjustedWidth) {
@@ -399,207 +410,64 @@ export function generateCaveBackground(width: number, height: number): string[][
 }
 
 /**
- * Generiert farbige Äderchen für den Hintergrund mit Tropf-Animation von oben nach unten
+ * Generiert farbige Äderchen für den Hintergrund
+ * Angepasst für dezentere Effekte
  * @param width Breite des Hintergrunds
  * @param height Höhe des Hintergrunds
  * @param numVeins Anzahl der Äderchen
- * @returns Array mit Positionen und Farben der Äderchen
+ * @returns Array mit Äderchen-Positionen und -Farben
  */
 export function generateColoredVeins(
   width: number, 
   height: number, 
   numVeins: number
 ): Array<{x: number, y: number, color: string}> {
+  // Begrenze die Anzahl der Äderchen
+  const adjustedNumVeins = Math.min(numVeins, MAX_VEINS);
+  
+  // Array für die Äderchen
   const veins: Array<{x: number, y: number, color: string}> = [];
   
   // Begrenze die Dimensionen auf die maximalen Werte
-  const adjustedWidth = Math.min(Math.max(width, 160), MAX_BG_WIDTH);  // Zwischen 160 und MAX_BG_WIDTH
-  const adjustedHeight = Math.min(Math.max(height, 100), MAX_BG_HEIGHT);  // Zwischen 100 und MAX_BG_HEIGHT
+  const adjustedWidth = Math.min(width, MAX_BG_WIDTH);
+  const adjustedHeight = Math.min(height, MAX_BG_HEIGHT);
   
-  // Begrenze die Anzahl der Adern
-  const limitedNumVeins = Math.min(numVeins, MAX_VEINS);
+  // Berechne die Zentrumsposition
+  const centerX = adjustedWidth / 2;
+  const centerY = adjustedHeight / 2;
   
-  // Parameter für Animation
-  const timestamp = Date.now() / 1000; // Zeitstempel für Animation
-  const animationSpeed = 0.5; // Geschwindigkeit der Animation
-  const animationPhase = (timestamp * animationSpeed) % adjustedHeight; // Phase der Animation (0 bis height)
-  
-  // Identifiziere Formationen und Strukturen im Hintergrund
-  const formationPoints: Array<{x: number, y: number}> = [];
-  
-  // Erzeuge Quellpunkte für Tropfen an markanten Stellen (Formationen, Stalaktiten)
-  const numSources = Math.floor(limitedNumVeins / 3);
-  
-  // Erstelle Quellpunkte am oberen Rand und an Stalaktiten
-  for (let i = 0; i < numSources; i++) {
-    const sourceX = Math.floor(Math.random() * adjustedWidth);
-    const sourceY = Math.floor(Math.random() * Math.min(5, adjustedHeight / 10)); // Oben im Bild
+  // Generiere Äderchen
+  for (let i = 0; i < adjustedNumVeins; i++) {
+    // Wähle eine zufällige Position für den Startpunkt des Äderchens
+    // Bevorzuge Positionen näher am Zentrum für dezentere Effekte
+    const centerBias = Math.random() < 0.7 ? 0.6 : 0.3; // 70% Chance für näher am Zentrum
+    const startX = centerX + (Math.random() - 0.5) * adjustedWidth * centerBias;
+    const startY = centerY + (Math.random() - 0.5) * adjustedHeight * centerBias;
     
-    formationPoints.push({x: sourceX, y: sourceY});
-  }
-  
-  // Erzeuge Tropfen für jede Quelle
-  formationPoints.forEach(source => {
-    // Wähle eine dominante Farbe für diesen Tropfen
-    const dominantColor = accentColors[Math.floor(Math.random() * accentColors.length)];
+    // Wähle eine zufällige Farbe aus den Akzentfarben
+    const colorIndex = Math.floor(Math.random() * accentColors.length);
+    const color = accentColors[colorIndex];
     
-    // Parameter für diesen Tropfen
-    const dropLength = Math.floor(Math.random() * 10) + 5; // Länge des Tropfens
-    const dropSpeed = Math.random() * 0.5 + 0.5; // Individuelle Geschwindigkeit
-    const dropPhase = (timestamp * dropSpeed) % (adjustedHeight * 2); // Individuelle Phase
+    // Wähle eine zufällige Länge für das Äderchen
+    // Reduzierte Länge für dezentere Effekte
+    const length = Math.floor(Math.random() * 8) + 3; // Reduziert von 12+5 auf 8+3
     
-    // Berechne aktuelle Y-Position basierend auf Zeit
-    let currentY = (source.y + dropPhase) % adjustedHeight;
+    // Generiere ein Cluster von Punkten um den Startpunkt
+    const cluster = generateCluster(
+      Math.floor(startX), 
+      Math.floor(startY), 
+      length, 
+      adjustedWidth, 
+      adjustedHeight
+    );
     
-    // Erzeuge den Tropfen
-    for (let i = 0; i < dropLength; i++) {
-      const y = Math.floor(currentY) - i;
-      
-      // Prüfe, ob der Punkt innerhalb der Grenzen liegt
-      if (y >= 0 && y < adjustedHeight) {
-        // Berechne X-Position mit leichtem Schwanken
-        const waveOffset = Math.sin(y * 0.2 + timestamp) * 1.5;
-        const x = Math.floor(source.x + waveOffset);
-        
-        // Prüfe, ob der Punkt innerhalb der Grenzen liegt
-        if (x >= 0 && x < adjustedWidth) {
-          // Berechne Opazität basierend auf Position im Tropfen
-          const opacity = 1 - (i / dropLength);
-          
-          // Füge Punkt zum Tropfen hinzu
-          veins.push({
-            x,
-            y,
-            color: dominantColor
-          });
-          
-          // Füge manchmal Seitenäste hinzu
-          if (i > 0 && i < dropLength - 1 && Math.random() < 0.2) {
-            const branchX = x + (Math.random() < 0.5 ? -1 : 1);
-            if (branchX >= 0 && branchX < adjustedWidth) {
-              veins.push({
-                x: branchX,
-                y,
-                color: dominantColor
-              });
-            }
-          }
-        }
-      }
-    }
-    
-    // Füge Tropfen am Ende hinzu
-    const endY = Math.floor(currentY);
-    if (endY >= 0 && endY < adjustedHeight) {
-      const endX = Math.floor(source.x + Math.sin(endY * 0.2 + timestamp) * 1.5);
-      if (endX >= 0 && endX < adjustedWidth) {
-        // Füge einen größeren Tropfen am Ende hinzu
-        veins.push({x: endX, y: endY, color: dominantColor});
-        
-        // Füge manchmal einen Spritzer hinzu
-        if (Math.random() < 0.3) {
-          for (let s = 0; s < 3; s++) {
-            const splashX = endX + Math.floor(Math.random() * 3) - 1;
-            const splashY = endY + Math.floor(Math.random() * 2) + 1;
-            if (splashX >= 0 && splashX < adjustedWidth && splashY >= 0 && splashY < adjustedHeight) {
-              veins.push({x: splashX, y: splashY, color: dominantColor});
-            }
-          }
-        }
-      }
-    }
-  });
-  
-  // Erzeuge zusätzliche fließende Muster, die von Strukturen abhängen
-  const numFlows = Math.floor(limitedNumVeins / 2);
-  
-  for (let i = 0; i < numFlows; i++) {
-    // Startpunkt für den Fluss (bevorzugt oben)
-    const startX = Math.floor(Math.random() * adjustedWidth);
-    const startY = Math.floor(Math.random() * (adjustedHeight / 3)); // Oberes Drittel
-    
-    // Farbe für diesen Fluss
-    const flowColor = accentColors[Math.floor(Math.random() * accentColors.length)];
-    
-    // Parameter für diesen Fluss
-    const flowLength = Math.floor(Math.random() * 15) + 10;
-    const flowSpeed = Math.random() * 0.3 + 0.2;
-    const flowPhase = (timestamp * flowSpeed) % adjustedHeight;
-    
-    // Aktuelle Position
-    let x = startX;
-    let y = (startY + flowPhase) % adjustedHeight;
-    
-    // Erzeuge den Fluss
-    for (let j = 0; j < flowLength; j++) {
-      // Bewegung hauptsächlich nach unten mit leichter seitlicher Bewegung
-      const dx = Math.sin(y * 0.1 + timestamp * 0.5) * 0.8;
-      const dy = 1 + Math.random() * 0.5; // Hauptsächlich nach unten
-      
-      // Bewege den Punkt
-      x += dx;
-      y += dy;
-      
-      // Runde auf ganze Pixel
-      const pixelX = Math.floor(x);
-      const pixelY = Math.floor(y);
-      
-      // Prüfe, ob der Punkt innerhalb der Grenzen liegt
-      if (pixelX >= 0 && pixelX < adjustedWidth && pixelY >= 0 && pixelY < adjustedHeight) {
-        // Füge den Punkt zum Fluss hinzu
-        veins.push({
-          x: pixelX,
-          y: pixelY,
-          color: flowColor
-        });
-        
-        // Füge manchmal Verzweigungen hinzu
-        if (j > 3 && Math.random() < 0.15) {
-          const branchLength = Math.floor(Math.random() * 3) + 1;
-          let branchX = x;
-          let branchY = y;
-          
-          for (let b = 0; b < branchLength; b++) {
-            // Verzweigung mit Tendenz nach unten
-            branchX += Math.random() * 2 - 1;
-            branchY += Math.random() * 1.5;
-            
-            const branchPixelX = Math.floor(branchX);
-            const branchPixelY = Math.floor(branchY);
-            
-            if (branchPixelX >= 0 && branchPixelX < adjustedWidth && branchPixelY >= 0 && branchPixelY < adjustedHeight) {
-              veins.push({
-                x: branchPixelX,
-                y: branchPixelY,
-                color: flowColor
-              });
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  // Erzeuge einige Ansammlungen am unteren Rand (wie Pfützen)
-  const numPuddles = Math.floor(limitedNumVeins / 10);
-  
-  for (let i = 0; i < numPuddles; i++) {
-    const puddleX = Math.floor(Math.random() * adjustedWidth);
-    const puddleY = Math.floor(adjustedHeight - Math.random() * (adjustedHeight / 5)); // Unteres Fünftel
-    const puddleSize = Math.floor(Math.random() * 5) + 2;
-    const puddleColor = accentColors[Math.floor(Math.random() * accentColors.length)];
-    
-    // Erzeuge eine kleine Ansammlung
-    const puddle = generateCluster(puddleX, puddleY, puddleSize, adjustedWidth, adjustedHeight);
-    
-    puddle.forEach(pos => {
-      if (pos.y < adjustedHeight && pos.x < adjustedWidth) {
-        veins.push({
-          x: pos.x,
-          y: pos.y,
-          color: puddleColor
-        });
-      }
+    // Füge die Punkte zum Äderchen hinzu
+    cluster.forEach(point => {
+      veins.push({
+        x: point.x,
+        y: point.y,
+        color
+      });
     });
   }
   

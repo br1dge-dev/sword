@@ -265,8 +265,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // Audio-reaktive Farb-Effekte
   useEffect(() => {
-    // Bei hoher Energie oder Beat Farbwechsel auslösen
-    if ((energy > 0.40 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) { // Erhöhter Schwellenwert von 0.25 auf 0.40
+    // Bei Beat oder hoher Energie Farbwechsel auslösen
+    // Erhöhte Reaktivität für Schwert und äußeren Ring
+    if ((energy > 0.30 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) {
       // Erzeuge eine harmonische Farbkombination
       const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
       
@@ -277,37 +278,47 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Aktualisiere den Zeitstempel für den letzten Farbwechsel
       setLastColorChangeTime(Date.now());
       
-      console.log(`[${new Date().toLocaleTimeString()}] [COLOR_CHANGE] New color: ${swordColor}, BG: ${newBgColor}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
+      // Dynamische Farbstabilität basierend auf Energielevel
+      // Bei hoher Energie schnellere Farbwechsel erlauben
+      const newStability = energy > 0.7 
+        ? Math.max(300, Math.floor(1000 - (energy * 800))) // Minimum 300ms bei hoher Energie
+        : Math.floor(1000 + Math.random() * 1500); // 1-2.5 Sekunden bei normaler Energie
+      
+      setColorStability(newStability);
+      
+      console.log(`[${new Date().toLocaleTimeString()}] [COLOR_CHANGE] New color: ${swordColor}, BG: ${newBgColor}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}, Stability: ${newStability}ms`);
     }
   }, [beatDetected, energy, lastColorChangeTime, colorStability]);
   
-  // Audio-reaktive Tile-Effekte
+  // Audio-reaktive Tile-Effekte - Erhöhte Reaktivität für Schwert
   useEffect(() => {
-    if (beatDetected || energy > 0.2) { // Reduzierter Schwellenwert von 0.3 auf 0.2
-      // Temporär erhöhte Farbeffekte
+    // Niedrigerer Schwellenwert für bessere Reaktivität
+    if (beatDetected || energy > 0.15) {
+      // Temporär erhöhte Farbeffekte - stärkere Reaktion auf Beats
       const tempIntensity = { ...colorEffectIntensity };
       for (const level in tempIntensity) {
         if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
           const numLevel = Number(level) as keyof typeof colorEffectIntensity;
-          tempIntensity[numLevel] = Math.min(3, tempIntensity[numLevel] + Math.floor(energy * 2));
+          // Stärkere Intensitätssteigerung bei Beats
+          tempIntensity[numLevel] = Math.min(3, tempIntensity[numLevel] + Math.floor(energy * (beatDetected ? 3 : 2)));
         }
       }
       
       setColoredTiles(generateColoredTiles(getSwordPositions(), glitchLevel, tempIntensity));
-      console.log(`[TILES] Tile-Effekte ausgelöst, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}, Tiles: ${coloredTiles.length}`);
       
-      // Zurücksetzen nach kurzer Zeit
+      // Längere Dauer für flüssigeren Übergang
       const timeout = setTimeout(() => {
         setColoredTiles(generateColoredTiles(getSwordPositions(), glitchLevel, colorEffectIntensity));
-      }, 800);
+      }, beatDetected ? 1000 : 800); // Längere Dauer bei Beat-Erkennung
       
       return () => clearTimeout(timeout);
     }
   }, [beatDetected, energy, glitchLevel]);
   
-  // Audio-reaktive Edge-Effekte (ersetzt intervalsRef.current.edge)
+  // Audio-reaktive Edge-Effekte - Erhöhte Reaktivität für Schwert
   useEffect(() => {
-    if (beatDetected || energy > 0.2) { // Reduzierter Schwellenwert von 0.4 auf 0.2
+    // Niedrigerer Schwellenwert für bessere Reaktivität
+    if (beatDetected || energy > 0.15) {
       // Wenn keine Kanten vorhanden sind, nichts tun
       const edgePositions = getEdgePositions();
       if (edgePositions.length === 0) return;
@@ -323,13 +334,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Multiplier für Level 2 (erhöht die Chance um 50%)
       const glitchMultiplier = chargeLevel === 2 ? 1.5 : 1;
       
-      // Erhöhe die Chancen basierend auf der Energie
-      const energyMultiplier = 1 + (energy * 1.5);
+      // Erhöhe die Chancen basierend auf der Energie - stärkere Reaktion
+      const energyMultiplier = 1 + (energy * 2.0); // Erhöht von 1.5 auf 2.0
       const effectiveVibrationChance = Math.min(0.95, vibrationChance * energyMultiplier);
       const effectiveGlitchChance = Math.min(0.95, glitchChance * glitchMultiplier * energyMultiplier);
       const effectiveColorChance = Math.min(0.95, colorChance * energyMultiplier);
-      
-      console.log(`[EDGE] Edge-Effekte berechnet - Vibration: ${effectiveVibrationChance.toFixed(2)}, Glitch: ${effectiveGlitchChance.toFixed(2)}, Color: ${effectiveColorChance.toFixed(2)}, Energy: ${energy.toFixed(2)}`);
       
       // Durchlaufe alle Kantenpositionen
       edgePositions.forEach(pos => {
@@ -373,36 +382,42 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       
       // Setze die neuen Edge-Effekte
       setEdgeEffects(newEdgeEffects);
-      console.log(`[EDGE] ${newEdgeEffects.length} Edge-Effekte angewendet, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
       
-      // Zurücksetzen nach kurzer Zeit
+      // Längere Dauer bei höherer Energie für flüssigeren Effekt
+      const duration = beatDetected ? 150 : Math.max(100, Math.min(200, Math.floor(energy * 200)));
+      
+      // Zurücksetzen nach berechneter Zeit
       setTimeout(() => {
         setEdgeEffects([]);
-      }, 100);
+      }, duration);
     }
   }, [beatDetected, energy, chargeLevel]);
   
-  // Audio-reaktive Unicode-Glitch-Effekte
+  // Audio-reaktive Unicode-Glitch-Effekte - Erhöhte Reaktivität für Schwert
   useEffect(() => {
-    if (beatDetected || energy > 0.25) { // Reduzierter Schwellenwert von 0.35 auf 0.25
+    // Niedrigerer Schwellenwert für bessere Reaktivität
+    if (beatDetected || energy > 0.20) {
       // Erhöhe temporär den Glitch-Level
       const tempGlitchLevel = Math.min(3, Math.floor(glitchLevel + (energy * 2)));
       setUnicodeGlitches(generateUnicodeGlitches(getSwordPositions(), tempGlitchLevel));
       
-      console.log(`[${new Date().toLocaleTimeString()}] [GLITCH] Unicode glitch triggered, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}, Glitches: ${unicodeGlitches.length}`);
+      // Längere Dauer bei höherer Energie für flüssigeren Effekt
+      const duration = beatDetected ? 200 : Math.max(160, Math.min(300, Math.floor(energy * 250)));
       
-      // Zurücksetzen nach kurzer Zeit
+      // Zurücksetzen nach berechneter Zeit
       const timeout = setTimeout(() => {
         setUnicodeGlitches([]);
-      }, 160);
+      }, duration);
       
       return () => clearTimeout(timeout);
     }
   }, [beatDetected, energy, glitchLevel]);
   
-  // Audio-reaktive Hintergrund-Effekte
+  // Audio-reaktive Hintergrund-Effekte - Deutlich dezentere Reaktion
   useEffect(() => {
-    if ((beatDetected && Math.random() < 0.15) || energy > 0.65) { // Reduzierte Wahrscheinlichkeit von 0.3 auf 0.15 und erhöhter Energieschwellenwert von 0.4 auf 0.65
+    // Deutlich reduzierte Wahrscheinlichkeit und erhöhter Energieschwellenwert
+    // Hintergrund soll nur bei signifikanten Stimmungsänderungen wechseln
+    if ((beatDetected && Math.random() < 0.05) || energy > 0.85) {
       // Größe für den Hintergrund dynamisch bestimmen
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       
@@ -411,17 +426,22 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setCaveBackground(newBackground);
       
       console.log(`[${new Date().toLocaleTimeString()}] [BACKGROUND] Background updated, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
+      
+      // Zusätzlich einen Timer setzen, der verhindert, dass der Hintergrund zu oft aktualisiert wird
+      setLastColorChangeTime(Date.now() + 30000); // Mindestens 30 Sekunden Stabilität
     }
   }, [beatDetected, energy]);
   
-  // Audio-reaktive Adern-Effekte
+  // Audio-reaktive Adern-Effekte - Dezentere Reaktion
   useEffect(() => {
-    if (beatDetected || energy > 0.30) { // Erhöhter Schwellenwert von 0.15 auf 0.30
+    // Höherer Schwellenwert für dezentere Reaktion
+    // Adern sollen nicht zu oft aktualisiert werden
+    if ((beatDetected && Math.random() < 0.2) || energy > 0.50) {
       // Größe für den Hintergrund dynamisch bestimmen
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       
-      // Mehr Veins bei höherer Energie
-      const numVeins = Math.floor(10 + energy * 30); // Erhöht von 20 auf 30 für mehr Veins
+      // Moderate Anzahl von Veins
+      const numVeins = Math.floor(10 + energy * 20);
       const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins);
       setColoredVeins(newVeins);
       
