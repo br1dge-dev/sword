@@ -457,4 +457,12 @@ export class AudioAnalyzer {
   public getLastBeatTime(): number {
     return this.lastBeatTime;
   }
+
+  /**
+   * Gibt die aktuellen Optionen des Analyzers zurück
+   * @returns Die aktuellen Analyzer-Optionen
+   */
+  public getOptions(): AudioAnalyzerOptions {
+    return { ...this.options };
+  }
 } 
