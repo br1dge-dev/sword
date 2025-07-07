@@ -80,14 +80,10 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
       const tileProgress = (i + 1) / totalTiles * 100;
       const isActive = isMaxLevel || tileProgress <= glitchProgress;
       
-      // Zufällige Glitch-Effekte für aktive Tiles, aber weniger häufig im MAX-Level
-      const isGlitching = isActive && (!isMaxLevel ? Math.random() > 0.85 : Math.random() > 0.7);
-      const glitchColor = Math.random() > 0.5 ? 'bg-green-400' : 'bg-pink-400';
-      
       tiles.push(
         <div 
           key={i}
-          className={`h-full w-[10%] ${isGlitching ? glitchColor : getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
+          className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
           style={{
             boxShadow: isActive && (isMaxLevel || glitchProgress >= 90) ? 'inset 0 0 3px rgba(255,0,255,0.8)' : 
                       isActive && glitchProgress >= 50 ? 'inset 0 0 2px rgba(255,0,255,0.5)' : 
@@ -191,8 +187,7 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
               {isGlitchComplete && (
                 <div className="absolute inset-0 opacity-70"
                      style={{ 
-                       boxShadow: '0 0 3px rgba(0,255,170,0.8)',
-                       animation: 'pulse 2s infinite alternate'
+                       boxShadow: '0 0 3px rgba(0,255,170,0.8)'
                      }}>
                 </div>
               )}

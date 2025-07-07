@@ -37,16 +37,6 @@
   }
 }
 
-/* Pulse-Animation für Glüheffekte */
-@keyframes pulse {
-  0% {
-    opacity: 0.5;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
 /* Shine-Animation für maximale Fortschrittsbalken */
 @keyframes shine {
   0% {

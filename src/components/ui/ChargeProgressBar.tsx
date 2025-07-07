@@ -148,8 +148,7 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
               {/* Glüheffekt */}
               <div className="absolute inset-0 opacity-70"
                    style={{ 
-                     boxShadow: '0 0 3px rgba(255,255,0,0.8)',
-                     animation: 'pulse 1.5s infinite alternate'
+                     boxShadow: '0 0 3px rgba(255,255,0,0.8)'
                    }}>
               </div>
             </div>
@@ -185,8 +184,7 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
               {isChargeComplete && (
                 <div className="absolute inset-0 opacity-70"
                      style={{ 
-                       boxShadow: '0 0 3px rgba(255,255,0,0.8)',
-                       animation: 'pulse 2s infinite alternate'
+                       boxShadow: '0 0 3px rgba(255,255,0,0.8)'
                      }}>
                 </div>
               )}

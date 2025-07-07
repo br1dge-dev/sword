@@ -148,8 +148,7 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
               {/* Glüheffekt */}
               <div className="absolute inset-0 opacity-70"
                    style={{ 
-                     boxShadow: '0 0 3px rgba(255,165,0,0.8)',
-                     animation: 'pulse 1.5s infinite alternate'
+                     boxShadow: '0 0 3px rgba(255,165,0,0.8)'
                    }}>
               </div>
             </div>
@@ -183,8 +182,7 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
               {isForgeComplete && (
                 <div className="absolute inset-0 opacity-70"
                      style={{ 
-                       boxShadow: '0 0 3px rgba(100,149,237,0.8)',
-                       animation: 'pulse 2s infinite alternate'
+                       boxShadow: '0 0 3px rgba(255,165,0,0.8)'
                      }}>
                 </div>
               )}

@@ -40,13 +40,6 @@ export default function GlitchButton({
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    // Zufällige Glitch-Effekte auch ohne Hover (selten)
-    const randomGlitchInterval = setInterval(() => {
-      if (Math.random() > 0.92) { // 8% Chance für zufälligen Glitch
-        triggerGlitch();
-      }
-    }, 2000);
-    
     // Intensivere Glitch-Effekte bei Hover
     if (isHovered) {
       interval = setInterval(() => {
@@ -56,7 +49,6 @@ export default function GlitchButton({
     
     return () => {
       clearInterval(interval);
-      clearInterval(randomGlitchInterval);
     };
   }, [isHovered, text]);
 

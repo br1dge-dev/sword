@@ -62,6 +62,9 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     }
   });
   
+  // Audio-Reaction-Store
+  const setMusicPlaying = useAudioReactionStore(state => state.setMusicPlaying);
+  
   // Initialisiere Audio-Analyzer, wenn Audio-Element verfügbar ist
   const initializeAudioAnalyzer = useCallback(async () => {
     if (!audioRef.current || analyzerInitialized || initializationAttemptedRef.current) {
@@ -192,6 +195,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       if (isPlaying) {
         audio.pause();
         setIsPlaying(false);
+        setMusicPlaying(false);
       } else {
         // Erhöhe die Lautstärke, um sicherzustellen, dass Audio hörbar ist
         audio.volume = Math.max(0.5, audio.volume);
@@ -205,6 +209,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         await audio.play();
         setError(null);
         setIsPlaying(true);
+        setMusicPlaying(true);
         console.log('Audio playback started successfully');
         
         // Starte die Analyse, wenn sie nicht bereits läuft
@@ -231,6 +236,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     if (wasPlaying && audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
+      setMusicPlaying(false);
     }
     
     // Wechsle zum nächsten Track (oder zurück zum ersten)
@@ -251,6 +257,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         
         await audioRef.current.play();
         setIsPlaying(true);
+        setMusicPlaying(true);
         setError(null);
         
         // Stelle sicher, dass die Analyse läuft
@@ -315,6 +322,24 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
 
   // Aktueller Track
   const currentTrack = tracks[currentTrackIndex];
+
+  // Effekt für Laden des Tracks
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.src = currentTrack.src;
+      audioRef.current.load();
+      
+      // Wenn vorher abgespielt wurde, auch den neuen Track abspielen
+      if (isPlaying) {
+        audioRef.current.play().catch(error => {
+          console.error('Error playing new track:', error);
+          setError('Neuer Track konnte nicht abgespielt werden.');
+          setIsPlaying(false);
+          setMusicPlaying(false);
+        });
+      }
+    }
+  }, [currentTrackIndex, currentTrack.src]);
 
   return (
     <div className={`flex flex-col ${className}`}>
@@ -382,8 +407,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
               
               <div className="absolute inset-0 opacity-70"
                    style={{ 
-                     boxShadow: '0 0 3px rgba(62,230,255,0.8)',
-                     animation: 'pulse 1.5s infinite alternate'
+                     boxShadow: '0 0 3px rgba(62,230,255,0.8)'
                    }}>
               </div>
             </div>
@@ -406,8 +430,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
               
               <div className="absolute inset-0 opacity-70"
                    style={{ 
-                     boxShadow: '0 0 3px rgba(62,230,255,0.8)',
-                     animation: 'pulse 1.5s infinite alternate'
+                     boxShadow: '0 0 3px rgba(62,230,255,0.8)'
                    }}>
               </div>
             </div>

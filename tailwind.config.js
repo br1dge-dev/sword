@@ -50,7 +50,6 @@ module.exports = {
         'press-start-2p': ['var(--font-press-start-2p)', 'Courier New', 'monospace'],
       },
       animation: {
-        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'flicker': 'flicker 2s linear infinite',
         'neon-pulse': 'neonPulse 2s ease-in-out infinite',
       },
