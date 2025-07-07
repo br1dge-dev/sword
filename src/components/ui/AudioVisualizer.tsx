@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useAudioReactionStore } from '@/store/audioReactionStore';
 
 interface AudioVisualizerProps {
   energy: number;
@@ -13,6 +14,9 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
   const lastEnergyRef = useRef(energy);
   const animationFrameRef = useRef<number | null>(null);
   const lastUpdateTimeRef = useRef(0);
+  
+  // Zugriff auf den Fallback-Status
+  const isFallbackActive = useAudioReactionStore(state => state.isFallbackActive());
   
   // Optimierte Aktualisierung des Energy-Werts
   useEffect(() => {
@@ -62,25 +66,32 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
           maxWidth: '200px' // Maximale Breite begrenzen
         }}
       >
-        {/* Visualisierungs-Balken - Nutze die volle Breite */}
-        {Array.from({ length: 12 }).map((_, index) => {
-          const isActive = index < Math.ceil(activeBars / 16 * 12);
-          const height = 20 - Math.abs(index - 6) * 1.2; // Höhere Balken in der Mitte
-          
-          return (
-            <div
-              key={index}
-              className={`flex-1 mx-[1px] transition-all duration-150 ${isActive ? 'bg-[#3EE6FF]' : 'bg-gray-800'}`}
-              style={{
-                height: `${Math.max(3, (height / 20) * 100)}%`,
-                transform: visualBeatActive && isActive ? 'scaleY(1.4)' : 'scaleY(1)',
-                boxShadow: isActive 
-                  ? 'inset 0 0 3px rgba(62,230,255,0.8)' 
-                  : 'none'
-              }}
-            />
-          );
-        })}
+        {isFallbackActive ? (
+          // IDLE-Anzeige für Fallback-Modus
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-[#3EE6FF] text-xs font-mono">IDLE</span>
+          </div>
+        ) : (
+          // Normale Visualisierungs-Balken
+          Array.from({ length: 12 }).map((_, index) => {
+            const isActive = index < Math.ceil(activeBars / 16 * 12);
+            const height = 20 - Math.abs(index - 6) * 1.2; // Höhere Balken in der Mitte
+            
+            return (
+              <div
+                key={index}
+                className={`flex-1 mx-[1px] transition-all duration-150 ${isActive ? 'bg-[#3EE6FF]' : 'bg-gray-800'}`}
+                style={{
+                  height: `${Math.max(3, (height / 20) * 100)}%`,
+                  transform: visualBeatActive && isActive ? 'scaleY(1.4)' : 'scaleY(1)',
+                  boxShadow: isActive 
+                    ? 'inset 0 0 3px rgba(62,230,255,0.8)' 
+                    : 'none'
+                }}
+              />
+            );
+          })
+        )}
       </div>
       
       {/* Beat-Indikator */}
@@ -94,7 +105,7 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
           }}
         />
         <div className="text-[8px] font-mono text-gray-500">
-          E: {(lastEnergyRef.current * 1.8).toFixed(2)}
+          {isFallbackActive ? "IDLE" : `E: ${(lastEnergyRef.current * 1.8).toFixed(2)}`}
         </div>
       </div>
     </div>

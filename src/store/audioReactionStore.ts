@@ -16,9 +16,9 @@ let fallbackInitialized = false; // Neue Variable, um zu verfolgen, ob der Fallb
 // Konstanten für Fallback-Animation
 const MIN_ENERGY = 0.2;
 const MAX_ENERGY = 0.7; // Reduziert von 0.8, um extremere Werte zu vermeiden
-const ENERGY_INTERVAL = 200; // ms
-const BEAT_INTERVAL = 500; // ms
-const BEAT_CHANCE = 0.25; // 25% Chance für einen Beat
+const ENERGY_INTERVAL = 1000; // ms - erhöht von 200ms auf 1000ms
+const BEAT_INTERVAL = 3000; // ms - erhöht von 500ms auf 3000ms
+const BEAT_CHANCE = 0.1; // 10% Chance für einen Beat - reduziert von 25%
 
 interface AudioReactionState {
   energy: number;
@@ -70,10 +70,13 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     set({ isMusicPlaying: playing });
     
     // Wenn Musik gestoppt wird und Fallback aktiviert ist
-    if (!playing && get().fallbackEnabled && !fallbackActive) {
+    if (!playing && get().fallbackEnabled) {
       // Kurze Verzögerung vor dem Start des Fallbacks
       setTimeout(() => {
-        get().startFallback();
+        // Fallback immer neu starten, wenn Musik pausiert wird
+        const { startFallback } = get();
+        startFallback();
+        console.log("Music paused, forcing fallback activation");
       }, 100);
     }
     // Wenn Musik gestartet wird und Fallback aktiv ist
@@ -84,19 +87,15 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   
   startFallback: () => {
     const store = get();
-    if (!store.fallbackEnabled || fallbackActive) return;
+    if (!store.fallbackEnabled) return;
     
-    // Verhindern, dass der Fallback mehrfach initialisiert wird
-    if (fallbackInitialized) {
-      console.log("Fallback already initialized, just activating");
-      fallbackActive = true;
+    // Wenn der Fallback bereits aktiv ist, nichts tun
+    if (fallbackActive) {
+      console.log("Fallback is already active");
       return;
     }
     
-    console.log("Starting fallback animation");
-    fallbackActive = true;
-    fallbackInitialized = true;
-    
+    // Immer die Intervalle neu starten, auch wenn bereits initialisiert
     // Cleanup bestehender Intervalle
     if (beatInterval) {
       clearInterval(beatInterval);
@@ -107,6 +106,15 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
       clearInterval(energyInterval);
       energyInterval = null;
     }
+    
+    if (fallbackInitialized) {
+      console.log("Fallback already initialized, restarting animation");
+    } else {
+      console.log("Starting fallback animation");
+      fallbackInitialized = true;
+    }
+    
+    fallbackActive = true;
     
     // Setze einen anfänglichen Energie-Wert, um Flackern zu vermeiden
     const initialEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY);
@@ -180,17 +188,17 @@ export function useBeatReset(delay: number = 100) {
 export function useFallbackAnimation() {
   const { isMusicPlaying, fallbackEnabled, startFallback } = useAudioReactionStore();
   
-  // Initialisiere Fallback bei Komponentenladung
+  // Initialisiere Fallback bei Komponentenladung und wenn Musik stoppt
   useEffect(() => {
     if (!isMusicPlaying && fallbackEnabled) {
       console.log("No music playing, activating fallback immediately");
       // Kurze Verzögerung, um sicherzustellen, dass die Komponente vollständig geladen ist
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         startFallback();
       }, 300); // Längere Verzögerung für bessere Stabilität
+      
+      return () => clearTimeout(timer);
     }
-    
-    // Kein Cleanup nötig, da der Store selbst die Intervalle verwaltet
   }, [isMusicPlaying, fallbackEnabled, startFallback]);
   
   return fallbackActive;

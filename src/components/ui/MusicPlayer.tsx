@@ -197,7 +197,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         
         // Setze Musik als nicht spielend und aktiviere Fallback
         const { setMusicPlaying } = useAudioReactionStore.getState();
-        setMusicPlaying(false);
         
         console.log("Music playback stopped, fallback should activate");
         
@@ -206,6 +205,10 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
           stop();
           console.log("Stopping audio analysis because playback stopped");
         }
+        
+        // Setze Musik als nicht spielend NACH dem Stoppen der Analyse
+        // Dies ist wichtig, damit der Fallback korrekt aktiviert wird
+        setMusicPlaying(false);
       } else {
         // Erhöhe die Lautstärke, um sicherzustellen, dass Audio hörbar ist
         audioRef.current.volume = Math.max(0.5, audioRef.current.volume);
