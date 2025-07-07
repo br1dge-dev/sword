@@ -31,7 +31,7 @@ export function generateCaveBackground(width: number, height: number): string[][
   
   // Zufällige Musterparameter für diese Generation
   // Bevorzuge noch stärker feinere Muster (0, 3, 4) für dezentere Effekte
-  const patternTypeWeights = [0.40, 0.05, 0.05, 0.35, 0.15]; // Höhere Gewichtung für feine Muster
+  const patternTypeWeights = [0.35, 0.10, 0.10, 0.30, 0.15]; // Ausgeglichenere Gewichtung für mehr Variation
   const patternTypeRand = Math.random();
   let patternType = 0;
   let cumulativeWeight = 0;
@@ -45,11 +45,11 @@ export function generateCaveBackground(width: number, height: number): string[][
     }
   }
   
-  // Reduzierte Amplitude und Frequenz für dezentere Effekte
-  const waveAmplitude = Math.floor(adjustedHeight / (10 + Math.random() * 6)); // Reduzierte Amplitude
-  const waveFrequency = 0.03 + (Math.random() * 0.04); // Reduzierte Frequenz
-  const noiseScale = 0.06 + (Math.random() * 0.06); // Reduzierte Rauschskalierung
-  const patternScale = 0.15 + (Math.random() * 0.25); // Reduzierte Skalierung des Grundmusters
+  // Optimierte Amplitude und Frequenz für bessere Sichtbarkeit
+  const waveAmplitude = Math.floor(adjustedHeight / (8 + Math.random() * 4)); // Erhöhte Amplitude
+  const waveFrequency = 0.04 + (Math.random() * 0.05); // Erhöhte Frequenz
+  const noiseScale = 0.07 + (Math.random() * 0.07); // Erhöhte Rauschskalierung
+  const patternScale = 0.18 + (Math.random() * 0.3); // Erhöhte Skalierung des Grundmusters
   
   // Zufällige Rotation/Verschiebung für diese Generation
   const rotationAngle = Math.random() * Math.PI * 2; // 0-360 Grad
@@ -60,31 +60,31 @@ export function generateCaveBackground(width: number, height: number): string[][
   const charSets = [
     // Set 1: Dünne Linien und Punkte (BEVORZUGT)
     {
-      light: ['·', ':', '.', '˙', '°', ' ', ' ', ' '], // Mehr Leerzeichen für dezentere Effekte
+      light: ['·', ':', '.', '˙', '°', ' ', ' '], // Weniger Leerzeichen für mehr sichtbare Zeichen
       medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '│', '─', '┬', '┴', '┼'],
       dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '┃', '━', '╸', '╹', '╺', '╻']
     },
     // Set 2: Blockige Texturen (REDUZIERT)
     {
-      light: ['·', ':', '.', '˙', '°', ' ', ' ', ' '],
+      light: ['·', ':', '.', '˙', '°', ' '],
       medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '┤', '├', '┬', '┴'],
       dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻']
     },
     // Set 3: Geometrische Formen (ANGEPASST)
     {
-      light: ['·', ':', '.', '˙', '°', ' ', ' ', ' '],
+      light: ['·', ':', '.', '˙', '°', ' '],
       medium: ['◇', '◆', '◊', '◈', '◦', '◎', '○', '◌'],
       dense: ['◊', '◈', '◎', '◉', '◍', '◐', '◑', '◒', '◓', '◔', '◕']
     },
     // Set 4: Technische Zeichen (OHNE KOMPLEXE SYMBOLE)
     {
-      light: ['⌐', '¬', '⌙', '⌖', '·', ':', '.', ' ', ' '],
+      light: ['⌐', '¬', '⌙', '⌖', '·', ':', '.', ' '],
       medium: ['⌘', '⌂', '⌤', '⌧', '⌗', '╱', '╲', '┌', '┐', '└', '┘'],
       dense: ['⎔', '⎕', '⎖', '⎗', '⎘', '⎙', '⎚', '⎛', '⎜', '⎝', '⎞', '⎟', '⎠', '⎡', '⎢']
     },
     // Set 5: Mischung aus feinen Zeichen (BEVORZUGT)
     {
-      light: ['·', ':', '.', '˙', '°', ' ', ' ', ' ', ' '], // Mehr Leerzeichen für dezentere Effekte
+      light: ['·', ':', '.', '˙', '°', ' ', ' '], // Weniger Leerzeichen für mehr sichtbare Zeichen
       medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '◇', '◆', '⌘', '⎔', '│', '─', '┬', '┴'],
       dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '◎', '◉', '◍', '⎕', '⎖', '⎗']
     }
@@ -99,8 +99,8 @@ export function generateCaveBackground(width: number, height: number): string[][
   // Berechne die Zentrumsposition
   const centerX = adjustedWidth / 2;
   
-  // Parameter für die Dichtegradierung - verstärkte Ausdünnung für dezentere Effekte
-  const fadeStartPercent = isLargeViewport ? 0.25 : 0.40; // Früher mit dem Ausblenden beginnen
+  // Parameter für die Dichtegradierung - optimierte Ausdünnung für bessere Sichtbarkeit
+  const fadeStartPercent = isLargeViewport ? 0.30 : 0.45; // Später mit dem Ausblenden beginnen
   const fadeStart = centerX * fadeStartPercent;
   const fadeWidth = centerX - fadeStart;
   
@@ -115,30 +115,30 @@ export function generateCaveBackground(width: number, height: number): string[][
     // Verschiedene Mustertypen
     switch(patternType) {
       case 0: // Wellenförmiges Muster mit feinen Linien
-        if (Math.sin(tx * patternScale) * Math.cos(ty * patternScale) > 0.4) { // Erhöhter Schwellenwert für weniger Zeichen
+        if (Math.sin(tx * patternScale) * Math.cos(ty * patternScale) > 0.35) { // Reduzierter Schwellenwert für mehr Zeichen
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
       case 1: // Konzentrische Kreise mit feinen Linien statt Blöcken
         const dist = Math.sqrt(Math.pow((tx - adjustedWidth/2) / adjustedWidth, 2) + Math.pow((ty - adjustedHeight/2) / adjustedHeight, 2));
-        if (Math.abs(Math.sin(dist * 20)) > 0.8) { // Erhöhter Schwellenwert für weniger Zeichen
+        if (Math.abs(Math.sin(dist * 20)) > 0.75) { // Reduzierter Schwellenwert für mehr Zeichen
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
       case 2: // Schachbrettmuster mit feinen Variationen
-        if ((Math.floor(tx * patternScale) + Math.floor(ty * patternScale)) % 3 === 0) { // Geändert von 2 auf 3 für weniger Zeichen
+        if ((Math.floor(tx * patternScale) + Math.floor(ty * patternScale)) % 2 === 0) { // Geändert von 3 auf 2 für mehr Zeichen
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
       case 3: // Spiralmuster mit einfachen Zeichen
         const angle = Math.atan2(ty - adjustedHeight/2, tx - adjustedWidth/2);
         const dist2 = Math.sqrt(Math.pow(tx - adjustedWidth/2, 2) + Math.pow(ty - adjustedHeight/2, 2));
-        if (Math.abs(Math.sin(angle * 5 + dist2 * 0.2)) > 0.8) { // Erhöhter Schwellenwert für weniger Zeichen
+        if (Math.abs(Math.sin(angle * 5 + dist2 * 0.2)) > 0.75) { // Reduzierter Schwellenwert für mehr Zeichen
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
       case 4: // Fraktales Muster mit feinen Zeichen
-        if (((tx & ty) % 4 === 0) || ((tx * ty) % 9 === 0)) { // Geändert von 3/7 auf 4/9 für weniger Zeichen
+        if (((tx & ty) % 3 === 0) || ((tx * ty) % 7 === 0)) { // Geändert von 4/9 auf 3/7 für mehr Zeichen
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
         break;
@@ -177,19 +177,19 @@ export function generateCaveBackground(width: number, height: number): string[][
       
       if (isLargeViewport && distFromCenter > fadeStart) {
         // Lineare Zunahme der Wahrscheinlichkeit für Leerraum von fadeStart bis centerX
-        emptyProbability = Math.min(0.98, (distFromCenter - fadeStart) / fadeWidth);
+        emptyProbability = Math.min(0.95, (distFromCenter - fadeStart) / fadeWidth);
         
         // Exponentieller Anstieg für natürlicheren Übergang
-        emptyProbability = Math.pow(emptyProbability, 1.3); // Reduziert von 1.5 für sanfteren Übergang
+        emptyProbability = Math.pow(emptyProbability, 1.2); // Reduziert von 1.3 für sanfteren Übergang
         
         // Wenn wir nahe am Rand sind, erhöhe die Wahrscheinlichkeit noch mehr
         if (distFromCenter > centerX * 0.85) {
-          emptyProbability = Math.min(0.99, emptyProbability * 1.3);
+          emptyProbability = Math.min(0.98, emptyProbability * 1.2);
         }
       }
       
-      // Erhöhte Grundwahrscheinlichkeit für Leerraum überall für dezentere Effekte
-      emptyProbability = Math.max(emptyProbability, 0.15);
+      // Reduzierte Grundwahrscheinlichkeit für Leerraum überall für bessere Sichtbarkeit
+      emptyProbability = Math.max(emptyProbability, 0.10);
       
       // Wenn die Zufallszahl unter der Wahrscheinlichkeit liegt, setze leeren Raum
       if (Math.random() < emptyProbability) {
@@ -212,9 +212,9 @@ export function generateCaveBackground(width: number, height: number): string[][
       
       // Wähle Zeichensatz basierend auf Region
       let charSet;
-      if (regionValue < 0.4) { // Erhöht von 0.3 für mehr leichte Zeichen
+      if (regionValue < 0.35) { // Reduziert von 0.4 für weniger leichte Zeichen
         charSet = selectedCharSet.light;
-      } else if (regionValue < 0.8) { // Erhöht von 0.7 für weniger dichte Zeichen
+      } else if (regionValue < 0.75) { // Reduziert von 0.8 für mehr dichte Zeichen
         charSet = selectedCharSet.medium;
       } else {
         charSet = selectedCharSet.dense;
@@ -223,21 +223,21 @@ export function generateCaveBackground(width: number, height: number): string[][
       // Bei großen Viewports: Zusätzliche Ausdünnung basierend auf Abstand vom Zentrum
       if (isLargeViewport && distFromCenter > fadeStart) {
         // Je weiter vom Zentrum entfernt, desto höhere Wahrscheinlichkeit für leichte Zeichen
-        const lightCharProbability = Math.min(0.9, (distFromCenter - fadeStart) / fadeWidth);
+        const lightCharProbability = Math.min(0.85, (distFromCenter - fadeStart) / fadeWidth);
         
         if (Math.random() < lightCharProbability) {
           charSet = selectedCharSet.light;
         }
       }
       
-      // Füge rhythmische Variation hinzu - reduzierte Häufigkeit für dezentere Effekte
-      if ((x + y) % 9 === 0 || Math.sin((x * y) * 0.01 + (timestamp * 0.0001)) > 0.8) { // Geändert von 7/0.7 auf 9/0.8
+      // Füge rhythmische Variation hinzu - erhöhte Häufigkeit für bessere Sichtbarkeit
+      if ((x + y) % 7 === 0 || Math.sin((x * y) * 0.01 + (timestamp * 0.0001)) > 0.75) { // Geändert von 9/0.8 auf 7/0.75
         // Spezielles Muster an rhythmischen Positionen
         background[y][x] = charSet[Math.floor(Math.random() * charSet.length)];
-      } else if ((x * y) % 13 === 0 || Math.cos((x - y) * 0.03) > 0.85) { // Geändert von 11/0.8 auf 13/0.85
+      } else if ((x * y) % 11 === 0 || Math.cos((x - y) * 0.03) > 0.80) { // Geändert von 13/0.85 auf 11/0.80
         // Sekundäres rhythmisches Muster
         background[y][x] = charSet[Math.floor(Math.random() * charSet.length)];
-      } else if (Math.random() < 0.6) { // Reduziert von 0.7 für weniger Zeichen
+      } else if (Math.random() < 0.7) { // Erhöht von 0.6 für mehr Zeichen
         // Grundmuster mit hoher Wahrscheinlichkeit
         background[y][x] = baseChar;
       } else {
@@ -247,7 +247,7 @@ export function generateCaveBackground(width: number, height: number): string[][
     }
   }
   
-  // Füge einige kleinere Felsformationen hinzu - reduzierte Anzahl für dezentere Effekte
+  // Füge einige kleinere Felsformationen hinzu - erhöhte Anzahl für bessere Sichtbarkeit
   const numFormations = Math.floor((adjustedWidth * adjustedHeight) / 200) + 1; // Reduziert von 150 auf 200
   const formationChars = ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '┃', '━', '╸', '╹', '╺', '╻'];
   

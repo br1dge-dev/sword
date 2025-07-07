@@ -5,7 +5,20 @@
  * Speichert die Audio-Energie und Beat-Detection-Informationen.
  */
 import { create } from 'zustand';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect } from 'react';
+
+// Globale Variablen für Fallback-Animation
+let fallbackActive = false;
+let beatInterval: NodeJS.Timeout | null = null;
+let energyInterval: NodeJS.Timeout | null = null;
+let fallbackInitialized = false; // Neue Variable, um zu verfolgen, ob der Fallback bereits initialisiert wurde
+
+// Konstanten für Fallback-Animation
+const MIN_ENERGY = 0.2;
+const MAX_ENERGY = 0.7; // Reduziert von 0.8, um extremere Werte zu vermeiden
+const ENERGY_INTERVAL = 200; // ms
+const BEAT_INTERVAL = 500; // ms
+const BEAT_CHANCE = 0.25; // 25% Chance für einen Beat
 
 interface AudioReactionState {
   energy: number;
@@ -13,7 +26,7 @@ interface AudioReactionState {
   lastBeatTime: number;
   isAudioActive: boolean;
   fallbackEnabled: boolean;
-  isMusicPlaying: boolean; // Neuer Status für aktive Musikwiedergabe
+  isMusicPlaying: boolean;
   
   // Aktionen
   updateEnergy: (energy: number) => void;
@@ -21,27 +34,30 @@ interface AudioReactionState {
   resetBeat: () => void;
   setAudioActive: (active: boolean) => void;
   setFallbackEnabled: (enabled: boolean) => void;
-  setMusicPlaying: (playing: boolean) => void; // Neue Aktion
+  setMusicPlaying: (playing: boolean) => void;
+  startFallback: () => void;
+  stopFallback: () => void;
+  isFallbackActive: () => boolean;
 }
 
 // Erstelle den Store
-export const useAudioReactionStore = create<AudioReactionState>((set) => ({
+export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   energy: 0,
   beatDetected: false,
   lastBeatTime: 0,
-  isAudioActive: false, // Standardmäßig inaktiv, um Fallback zu ermöglichen
-  fallbackEnabled: true, // Standardmäßig aktiviert
-  isMusicPlaying: false, // Standardmäßig keine Musik
+  isAudioActive: false,
+  fallbackEnabled: true,
+  isMusicPlaying: false,
   
   updateEnergy: (energy) => set((state) => ({ 
     energy,
-    isAudioActive: energy > 0.05 ? true : state.isAudioActive // Nur als aktiv markieren, wenn Energie über Schwellenwert
+    isAudioActive: energy > 0.05 ? true : state.isAudioActive
   })),
   
   triggerBeat: () => set({ 
     beatDetected: true,
     lastBeatTime: Date.now(),
-    isAudioActive: true // Wenn Beat erkannt wird, ist Audio aktiv
+    isAudioActive: true
   }),
   
   resetBeat: () => set({ beatDetected: false }),
@@ -50,7 +66,99 @@ export const useAudioReactionStore = create<AudioReactionState>((set) => ({
   
   setFallbackEnabled: (enabled) => set({ fallbackEnabled: enabled }),
   
-  setMusicPlaying: (playing) => set({ isMusicPlaying: playing }) // Neue Aktion
+  setMusicPlaying: (playing) => {
+    set({ isMusicPlaying: playing });
+    
+    // Wenn Musik gestoppt wird und Fallback aktiviert ist
+    if (!playing && get().fallbackEnabled && !fallbackActive) {
+      // Kurze Verzögerung vor dem Start des Fallbacks
+      setTimeout(() => {
+        get().startFallback();
+      }, 100);
+    }
+    // Wenn Musik gestartet wird und Fallback aktiv ist
+    else if (playing && fallbackActive) {
+      get().stopFallback();
+    }
+  },
+  
+  startFallback: () => {
+    const store = get();
+    if (!store.fallbackEnabled || fallbackActive) return;
+    
+    // Verhindern, dass der Fallback mehrfach initialisiert wird
+    if (fallbackInitialized) {
+      console.log("Fallback already initialized, just activating");
+      fallbackActive = true;
+      return;
+    }
+    
+    console.log("Starting fallback animation");
+    fallbackActive = true;
+    fallbackInitialized = true;
+    
+    // Cleanup bestehender Intervalle
+    if (beatInterval) {
+      clearInterval(beatInterval);
+      beatInterval = null;
+    }
+    
+    if (energyInterval) {
+      clearInterval(energyInterval);
+      energyInterval = null;
+    }
+    
+    // Setze einen anfänglichen Energie-Wert, um Flackern zu vermeiden
+    const initialEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY);
+    store.updateEnergy(initialEnergy);
+    
+    // Zufällige Beats generieren (alle BEAT_INTERVAL ms, BEAT_CHANCE Chance)
+    beatInterval = setInterval(() => {
+      if (!fallbackActive) return; // Sicherheitscheck
+      
+      if (Math.random() < BEAT_CHANCE) {
+        console.log("Fallback: Triggering beat");
+        store.triggerBeat();
+        
+        // Automatisches Beat-Reset nach 100ms
+        setTimeout(() => {
+          if (useAudioReactionStore.getState().beatDetected) {
+            const { resetBeat } = useAudioReactionStore.getState();
+            resetBeat();
+          }
+        }, 100);
+      }
+    }, BEAT_INTERVAL);
+    
+    // Zufällige Energie-Level generieren (alle ENERGY_INTERVAL ms)
+    energyInterval = setInterval(() => {
+      if (!fallbackActive) return; // Sicherheitscheck
+      
+      // Zufälliger Energie-Level zwischen MIN_ENERGY und MAX_ENERGY
+      const randomEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY);
+      console.log(`Fallback: Setting energy to ${randomEnergy.toFixed(2)}`);
+      store.updateEnergy(randomEnergy);
+    }, ENERGY_INTERVAL);
+  },
+  
+  stopFallback: () => {
+    console.log("Stopping fallback animation");
+    
+    if (beatInterval) {
+      clearInterval(beatInterval);
+      beatInterval = null;
+    }
+    
+    if (energyInterval) {
+      clearInterval(energyInterval);
+      energyInterval = null;
+    }
+    
+    fallbackActive = false;
+    // Wir setzen fallbackInitialized nicht zurück, damit wir den Fallback nicht neu initialisieren müssen
+  },
+  
+  isFallbackActive: () => fallbackActive
 }));
 
 // Hook für automatisches Beat-Reset
@@ -68,124 +176,22 @@ export function useBeatReset(delay: number = 100) {
   }, [beatDetected, resetBeat, delay]);
 }
 
-// Globale Referenzen für die Fallback-Intervalle, um sicherzustellen, dass sie nur einmal existieren
-let globalBeatInterval: NodeJS.Timeout | null = null;
-let globalEnergyInterval: NodeJS.Timeout | null = null;
-
-// Hook für Fallback-Animation, wenn keine Audio-Reaktivität vorhanden ist
+// Hook für Fallback-Animation
 export function useFallbackAnimation() {
-  const { isAudioActive, triggerBeat, updateEnergy, fallbackEnabled, isMusicPlaying } = useAudioReactionStore();
-  const [fallbackActive, setFallbackActive] = useState(false);
-  const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const inactivityTimerRef = useRef<number>(0);
-  const lastActivityCheckRef = useRef<number>(Date.now());
+  const { isMusicPlaying, fallbackEnabled, startFallback } = useAudioReactionStore();
   
-  // Cleanup-Funktion
-  const cleanupIntervals = () => {
-    if (globalBeatInterval) {
-      clearInterval(globalBeatInterval);
-      globalBeatInterval = null;
-    }
-    if (globalEnergyInterval) {
-      clearInterval(globalEnergyInterval);
-      globalEnergyInterval = null;
-    }
-  };
-  
-  // Starte die Fallback-Animation
-  const startFallback = () => {
-    if (!fallbackEnabled) return;
-    
-    console.log("Starting fallback animation");
-    setFallbackActive(true);
-    
-    // Cleanup vor dem Erstellen neuer Intervalle
-    cleanupIntervals();
-    
-    // Zufällige Beats generieren (alle 500ms, 25% Chance)
-    globalBeatInterval = setInterval(() => {
-      if (Math.random() < 0.25) {
-        console.log("Fallback: Triggering beat");
-        triggerBeat();
-      }
-    }, 500);
-    
-    // Zufällige Energie-Level generieren (alle 200ms)
-    globalEnergyInterval = setInterval(() => {
-      // Zufälliger Energie-Level zwischen 0.2 und 0.8
-      const randomEnergy = 0.2 + Math.random() * 0.6;
-      console.log(`Fallback: Setting energy to ${randomEnergy.toFixed(2)}`);
-      updateEnergy(randomEnergy);
-    }, 200);
-  };
-  
-  // Sofort Fallback starten, wenn keine Musik abgespielt wird
+  // Initialisiere Fallback bei Komponentenladung
   useEffect(() => {
-    // Wenn keine Musik abgespielt wird und Fallback aktiviert ist
-    if (!isMusicPlaying && fallbackEnabled && !fallbackActive) {
+    if (!isMusicPlaying && fallbackEnabled) {
       console.log("No music playing, activating fallback immediately");
-      startFallback();
-    }
-    // Wenn Musik gestartet wird, Fallback deaktivieren
-    else if (isMusicPlaying && fallbackActive) {
-      console.log("Music started playing, deactivating fallback");
-      setFallbackActive(false);
-      cleanupIntervals();
+      // Kurze Verzögerung, um sicherzustellen, dass die Komponente vollständig geladen ist
+      setTimeout(() => {
+        startFallback();
+      }, 300); // Längere Verzögerung für bessere Stabilität
     }
     
-    // Cleanup beim Unmount
-    return () => {
-      if (fallbackActive) {
-        cleanupIntervals();
-      }
-    };
-  }, [isMusicPlaying, fallbackEnabled, fallbackActive]);
+    // Kein Cleanup nötig, da der Store selbst die Intervalle verwaltet
+  }, [isMusicPlaying, fallbackEnabled, startFallback]);
   
-  useEffect(() => {
-    // Prüfe regelmäßig auf Audio-Inaktivität, aber nur wenn Musik abgespielt wird
-    const checkActivityInterval = setInterval(() => {
-      // Wenn keine Musik abgespielt wird, ignorieren wir die Audio-Aktivität
-      if (!isMusicPlaying) {
-        if (!fallbackActive && fallbackEnabled) {
-          startFallback();
-        }
-        return;
-      }
-      
-      const now = Date.now();
-      const timeSinceLastCheck = now - lastActivityCheckRef.current;
-      lastActivityCheckRef.current = now;
-      
-      if (isAudioActive) {
-        // Zurücksetzen des Inaktivitäts-Timers bei Audio-Aktivität
-        inactivityTimerRef.current = 0;
-        
-        // Wenn Fallback aktiv ist, deaktivieren
-        if (fallbackActive) {
-          console.log("Audio activity detected, stopping fallback animation");
-          setFallbackActive(false);
-          cleanupIntervals();
-        }
-      } else {
-        // Erhöhe den Inaktivitäts-Timer
-        inactivityTimerRef.current += timeSinceLastCheck;
-        
-        // Starte Fallback nach 5 Sekunden Inaktivität (reduziert von 15 auf 5 Sekunden)
-        if (inactivityTimerRef.current >= 5000 && !fallbackActive && fallbackEnabled) {
-          startFallback();
-        }
-      }
-    }, 1000); // Prüfe jede Sekunde
-    
-    return () => {
-      clearInterval(checkActivityInterval);
-      cleanupIntervals();
-      if (fallbackTimeoutRef.current) {
-        clearTimeout(fallbackTimeoutRef.current);
-      }
-    };
-  }, [isAudioActive, fallbackActive, triggerBeat, updateEnergy, fallbackEnabled, isMusicPlaying]);
-  
-  // Gibt zurück, ob die Fallback-Animation aktiv ist
   return fallbackActive;
 } 

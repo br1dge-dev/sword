@@ -4,8 +4,11 @@
  * This is the root layout component that wraps all pages in the application.
  * It provides the HTML structure and includes global styles and metadata.
  */
-import type { Metadata } from 'next';
+'use client';
+
+import { useEffect } from 'react';
 import { Inter, Press_Start_2P } from 'next/font/google';
+import { useAudioReactionStore } from '@/store/audioReactionStore';
 import '../styles/globals.css';
 
 // Initialize the Inter font with Latin subset
@@ -19,19 +22,24 @@ const pressStart2P = Press_Start_2P({
   display: 'swap',
 });
 
-// Metadata for the application
-export const metadata: Metadata = {
-  title: 'Griftblade - ASCII Blockchain Visualizer',
-  description: 'Real-time Ethereum blockchain visualization in ASCII art',
-};
-
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Wir initialisieren den Fallback NICHT mehr im RootLayout, sondern überlassen das den Komponenten
+  
+  useEffect(() => {
+    // Setze nur den Titel und die Beschreibung
+    console.log('RootLayout mounted, fallback started');
+    document.title = 'Griftblade - ASCII Blockchain Visualizer';
+  }, []);
+  
   return (
     <html lang="en" className={`dark overflow-hidden ${pressStart2P.variable}`}>
+      <head>
+        <meta name="description" content="Real-time Ethereum blockchain visualization in ASCII art" />
+      </head>
       <body className={`${inter.className} min-h-screen overflow-hidden horizontal-scanlines`} style={{
         backgroundColor: 'var(--color-bg-primary)',
         backgroundImage: 'radial-gradient(circle at 50% 50%, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%)',

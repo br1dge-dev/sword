@@ -58,7 +58,8 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
             ? 'inset 0 0 8px rgba(62,230,255,0.8), 0 0 12px rgba(62,230,255,0.4)' 
             : 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
           transition: 'box-shadow 0.1s ease-out',
-          width: '12rem'
+          width: '100%', // Volle Breite des Containers
+          maxWidth: '200px' // Maximale Breite begrenzen
         }}
       >
         {/* Visualisierungs-Balken - Nutze die volle Breite */}

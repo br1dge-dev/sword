@@ -5,6 +5,7 @@
  */
 import { baseColors, accentColors } from '../constants/swordConstants';
 import { getComplementaryColor } from '../utils/swordUtils';
+import { SwordPosition } from '../types/swordTypes';
 
 /**
  * Generiert ein harmonisches Farbpaar für Schwert und Hintergrund
@@ -125,4 +126,141 @@ export function generateHarmonicColorPair(): { swordColor: string, bgColor: stri
   }
   
   return { swordColor, bgColor };
+}
+
+/**
+ * Generiert farbige Kacheln für das Schwert basierend auf der Energie und dem Beat
+ * @param positions Array von Schwertpositionen
+ * @param energy Aktuelle Audio-Energie (0-1)
+ * @param beatDetected Ob ein Beat erkannt wurde
+ * @param glitchLevel Aktuelles Glitch-Level (0-3)
+ * @returns Array von farbigen Kacheln
+ */
+export function generateColoredTiles(
+  positions: Array<SwordPosition>, 
+  energy: number, 
+  beatDetected: boolean,
+  glitchLevel: number
+): Array<{x: number, y: number, color: string}> {
+  const coloredTiles: Array<{x: number, y: number, color: string}> = [];
+  
+  // Berechne die Anzahl der farbigen Kacheln basierend auf Energie und Beat
+  // Erhöhte Basisanzahl und stärkere Reaktion auf Energie für bessere Sichtbarkeit
+  let numTiles = Math.floor(positions.length * 0.05); // Basiswert: 5% der Schwertpositionen (erhöht von 0.03)
+  
+  // Erhöhe die Anzahl basierend auf Energie und Beat
+  numTiles += Math.floor(positions.length * energy * 0.15); // Erhöht von 0.1 für bessere Sichtbarkeit
+  
+  // Zusätzliche Kacheln bei Beat-Erkennung
+  if (beatDetected) {
+    numTiles += Math.floor(positions.length * 0.08); // Erhöht von 0.05 für bessere Sichtbarkeit
+  }
+  
+  // Zusätzliche Kacheln bei höherem Glitch-Level
+  numTiles += Math.floor(glitchLevel * positions.length * 0.04); // Erhöht von 0.02 für bessere Sichtbarkeit
+  
+  // Begrenze die maximale Anzahl
+  const maxTiles = Math.floor(positions.length * 0.4); // Erhöht von 0.3 für bessere Sichtbarkeit
+  numTiles = Math.min(numTiles, maxTiles);
+  
+  // Wähle zufällige Positionen aus
+  const selectedPositions = [...positions]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, numTiles);
+  
+  // Erstelle farbige Kacheln für die ausgewählten Positionen
+  for (const pos of selectedPositions) {
+    // Wähle eine zufällige Farbe aus den Akzentfarben
+    const color = accentColors[Math.floor(Math.random() * accentColors.length)];
+    
+    // Füge die farbige Kachel hinzu
+    coloredTiles.push({
+      x: pos.x,
+      y: pos.y,
+      color
+    });
+  }
+  
+  return coloredTiles;
+}
+
+/**
+ * Generiert einen Farbverlauf für das Schwert basierend auf der Energie
+ * @param energy Aktuelle Audio-Energie (0-1)
+ * @param beatDetected Ob ein Beat erkannt wurde
+ * @param glitchLevel Aktuelles Glitch-Level (0-3)
+ * @returns Farbe im Hex-Format
+ */
+export function generateSwordColor(
+  energy: number, 
+  beatDetected: boolean,
+  glitchLevel: number
+): string {
+  // Basis-Farbwerte
+  let r = 62; // 3E in Hex
+  let g = 230; // E6 in Hex
+  let b = 255; // FF in Hex
+  
+  // Pulsieren basierend auf Energie - verstärkte Reaktion für bessere Sichtbarkeit
+  const pulseAmount = energy * 25; // Erhöht von 15 für stärkere Farbänderung
+  r = Math.min(255, r + Math.floor(pulseAmount * 1.5)); // Erhöht von 1.2 für stärkere Rotkomponente
+  g = Math.max(180, g - Math.floor(pulseAmount * 0.8)); // Erhöht von 0.5 für stärkere Grünreduktion
+  
+  // Zusätzliche Farbänderung bei Beat-Erkennung - verstärkte Reaktion für bessere Sichtbarkeit
+  if (beatDetected) {
+    r = Math.min(255, r + 25); // Erhöht von 15 für stärkeren Beat-Effekt
+    g = Math.min(255, g + 15); // Erhöht von 10 für stärkeren Beat-Effekt
+    b = Math.max(200, b - 15); // Erhöht von 10 für stärkeren Beat-Effekt
+  }
+  
+  // Farbverschiebung bei höherem Glitch-Level - verstärkte Reaktion für bessere Sichtbarkeit
+  if (glitchLevel > 0) {
+    const glitchMultiplier = glitchLevel * 0.4; // Erhöht von 0.25 für stärkeren Glitch-Effekt
+    r = Math.min(255, Math.floor(r * (1 + glitchMultiplier * 0.5)));
+    g = Math.max(100, Math.floor(g * (1 - glitchMultiplier * 0.3)));
+    b = Math.min(255, Math.floor(b * (1 + glitchMultiplier * 0.2)));
+  }
+  
+  // Konvertiere zu Hex-Farbe
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * Generiert eine dunklere Hintergrundfarbe basierend auf der Schwertfarbe
+ * @param baseColor Die Basisfarbe des Schwerts im Hex-Format
+ * @returns Dunklere Farbe im Hex-Format
+ */
+export function getDarkerColor(baseColor: string): string {
+  // Extrahiere RGB-Komponenten
+  const r = parseInt(baseColor.substring(1, 3), 16);
+  const g = parseInt(baseColor.substring(3, 5), 16);
+  const b = parseInt(baseColor.substring(5, 7), 16);
+  
+  // Berechne dunklere Farbe - stärkerer Kontrast für bessere Sichtbarkeit
+  const darkerR = Math.floor(r * 0.08); // Reduziert von 0.1 für dunkleren Hintergrund
+  const darkerG = Math.floor(g * 0.08); // Reduziert von 0.1 für dunkleren Hintergrund
+  const darkerB = Math.floor(b * 0.12); // Reduziert von 0.15 für dunkleren Hintergrund
+  
+  // Konvertiere zu Hex-Farbe
+  return `#${darkerR.toString(16).padStart(2, '0')}${darkerG.toString(16).padStart(2, '0')}${darkerB.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * Generiert eine hellere Farbe für den Höhlenhintergrund
+ * @param baseColor Die Basisfarbe des Schwerts im Hex-Format
+ * @returns Hellere Farbe im Hex-Format
+ */
+export function getLighterColor(baseColor: string): string {
+  // Extrahiere RGB-Komponenten
+  const r = parseInt(baseColor.substring(1, 3), 16);
+  const g = parseInt(baseColor.substring(3, 5), 16);
+  const b = parseInt(baseColor.substring(5, 7), 16);
+  
+  // Berechne hellere Farbe - verstärkter Kontrast für bessere Sichtbarkeit
+  const lighterR = Math.min(255, Math.floor(r * 0.35)); // Erhöht von 0.25 für besseren Kontrast
+  const lighterG = Math.min(255, Math.floor(g * 0.35)); // Erhöht von 0.25 für besseren Kontrast
+  const lighterB = Math.min(255, Math.floor(b * 0.5)); // Erhöht von 0.4 für besseren Kontrast
+  
+  // Konvertiere zu Hex-Farbe
+  return `#${lighterR.toString(16).padStart(2, '0')}${lighterG.toString(16).padStart(2, '0')}${lighterB.toString(16).padStart(2, '0')}`;
 } 

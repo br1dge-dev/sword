@@ -417,7 +417,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     // Deutlich reduzierte Wahrscheinlichkeit und erhöhter Energieschwellenwert
     // Hintergrund soll nur bei signifikanten Stimmungsänderungen wechseln
-    if ((beatDetected && Math.random() < 0.05) || energy > 0.85) {
+    if ((beatDetected && Math.random() < 0.15) || energy > 0.75) {
       // Größe für den Hintergrund dynamisch bestimmen
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       
@@ -428,7 +428,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       console.log(`[${new Date().toLocaleTimeString()}] [BACKGROUND] Background updated, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
       
       // Zusätzlich einen Timer setzen, der verhindert, dass der Hintergrund zu oft aktualisiert wird
-      setLastColorChangeTime(Date.now() + 30000); // Mindestens 30 Sekunden Stabilität
+      setLastColorChangeTime(Date.now() + 10000); // Mindestens 10 Sekunden Stabilität (reduziert von 30s)
     }
   }, [beatDetected, energy]);
   
@@ -436,7 +436,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     // Höherer Schwellenwert für dezentere Reaktion
     // Adern sollen nicht zu oft aktualisiert werden
-    if ((beatDetected && Math.random() < 0.2) || energy > 0.50) {
+    if ((beatDetected && Math.random() < 0.3) || energy > 0.45) {
       // Größe für den Hintergrund dynamisch bestimmen
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       

@@ -194,12 +194,18 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       if (isPlaying) {
         audioRef.current.pause();
         setIsPlaying(false);
-        setMusicPlaying(false); // Setze den Status im Store
+        
+        // Setze Musik als nicht spielend und aktiviere Fallback
+        const { setMusicPlaying } = useAudioReactionStore.getState();
+        setMusicPlaying(false);
+        
         console.log("Music playback stopped, fallback should activate");
         
-        // Setze Audio als inaktiv im Store
-        const { setAudioActive } = useAudioReactionStore.getState();
-        setAudioActive(false);
+        // Stoppe die Audio-Analyse
+        if (isAnalyzing) {
+          stop();
+          console.log("Stopping audio analysis because playback stopped");
+        }
       } else {
         // Erhöhe die Lautstärke, um sicherzustellen, dass Audio hörbar ist
         audioRef.current.volume = Math.max(0.5, audioRef.current.volume);
@@ -209,31 +215,39 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
           await initializeAudioAnalyzer();
         }
         
-        // Versuche zu spielen und fange Fehler ab
-        audioRef.current.play().catch(error => {
-          console.error('Error playing audio:', error);
+        try {
+          // Versuche zu spielen und fange Fehler ab
+          await audioRef.current.play();
+          setError(null);
+          setIsPlaying(true);
+          
+          // Setze Musik als spielend und deaktiviere Fallback
+          const { setMusicPlaying, setAudioActive } = useAudioReactionStore.getState();
+          setMusicPlaying(true);
+          setAudioActive(true);
+          
+          console.log("Music playback started, fallback should deactivate");
+          
+          // Starte die Analyse, wenn sie nicht bereits läuft
+          if (isInitialized && !isAnalyzing) {
+            start();
+          }
+        } catch (playError) {
+          console.error('Error playing audio:', playError);
           setError('Audio konnte nicht abgespielt werden.');
-          setMusicPlaying(false); // Stelle sicher, dass der Status auf false bleibt bei Fehler
-        });
-        
-        setError(null);
-        setIsPlaying(true);
-        setMusicPlaying(true); // Setze den Status im Store
-        console.log("Music playback started, fallback should deactivate");
-        
-        // Starte die Analyse, wenn sie nicht bereits läuft
-        if (isInitialized && !isAnalyzing) {
-          start();
+          
+          // Bei Fehler Fallback aktivieren
+          const { setMusicPlaying } = useAudioReactionStore.getState();
+          setMusicPlaying(false);
         }
-        
-        // Setze Audio als aktiv im Store
-        const { setAudioActive } = useAudioReactionStore.getState();
-        setAudioActive(true);
       }
     } catch (err) {
       console.error("Fehler beim Abspielen:", err);
       setError("Wiedergabe nicht möglich");
       setIsPlaying(false);
+      
+      // Bei Fehler Fallback aktivieren
+      const { setMusicPlaying } = useAudioReactionStore.getState();
       setMusicPlaying(false);
     }
   };
@@ -361,109 +375,71 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       />
       
       <div className="flex flex-col w-full">
-        <div className="mb-1 text-xs font-bold font-press-start-2p text-[#3EE6FF] flex justify-between items-center" 
+        {/* Track-Name und Audio-Sync-Hinweis */}
+        <div className="mb-1 text-xs font-bold text-[#3EE6FF] flex justify-between items-center w-full" 
              style={{ 
                textShadow: '0 0 1px #3EE6FF',
-               letterSpacing: '0.05em'
-             }}>
-          <div>{currentTrack.name}</div>
+               letterSpacing: '0.05em',
+               fontFamily: 'var(--font-press-start-2p)'
+             }}
+        >
+          <div className="truncate mr-2">{currentTrack.name}</div>
           {!isPlaying && !isAnalyzing && (
-            <div className="text-[#FF3EC8] text-[8px] animate-pulse">
-              KLICK PLAY FÜR AUDIO SYNC
-            </div>
+            <div className="text-[#FF3EC8] text-[8px] whitespace-nowrap">KLICK PLAY</div>
           )}
         </div>
         
-        <div className="flex items-center gap-2">
-          <div className="relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex"
-               style={{ 
-                 boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
-                 imageRendering: 'pixelated'
-               }}>
-            {renderProgressTiles()}
-            
-            <input 
-              type="range" 
-              min="0" 
-              max="100" 
-              value={progress} 
-              onChange={handleProgressChange}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              aria-label="Fortschritt"
-            />
-          </div>
-          
-          <button
-            onClick={togglePlay}
-            className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF]"
+        {/* Fortschrittsbalken */}
+        <div 
+          className="h-1.5 bg-gray-800 mb-2 relative overflow-hidden"
+          style={{ 
+            width: '100%',
+            maxWidth: '200px',
+            boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5)'
+          }}
+        >
+          <div 
+            className="absolute top-0 left-0 h-full bg-[#3EE6FF]"
             style={{ 
-              boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(62,230,255,0.3)',
-              imageRendering: 'pixelated',
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
-              backgroundSize: '4px 4px'
+              width: `${progress}%`,
+              boxShadow: '0 0 8px rgba(62,230,255,0.6)'
             }}
-          >
-            <div className="relative w-3 h-3">
-              {isPlaying ? (
-                <>
-                  <div className="absolute top-0 left-0 w-1 h-3 bg-[#3EE6FF]"></div>
-                  <div className="absolute top-0 left-2 w-1 h-3 bg-[#3EE6FF]"></div>
-                </>
-              ) : (
-                <>
-                  <div className="absolute top-0 left-0 w-2 h-3 bg-[#3EE6FF] clip-triangle"></div>
-                </>
-              )}
-              
-              <div className="absolute inset-0 opacity-70"
-                   style={{ 
-                     boxShadow: '0 0 3px rgba(62,230,255,0.8)'
-                   }}>
-              </div>
-            </div>
-          </button>
-          
-          <button
-            onClick={nextTrack}
-            className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF]"
-            style={{ 
-              boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(62,230,255,0.3)',
-              imageRendering: 'pixelated',
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
-              backgroundSize: '4px 4px'
-            }}
-          >
-            <div className="relative w-3 h-3">
-              <div className="absolute top-0 left-0 w-1 h-3 bg-[#3EE6FF] clip-triangle"></div>
-              <div className="absolute top-0 left-2 w-1 h-3 bg-[#3EE6FF] clip-triangle"></div>
-              <div className="absolute top-0 left-3 w-[2px] h-3 bg-[#3EE6FF]"></div>
-              
-              <div className="absolute inset-0 opacity-70"
-                   style={{ 
-                     boxShadow: '0 0 3px rgba(62,230,255,0.8)'
-                   }}>
-              </div>
-            </div>
-          </button>
+          />
+          {renderProgressTiles()}
         </div>
         
-        {error && (
-          <div className="mt-1 text-[10px] opacity-80 font-mono text-[#FF3EC8]">
-            {error}
+        {/* Steuerelemente */}
+        <div className="flex justify-between items-center">
+          {/* Play/Pause und Next-Buttons */}
+          <div className="flex space-x-2">
+            <button 
+              onClick={togglePlay}
+              className="w-8 h-8 flex items-center justify-center bg-gray-900 border border-gray-700 hover:bg-gray-800 focus:outline-none"
+              style={{ boxShadow: '0 0 5px rgba(0,0,0,0.3)' }}
+            >
+              {isPlaying ? (
+                <span className="text-[#3EE6FF]">||</span>
+              ) : (
+                <span className="text-[#3EE6FF]">▶</span>
+              )}
+            </button>
+            
+            <button 
+              onClick={nextTrack}
+              className="w-8 h-8 flex items-center justify-center bg-gray-900 border border-gray-700 hover:bg-gray-800 focus:outline-none"
+              style={{ boxShadow: '0 0 5px rgba(0,0,0,0.3)' }}
+            >
+              <span className="text-[#3EE6FF]">≫</span>
+            </button>
           </div>
-        )}
-        
-        {showAnalyzerInfo && (
-          <div className="mt-2 text-[8px] font-mono text-gray-400 border border-gray-800 p-1 w-full">
-            <div>Energy: {energy.toFixed(3)}</div>
-            {beatInfo && (
-              <>
-                <div>BPM: {beatInfo.bpm}</div>
-                <div>Offset: {beatInfo.offset.toFixed(2)}s</div>
-              </>
-            )}
-          </div>
-        )}
+          
+          {/* Fehleranzeige */}
+          {error && (
+            <div className="text-red-500 text-xs ml-2">
+              {error}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
