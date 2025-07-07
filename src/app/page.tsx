@@ -19,52 +19,37 @@ export default function HomePage() {
   // Base level setting (will be overridden by PowerUp)
   const baseSwordLevel = 1;
   
-  // Audio analysis state
-  const [audioEnergy, setAudioEnergy] = useState(0);
-  const [beatDetected, setBeatDetected] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const { energy, beatDetected, setAudioActive, setMusicPlaying } = useAudioReactionStore();
   
-  // Handle beat detection
-  const handleBeat = () => {
-    console.log('Beat detected in main component!');
-    setBeatDetected(true);
-    
-    // Aktualisiere den Audio-Reaction-Store direkt
-    const { triggerBeat } = useAudioReactionStore.getState();
-    triggerBeat();
-    
-    // Reset beat detection after a short delay
-    setTimeout(() => {
-      setBeatDetected(false);
-    }, 100);
-  };
-  
-  // Handle energy changes
-  const handleEnergyChange = (energy: number) => {
-    setAudioEnergy(energy);
-    
-    // Aktualisiere den Audio-Reaction-Store direkt
-    const { updateEnergy } = useAudioReactionStore.getState();
-    updateEnergy(energy);
-  };
-
-  // Setze Audio als aktiv, wenn die Komponente geladen wird
+  // Beat-Effekt für Debugging
   useEffect(() => {
-    const { setAudioActive } = useAudioReactionStore.getState();
-    // Starte mit aktivem Audio, damit Fallback-Animation nicht aktiviert wird
-    setAudioActive(true);
+    if (beatDetected) {
+      console.log('Beat detected in main component!');
+    }
+  }, [beatDetected]);
+  
+  // Client-Side Rendering aktivieren
+  useEffect(() => {
+    setIsClient(true);
     
-    // Debug-Log zur Überprüfung der Audio-Reaktivität
+    // Audio als aktiv markieren, damit Fallback nicht sofort startet
+    setAudioActive(false);
+    
+    // Musik als nicht spielend markieren, damit Fallback aktiviert wird
+    setMusicPlaying(false);
+    
     console.log('HomePage mounted, audio set to active');
     
     return () => {
       console.log('HomePage unmounted');
     };
-  }, []);
+  }, [setAudioActive, setMusicPlaying]);
   
-  // Debug-Effekt, um Audio-Reaktivität zu überwachen
+  // Energie- und Beat-Änderungen loggen
   useEffect(() => {
-    console.log(`Energy changed: ${audioEnergy.toFixed(2)}, Beat: ${beatDetected}`);
-  }, [audioEnergy, beatDetected]);
+    console.log(`Energy changed: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
+  }, [energy, beatDetected]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center py-2 px-4 overflow-hidden bg-black">
@@ -72,7 +57,7 @@ export default function HomePage() {
         <div className="w-full h-full flex items-center justify-center">
           <AsciiSword 
             level={baseSwordLevel} 
-            directEnergy={audioEnergy} 
+            directEnergy={energy} 
             directBeat={beatDetected} 
           />
         </div>
@@ -82,11 +67,11 @@ export default function HomePage() {
       <div className="fixed left-[10%] top-1/2 -translate-y-1/2 z-10 hidden sm:flex flex-col items-start gap-6">
         <SideButtons />
         <MusicPlayer 
-          onBeat={handleBeat} 
-          onEnergyChange={handleEnergyChange} 
+          onBeat={() => {}} 
+          onEnergyChange={(e) => {}} 
         />
         <AudioVisualizer 
-          energy={audioEnergy} 
+          energy={energy} 
           beatDetected={beatDetected} 
         />
       </div>
@@ -94,10 +79,10 @@ export default function HomePage() {
       {/* Mobiles Overlay - nur auf kleinen Bildschirmen sichtbar */}
       <div className="sm:hidden">
         <MobileControlsOverlay
-          audioEnergy={audioEnergy}
+          audioEnergy={energy}
           beatDetected={beatDetected}
-          onBeat={handleBeat}
-          onEnergyChange={handleEnergyChange}
+          onBeat={() => {}}
+          onEnergyChange={(e) => {}}
         />
       </div>
     </main>

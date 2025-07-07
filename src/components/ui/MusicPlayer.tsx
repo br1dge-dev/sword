@@ -183,22 +183,26 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     return false;
   }, [isInitialized, isAnalyzing, isPlaying, start]);
   
-  // Play/Pause-Funktion
+  // Wiedergabe starten/pausieren
   const togglePlay = async () => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    if (!audioRef.current) return;
     
     try {
       // Aktiviere den AudioContext bei jeder Benutzerinteraktion
       await resumeAudioContext();
       
       if (isPlaying) {
-        audio.pause();
+        audioRef.current.pause();
         setIsPlaying(false);
-        setMusicPlaying(false);
+        setMusicPlaying(false); // Setze den Status im Store
+        console.log("Music playback stopped, fallback should activate");
+        
+        // Setze Audio als inaktiv im Store
+        const { setAudioActive } = useAudioReactionStore.getState();
+        setAudioActive(false);
       } else {
         // Erhöhe die Lautstärke, um sicherzustellen, dass Audio hörbar ist
-        audio.volume = Math.max(0.5, audio.volume);
+        audioRef.current.volume = Math.max(0.5, audioRef.current.volume);
         
         // Stelle sicher, dass der Analyzer initialisiert ist
         if (!analyzerInitialized) {
@@ -206,11 +210,16 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         }
         
         // Versuche zu spielen und fange Fehler ab
-        await audio.play();
+        audioRef.current.play().catch(error => {
+          console.error('Error playing audio:', error);
+          setError('Audio konnte nicht abgespielt werden.');
+          setMusicPlaying(false); // Stelle sicher, dass der Status auf false bleibt bei Fehler
+        });
+        
         setError(null);
         setIsPlaying(true);
-        setMusicPlaying(true);
-        console.log('Audio playback started successfully');
+        setMusicPlaying(true); // Setze den Status im Store
+        console.log("Music playback started, fallback should deactivate");
         
         // Starte die Analyse, wenn sie nicht bereits läuft
         if (isInitialized && !isAnalyzing) {
@@ -225,6 +234,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       console.error("Fehler beim Abspielen:", err);
       setError("Wiedergabe nicht möglich");
       setIsPlaying(false);
+      setMusicPlaying(false);
     }
   };
   

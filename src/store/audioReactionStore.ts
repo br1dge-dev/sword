@@ -24,6 +24,7 @@ interface AudioReactionState {
   setMusicPlaying: (playing: boolean) => void; // Neue Aktion
 }
 
+// Erstelle den Store
 export const useAudioReactionStore = create<AudioReactionState>((set) => ({
   energy: 0,
   beatDetected: false,
@@ -67,25 +68,27 @@ export function useBeatReset(delay: number = 100) {
   }, [beatDetected, resetBeat, delay]);
 }
 
+// Globale Referenzen für die Fallback-Intervalle, um sicherzustellen, dass sie nur einmal existieren
+let globalBeatInterval: NodeJS.Timeout | null = null;
+let globalEnergyInterval: NodeJS.Timeout | null = null;
+
 // Hook für Fallback-Animation, wenn keine Audio-Reaktivität vorhanden ist
 export function useFallbackAnimation() {
   const { isAudioActive, triggerBeat, updateEnergy, fallbackEnabled, isMusicPlaying } = useAudioReactionStore();
   const [fallbackActive, setFallbackActive] = useState(false);
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const beatIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const energyIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inactivityTimerRef = useRef<number>(0);
   const lastActivityCheckRef = useRef<number>(Date.now());
   
   // Cleanup-Funktion
   const cleanupIntervals = () => {
-    if (beatIntervalRef.current) {
-      clearInterval(beatIntervalRef.current);
-      beatIntervalRef.current = null;
+    if (globalBeatInterval) {
+      clearInterval(globalBeatInterval);
+      globalBeatInterval = null;
     }
-    if (energyIntervalRef.current) {
-      clearInterval(energyIntervalRef.current);
-      energyIntervalRef.current = null;
+    if (globalEnergyInterval) {
+      clearInterval(globalEnergyInterval);
+      globalEnergyInterval = null;
     }
   };
   
@@ -96,17 +99,22 @@ export function useFallbackAnimation() {
     console.log("Starting fallback animation");
     setFallbackActive(true);
     
+    // Cleanup vor dem Erstellen neuer Intervalle
+    cleanupIntervals();
+    
     // Zufällige Beats generieren (alle 500ms, 25% Chance)
-    beatIntervalRef.current = setInterval(() => {
+    globalBeatInterval = setInterval(() => {
       if (Math.random() < 0.25) {
+        console.log("Fallback: Triggering beat");
         triggerBeat();
       }
     }, 500);
     
     // Zufällige Energie-Level generieren (alle 200ms)
-    energyIntervalRef.current = setInterval(() => {
+    globalEnergyInterval = setInterval(() => {
       // Zufälliger Energie-Level zwischen 0.2 und 0.8
       const randomEnergy = 0.2 + Math.random() * 0.6;
+      console.log(`Fallback: Setting energy to ${randomEnergy.toFixed(2)}`);
       updateEnergy(randomEnergy);
     }, 200);
   };
@@ -124,7 +132,14 @@ export function useFallbackAnimation() {
       setFallbackActive(false);
       cleanupIntervals();
     }
-  }, [isMusicPlaying, fallbackEnabled]);
+    
+    // Cleanup beim Unmount
+    return () => {
+      if (fallbackActive) {
+        cleanupIntervals();
+      }
+    };
+  }, [isMusicPlaying, fallbackEnabled, fallbackActive]);
   
   useEffect(() => {
     // Prüfe regelmäßig auf Audio-Inaktivität, aber nur wenn Musik abgespielt wird
