@@ -6,6 +6,11 @@
 import { caveBgPatterns, accentColors } from '../constants/swordConstants';
 import { generateCluster } from '../utils/swordUtils';
 
+// Maximale Dimensionen für Hintergründe
+export const MAX_BG_WIDTH = 200;
+export const MAX_BG_HEIGHT = 120;
+export const MAX_VEINS = 300; // Maximale Anzahl von Adern
+
 /**
  * Generiert einen Höhlenhintergrund mit dynamischen Texturen und rhythmischen Mustern
  * @param width Breite des Hintergrunds
@@ -14,6 +19,10 @@ import { generateCluster } from '../utils/swordUtils';
  */
 export function generateCaveBackground(width: number, height: number): string[][] {
   const background: string[][] = [];
+  
+  // Begrenze die Dimensionen auf die maximalen Werte
+  const adjustedWidth = Math.min(Math.max(width, 160), MAX_BG_WIDTH);  // Zwischen 160 und MAX_BG_WIDTH
+  const adjustedHeight = Math.min(Math.max(height, 100), MAX_BG_HEIGHT);  // Zwischen 100 und MAX_BG_HEIGHT
   
   // Zeitstempel für dynamische Muster
   const timestamp = Date.now();
@@ -34,15 +43,15 @@ export function generateCaveBackground(width: number, height: number): string[][
     }
   }
   
-  const waveAmplitude = Math.floor(height / (8 + Math.random() * 4)); // Zufällige Amplitude
+  const waveAmplitude = Math.floor(adjustedHeight / (8 + Math.random() * 4)); // Zufällige Amplitude
   const waveFrequency = 0.05 + (Math.random() * 0.05); // Zufällige Frequenz
   const noiseScale = 0.08 + (Math.random() * 0.08); // Zufällige Rauschskalierung
   const patternScale = 0.2 + (Math.random() * 0.3); // Skalierung des Grundmusters
   
   // Zufällige Rotation/Verschiebung für diese Generation
   const rotationAngle = Math.random() * Math.PI * 2; // 0-360 Grad
-  const offsetX = Math.floor(Math.random() * width);
-  const offsetY = Math.floor(Math.random() * height);
+  const offsetX = Math.floor(Math.random() * adjustedWidth);
+  const offsetY = Math.floor(Math.random() * adjustedHeight);
   
   // Überarbeitete Zeichensätze mit mehr feinen Linien und weniger Blöcken
   // Entfernung komplexer Symbole wie Uhren, Sanduhren, etc.
@@ -87,8 +96,8 @@ export function generateCaveBackground(width: number, height: number): string[][
     // Transformiere Koordinaten für Rotation und Verschiebung
     const rotX = Math.cos(rotationAngle) * x - Math.sin(rotationAngle) * y;
     const rotY = Math.sin(rotationAngle) * x + Math.cos(rotationAngle) * y;
-    const tx = (rotX + offsetX) % width;
-    const ty = (rotY + offsetY) % height;
+    const tx = (rotX + offsetX) % adjustedWidth;
+    const ty = (rotY + offsetY) % adjustedHeight;
     
     // Verschiedene Mustertypen
     switch(patternType) {
@@ -98,7 +107,7 @@ export function generateCaveBackground(width: number, height: number): string[][
         }
         break;
       case 1: // Konzentrische Kreise mit feinen Linien statt Blöcken
-        const dist = Math.sqrt(Math.pow((tx - width/2) / width, 2) + Math.pow((ty - height/2) / height, 2));
+        const dist = Math.sqrt(Math.pow((tx - adjustedWidth/2) / adjustedWidth, 2) + Math.pow((ty - adjustedHeight/2) / adjustedHeight, 2));
         if (Math.abs(Math.sin(dist * 20)) > 0.7) {
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
@@ -109,8 +118,8 @@ export function generateCaveBackground(width: number, height: number): string[][
         }
         break;
       case 3: // Spiralmuster mit einfachen Zeichen
-        const angle = Math.atan2(ty - height/2, tx - width/2);
-        const dist2 = Math.sqrt(Math.pow(tx - width/2, 2) + Math.pow(ty - height/2, 2));
+        const angle = Math.atan2(ty - adjustedHeight/2, tx - adjustedWidth/2);
+        const dist2 = Math.sqrt(Math.pow(tx - adjustedWidth/2, 2) + Math.pow(ty - adjustedHeight/2, 2));
         if (Math.abs(Math.sin(angle * 5 + dist2 * 0.2)) > 0.7) {
           return selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
         }
@@ -140,13 +149,13 @@ export function generateCaveBackground(width: number, height: number): string[][
   };
   
   // Initialisiere den Hintergrund mit rhythmischen Mustern
-  for (let y = 0; y < height; y++) {
+  for (let y = 0; y < adjustedHeight; y++) {
     background[y] = [];
     
     // Erzeuge Welleneffekt für die vertikale Position
     const baseWaveY = Math.sin(y * waveFrequency) * waveAmplitude;
     
-    for (let x = 0; x < width; x++) {
+    for (let x = 0; x < adjustedWidth; x++) {
       // Erzeuge Welleneffekt für die horizontale Position
       const waveX = Math.sin((x + y) * waveFrequency * 0.7) * waveAmplitude;
       const waveY = baseWaveY + Math.cos(x * waveFrequency * 0.5) * (waveAmplitude / 2);
@@ -155,7 +164,7 @@ export function generateCaveBackground(width: number, height: number): string[][
       const noiseValue = Math.abs(Math.sin(x * noiseScale) * Math.cos(y * noiseScale));
       
       // Bestimme Region basierend auf Wellenwerten und Mustern
-      const regionValue = (noiseValue + Math.abs(waveX / width) + Math.abs(waveY / height)) / 3;
+      const regionValue = (noiseValue + Math.abs(waveX / adjustedWidth) + Math.abs(waveY / adjustedHeight)) / 3;
       
       // Basismuster für diese Position
       const baseChar = generatePattern(x, y, 'base');
@@ -188,18 +197,18 @@ export function generateCaveBackground(width: number, height: number): string[][
   }
   
   // Füge einige kleinere Felsformationen hinzu - mit feinen Zeichen statt Blöcken
-  const numFormations = Math.floor((width * height) / 150) + 2;
+  const numFormations = Math.floor((adjustedWidth * adjustedHeight) / 150) + 2;
   const formationChars = ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '┃', '━', '╸', '╹', '╺', '╻'];
   
   for (let i = 0; i < numFormations; i++) {
-    const formationX = Math.floor(Math.random() * width);
-    const formationY = Math.floor(Math.random() * height);
+    const formationX = Math.floor(Math.random() * adjustedWidth);
+    const formationY = Math.floor(Math.random() * adjustedHeight);
     const formationSize = Math.floor(Math.random() * 5) + 2; // 2-6 Zeichen große Formationen
     
-    const formation = generateCluster(formationX, formationY, formationSize, width, height);
+    const formation = generateCluster(formationX, formationY, formationSize, adjustedWidth, adjustedHeight);
     
     formation.forEach(pos => {
-      if (pos.y < height && pos.x < width) {
+      if (pos.y < adjustedHeight && pos.x < adjustedWidth) {
         // Feine Zeichen für Formationen statt '▒'
         background[pos.y][pos.x] = formationChars[Math.floor(Math.random() * formationChars.length)];
       }
@@ -207,19 +216,19 @@ export function generateCaveBackground(width: number, height: number): string[][
   }
   
   // Füge einige Stalaktiten/Stalagmiten hinzu mit feinen Zeichen
-  const numStalactites = Math.floor(width / 5);
+  const numStalactites = Math.floor(adjustedWidth / 5);
   const stalactiteChars = ['╹', '╿', '┃', '│', '╽', '╵'];
   const stalagmiteChars = ['╻', '╿', '┃', '│', '╽', '╵'];
   
   for (let i = 0; i < numStalactites; i++) {
-    const stalX = Math.floor(Math.random() * width);
+    const stalX = Math.floor(Math.random() * adjustedWidth);
     const isTop = Math.random() < 0.5;
     
     if (isTop) {
       // Stalaktit von oben mit feinen Zeichen
       const length = Math.floor(Math.random() * 3) + 1;
       for (let y = 0; y < length; y++) {
-        if (y < height) {
+        if (y < adjustedHeight) {
           background[y][stalX] = stalactiteChars[Math.floor(Math.random() * stalactiteChars.length)];
         }
       }
@@ -227,7 +236,7 @@ export function generateCaveBackground(width: number, height: number): string[][
       // Stalagmit von unten mit feinen Zeichen
       const length = Math.floor(Math.random() * 3) + 1;
       for (let y = 0; y < length; y++) {
-        const posY = height - 1 - y;
+        const posY = adjustedHeight - 1 - y;
         if (posY >= 0) {
           background[posY][stalX] = stalagmiteChars[Math.floor(Math.random() * stalagmiteChars.length)];
         }
@@ -236,19 +245,19 @@ export function generateCaveBackground(width: number, height: number): string[][
   }
   
   // Füge einige kleine "Höhlen" hinzu (Bereiche mit leichter Textur)
-  const numCaves = Math.floor((width * height) / 800); // Weniger Höhlen: eine Höhle pro 800 Pixel
+  const numCaves = Math.floor((adjustedWidth * adjustedHeight) / 800); // Weniger Höhlen: eine Höhle pro 800 Pixel
   
   for (let i = 0; i < numCaves; i++) {
     // Zufällige Position für die Höhle
-    const caveX = Math.floor(Math.random() * width);
-    const caveY = Math.floor(Math.random() * height);
+    const caveX = Math.floor(Math.random() * adjustedWidth);
+    const caveY = Math.floor(Math.random() * adjustedHeight);
     
     // Kleinere Höhlen (3-6 Pixel)
     const caveSize = Math.floor(Math.random() * 4) + 3;
     
     // Fülle die Höhle mit dünneren Mustern
-    for (let y = Math.max(0, caveY - caveSize); y < Math.min(height, caveY + caveSize); y++) {
-      for (let x = Math.max(0, caveX - caveSize); x < Math.min(width, caveX + caveSize); x++) {
+    for (let y = Math.max(0, caveY - caveSize); y < Math.min(adjustedHeight, caveY + caveSize); y++) {
+      for (let x = Math.max(0, caveX - caveSize); x < Math.min(adjustedWidth, caveX + caveSize); x++) {
         // Berechne den Abstand zum Mittelpunkt
         const distance = Math.sqrt(Math.pow(x - caveX, 2) + Math.pow(y - caveY, 2));
         
@@ -266,12 +275,12 @@ export function generateCaveBackground(width: number, height: number): string[][
   }
   
   // Füge einige "Risse" im Hintergrund hinzu
-  const numCracks = Math.floor((width * height) / 1000); // Ungefähr ein Riss pro 1000 Pixel
+  const numCracks = Math.floor((adjustedWidth * adjustedHeight) / 1000); // Ungefähr ein Riss pro 1000 Pixel
   
   for (let i = 0; i < numCracks; i++) {
     // Zufälliger Startpunkt für den Riss
-    let x = Math.floor(Math.random() * width);
-    let y = Math.floor(Math.random() * height);
+    let x = Math.floor(Math.random() * adjustedWidth);
+    let y = Math.floor(Math.random() * adjustedHeight);
     
     // Zufällige Länge für den Riss (5-15 Pixel)
     const crackLength = Math.floor(Math.random() * 11) + 5;
@@ -283,7 +292,7 @@ export function generateCaveBackground(width: number, height: number): string[][
     // Zeichne den Riss
     for (let j = 0; j < crackLength; j++) {
       // Prüfe, ob der Punkt innerhalb der Grenzen liegt
-      if (x >= 0 && x < width && y >= 0 && y < height) {
+      if (x >= 0 && x < adjustedWidth && y >= 0 && y < adjustedHeight) {
         // 80% Chance für leeren Raum, 20% Chance für dünnes Muster
         background[y][x] = Math.random() < 0.8 ? ' ' : ['·', ':', '.', '˙', '°'][Math.floor(Math.random() * 5)];
       }
@@ -319,21 +328,28 @@ export function generateColoredVeins(
 ): Array<{x: number, y: number, color: string}> {
   const veins: Array<{x: number, y: number, color: string}> = [];
   
+  // Begrenze die Dimensionen auf die maximalen Werte
+  const adjustedWidth = Math.min(Math.max(width, 160), MAX_BG_WIDTH);  // Zwischen 160 und MAX_BG_WIDTH
+  const adjustedHeight = Math.min(Math.max(height, 100), MAX_BG_HEIGHT);  // Zwischen 100 und MAX_BG_HEIGHT
+  
+  // Begrenze die Anzahl der Adern
+  const limitedNumVeins = Math.min(numVeins, MAX_VEINS);
+  
   // Parameter für Animation
   const timestamp = Date.now() / 1000; // Zeitstempel für Animation
   const animationSpeed = 0.5; // Geschwindigkeit der Animation
-  const animationPhase = (timestamp * animationSpeed) % height; // Phase der Animation (0 bis height)
+  const animationPhase = (timestamp * animationSpeed) % adjustedHeight; // Phase der Animation (0 bis height)
   
   // Identifiziere Formationen und Strukturen im Hintergrund
   const formationPoints: Array<{x: number, y: number}> = [];
   
   // Erzeuge Quellpunkte für Tropfen an markanten Stellen (Formationen, Stalaktiten)
-  const numSources = Math.floor(numVeins / 3);
+  const numSources = Math.floor(limitedNumVeins / 3);
   
   // Erstelle Quellpunkte am oberen Rand und an Stalaktiten
   for (let i = 0; i < numSources; i++) {
-    const sourceX = Math.floor(Math.random() * width);
-    const sourceY = Math.floor(Math.random() * Math.min(5, height / 10)); // Oben im Bild
+    const sourceX = Math.floor(Math.random() * adjustedWidth);
+    const sourceY = Math.floor(Math.random() * Math.min(5, adjustedHeight / 10)); // Oben im Bild
     
     formationPoints.push({x: sourceX, y: sourceY});
   }
@@ -346,23 +362,23 @@ export function generateColoredVeins(
     // Parameter für diesen Tropfen
     const dropLength = Math.floor(Math.random() * 10) + 5; // Länge des Tropfens
     const dropSpeed = Math.random() * 0.5 + 0.5; // Individuelle Geschwindigkeit
-    const dropPhase = (timestamp * dropSpeed) % (height * 2); // Individuelle Phase
+    const dropPhase = (timestamp * dropSpeed) % (adjustedHeight * 2); // Individuelle Phase
     
     // Berechne aktuelle Y-Position basierend auf Zeit
-    let currentY = (source.y + dropPhase) % height;
+    let currentY = (source.y + dropPhase) % adjustedHeight;
     
     // Erzeuge den Tropfen
     for (let i = 0; i < dropLength; i++) {
       const y = Math.floor(currentY) - i;
       
       // Prüfe, ob der Punkt innerhalb der Grenzen liegt
-      if (y >= 0 && y < height) {
+      if (y >= 0 && y < adjustedHeight) {
         // Berechne X-Position mit leichtem Schwanken
         const waveOffset = Math.sin(y * 0.2 + timestamp) * 1.5;
         const x = Math.floor(source.x + waveOffset);
         
         // Prüfe, ob der Punkt innerhalb der Grenzen liegt
-        if (x >= 0 && x < width) {
+        if (x >= 0 && x < adjustedWidth) {
           // Berechne Opazität basierend auf Position im Tropfen
           const opacity = 1 - (i / dropLength);
           
@@ -376,7 +392,7 @@ export function generateColoredVeins(
           // Füge manchmal Seitenäste hinzu
           if (i > 0 && i < dropLength - 1 && Math.random() < 0.2) {
             const branchX = x + (Math.random() < 0.5 ? -1 : 1);
-            if (branchX >= 0 && branchX < width) {
+            if (branchX >= 0 && branchX < adjustedWidth) {
               veins.push({
                 x: branchX,
                 y,
@@ -390,9 +406,9 @@ export function generateColoredVeins(
     
     // Füge Tropfen am Ende hinzu
     const endY = Math.floor(currentY);
-    if (endY >= 0 && endY < height) {
+    if (endY >= 0 && endY < adjustedHeight) {
       const endX = Math.floor(source.x + Math.sin(endY * 0.2 + timestamp) * 1.5);
-      if (endX >= 0 && endX < width) {
+      if (endX >= 0 && endX < adjustedWidth) {
         // Füge einen größeren Tropfen am Ende hinzu
         veins.push({x: endX, y: endY, color: dominantColor});
         
@@ -401,7 +417,7 @@ export function generateColoredVeins(
           for (let s = 0; s < 3; s++) {
             const splashX = endX + Math.floor(Math.random() * 3) - 1;
             const splashY = endY + Math.floor(Math.random() * 2) + 1;
-            if (splashX >= 0 && splashX < width && splashY >= 0 && splashY < height) {
+            if (splashX >= 0 && splashX < adjustedWidth && splashY >= 0 && splashY < adjustedHeight) {
               veins.push({x: splashX, y: splashY, color: dominantColor});
             }
           }
@@ -411,12 +427,12 @@ export function generateColoredVeins(
   });
   
   // Erzeuge zusätzliche fließende Muster, die von Strukturen abhängen
-  const numFlows = Math.floor(numVeins / 2);
+  const numFlows = Math.floor(limitedNumVeins / 2);
   
   for (let i = 0; i < numFlows; i++) {
     // Startpunkt für den Fluss (bevorzugt oben)
-    const startX = Math.floor(Math.random() * width);
-    const startY = Math.floor(Math.random() * (height / 3)); // Oberes Drittel
+    const startX = Math.floor(Math.random() * adjustedWidth);
+    const startY = Math.floor(Math.random() * (adjustedHeight / 3)); // Oberes Drittel
     
     // Farbe für diesen Fluss
     const flowColor = accentColors[Math.floor(Math.random() * accentColors.length)];
@@ -424,11 +440,11 @@ export function generateColoredVeins(
     // Parameter für diesen Fluss
     const flowLength = Math.floor(Math.random() * 15) + 10;
     const flowSpeed = Math.random() * 0.3 + 0.2;
-    const flowPhase = (timestamp * flowSpeed) % height;
+    const flowPhase = (timestamp * flowSpeed) % adjustedHeight;
     
     // Aktuelle Position
     let x = startX;
-    let y = (startY + flowPhase) % height;
+    let y = (startY + flowPhase) % adjustedHeight;
     
     // Erzeuge den Fluss
     for (let j = 0; j < flowLength; j++) {
@@ -445,7 +461,7 @@ export function generateColoredVeins(
       const pixelY = Math.floor(y);
       
       // Prüfe, ob der Punkt innerhalb der Grenzen liegt
-      if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
+      if (pixelX >= 0 && pixelX < adjustedWidth && pixelY >= 0 && pixelY < adjustedHeight) {
         // Füge den Punkt zum Fluss hinzu
         veins.push({
           x: pixelX,
@@ -467,7 +483,7 @@ export function generateColoredVeins(
             const branchPixelX = Math.floor(branchX);
             const branchPixelY = Math.floor(branchY);
             
-            if (branchPixelX >= 0 && branchPixelX < width && branchPixelY >= 0 && branchPixelY < height) {
+            if (branchPixelX >= 0 && branchPixelX < adjustedWidth && branchPixelY >= 0 && branchPixelY < adjustedHeight) {
               veins.push({
                 x: branchPixelX,
                 y: branchPixelY,
@@ -481,19 +497,19 @@ export function generateColoredVeins(
   }
   
   // Erzeuge einige Ansammlungen am unteren Rand (wie Pfützen)
-  const numPuddles = Math.floor(numVeins / 10);
+  const numPuddles = Math.floor(limitedNumVeins / 10);
   
   for (let i = 0; i < numPuddles; i++) {
-    const puddleX = Math.floor(Math.random() * width);
-    const puddleY = Math.floor(height - Math.random() * (height / 5)); // Unteres Fünftel
+    const puddleX = Math.floor(Math.random() * adjustedWidth);
+    const puddleY = Math.floor(adjustedHeight - Math.random() * (adjustedHeight / 5)); // Unteres Fünftel
     const puddleSize = Math.floor(Math.random() * 5) + 2;
     const puddleColor = accentColors[Math.floor(Math.random() * accentColors.length)];
     
     // Erzeuge eine kleine Ansammlung
-    const puddle = generateCluster(puddleX, puddleY, puddleSize, width, height);
+    const puddle = generateCluster(puddleX, puddleY, puddleSize, adjustedWidth, adjustedHeight);
     
     puddle.forEach(pos => {
-      if (pos.y < height && pos.x < width) {
+      if (pos.y < adjustedHeight && pos.x < adjustedWidth) {
         veins.push({
           x: pos.x,
           y: pos.y,

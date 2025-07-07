@@ -23,9 +23,26 @@ interface UseAudioAnalyzerReturn {
 }
 
 // Globaler Analyzer für die gesamte Anwendung
-let globalAnalyzer: AudioAnalyzer | null = null;
-// Flag, um zu verfolgen, ob wir bereits eine Meldung über die Verwendung des globalen Analyzers ausgegeben haben
-let globalAnalyzerLoggedOnce = false;
+export let globalAnalyzer: AudioAnalyzer | null = null;
+
+// Flag, um zu verfolgen, ob eine Initialisierung im Gange ist
+let isGlobalInitializing = false;
+
+// Debounce-Funktion für Logging
+const createDebouncer = (interval: number = 1000) => {
+  const lastCalled: Record<string, number> = {};
+  
+  return (key: string, fn: Function) => {
+    const now = Date.now();
+    if (!lastCalled[key] || now - lastCalled[key] > interval) {
+      lastCalled[key] = now;
+      fn();
+    }
+  };
+};
+
+// Debouncer für Logs
+const logDebouncer = createDebouncer(2000);
 
 export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAnalyzerReturn {
   const analyzerRef = useRef<AudioAnalyzer | null>(null);
@@ -38,6 +55,8 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   const [tempo, setTempo] = useState<number | null>(null);
   const [beatInfo, setBeatInfo] = useState<BeatDetectionResult | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const initializingRef = useRef<boolean>(false);
+  const lastLogTimeRef = useRef<number>(0);
   
   // Audio-Reaction-Store
   const { updateEnergy, triggerBeat, setAudioActive } = useAudioReactionStore();
@@ -63,43 +82,40 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   useEffect(() => {
     // Standard-Analyseintervall für bessere Performance
     const defaultOptions = {
-      analyzeInterval: 100, // 100ms zwischen Analysen (10 FPS)
-      energyThreshold: 0.25, // Niedrigerer Schwellenwert für bessere Beat-Erkennung
+      analyzeInterval: 50, // Reduziert von 100ms auf 50ms für schnellere Reaktion
+      energyThreshold: 0.1, // Reduziert von 0.15 auf 0.1 für bessere Beat-Erkennung
+      beatSensitivity: 1.2, // Neuer Parameter für Beat-Sensitivität
       ...options
     };
     
-    // Verwende den globalen Analyzer, wenn er existiert
-    if (globalAnalyzer) {
-      analyzerRef.current = globalAnalyzer;
-      
-      // Log nur einmal pro Komponente
-      if (!globalAnalyzerLoggedOnce) {
-        console.log('Using existing global audio analyzer');
-        globalAnalyzerLoggedOnce = true;
-      }
-    } else {
+    // Prüfen, ob bereits ein globaler Analyzer existiert
+    if (!globalAnalyzer) {
+      // Immer einen neuen Analyzer erstellen
       const analyzerOptions: AudioAnalyzerOptions = {
         onBeat: (time) => {
-          console.log(`Beat detected at time: ${time}`);
+          console.log(`Beat detected at time: ${time}, energy: ${energy.toFixed(2)}`);
           setBeatDetected(true);
           triggerBeat(); // Aktualisiere den globalen Store
+          
+          // Audio als aktiv markieren
+          setAudioActive(true);
         },
         onEnergy: (e) => {
           setEnergy(e);
           updateEnergy(e); // Aktualisiere den globalen Store
           
-          // Wenn Energie über 0.1 liegt, setzen wir Audio als aktiv
-          if (e > 0.1) {
+          // Wenn Energie über 0.03 liegt, setzen wir Audio als aktiv (reduziert von 0.05)
+          if (e > 0.03) {
             setAudioActive(true);
           }
           
           // Wenn Energie über dem Schwellenwert liegt, könnte es ein Beat sein
-          if (e > (analyzerOptions.energyThreshold || 0.25)) {
+          if (e > (analyzerOptions.energyThreshold || 0.1)) {
             const now = Date.now();
             const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
             
-            // Mindestens 200ms zwischen Beats
-            if (timeSinceLastBeat > 200) {
+            // Mindestens 150ms zwischen Beats (reduziert von 200ms)
+            if (timeSinceLastBeat > 150) {
               console.log(`Energy-based beat detected: ${e.toFixed(2)}`);
               setBeatDetected(true);
               triggerBeat();
@@ -109,14 +125,29 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
         ...defaultOptions
       };
       
-      globalAnalyzer = new AudioAnalyzer(analyzerOptions);
+      const newAnalyzer = new AudioAnalyzer(analyzerOptions);
+      analyzerRef.current = newAnalyzer;
+      globalAnalyzer = newAnalyzer; // Aktualisiere den globalen Analyzer
+      console.log('Created new audio analyzer with options:', analyzerOptions);
+    } else {
+      // Verwende den existierenden globalen Analyzer
       analyzerRef.current = globalAnalyzer;
-      console.log('Created new global audio analyzer');
+      
+      // Debounce das Logging, um Konsolenflut zu vermeiden
+      logDebouncer('usingExistingAnalyzer', () => {
+        console.log('Using existing global audio analyzer');
+      });
     }
     
     return () => {
-      // Wir räumen den globalen Analyzer nicht auf, da er von anderen Komponenten verwendet werden könnte
-      analyzerRef.current = null;
+      // Wir räumen den Analyzer nur auf, wenn die Komponente unmounted wird und es keine anderen Nutzer gibt
+      if (analyzerRef.current === globalAnalyzer) {
+        // Hier könnten wir prüfen, ob andere Komponenten den Analyzer noch verwenden
+        // Für jetzt lassen wir den globalen Analyzer bestehen
+      } else if (analyzerRef.current) {
+        analyzerRef.current.dispose();
+        analyzerRef.current = null;
+      }
     };
   }, [updateEnergy, triggerBeat, setAudioActive, options]);
   
@@ -127,29 +158,42 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       }
       
       // Vermeide mehrfache Initialisierungsversuche
-      if (initializeAttemptedRef.current) {
-        console.log('Initialize already attempted, skipping');
+      if (initializeAttemptedRef.current || initializingRef.current || isGlobalInitializing) {
+        // Debounce das Logging, um Konsolenflut zu vermeiden
+        logDebouncer('initializeAttempted', () => {
+          console.log('Initialize already attempted or in progress, skipping');
+        });
         return;
       }
       
       initializeAttemptedRef.current = true;
+      initializingRef.current = true;
+      isGlobalInitializing = true;
       audioElementRef.current = audioElement;
       
-      await analyzerRef.current.initialize(audioElement);
-      setIsInitialized(true);
-      console.log('Audio analyzer initialized successfully');
-      
-      if (options?.autoStart) {
-        start();
-      }
-      
-      if (options?.autoDetectBeat) {
-        try {
-          const result = await guessBeat();
-          console.log('Auto beat detection result:', result);
-        } catch (err) {
-          console.error('Auto beat detection failed:', err);
+      try {
+        await analyzerRef.current.initialize(audioElement);
+        setIsInitialized(true);
+        console.log('Audio analyzer initialized successfully');
+        
+        // Audio als aktiv markieren
+        setAudioActive(true);
+        
+        if (options?.autoStart) {
+          start();
         }
+        
+        if (options?.autoDetectBeat) {
+          try {
+            const result = await guessBeat();
+            console.log('Auto beat detection result:', result);
+          } catch (err) {
+            console.error('Auto beat detection failed:', err);
+          }
+        }
+      } finally {
+        initializingRef.current = false;
+        isGlobalInitializing = false;
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
@@ -160,14 +204,22 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   };
   
   const start = () => {
-    if (!analyzerRef.current || !isInitialized) {
+    if (!analyzerRef.current) {
       console.warn('Cannot start: analyzer not initialized');
+      return;
+    }
+    
+    if (isAnalyzing) {
+      console.log('Audio analysis already running, not starting again');
       return;
     }
     
     analyzerRef.current.start();
     setIsAnalyzing(true);
     console.log('Audio analysis started');
+    
+    // Audio als aktiv markieren, wenn Analyse startet
+    setAudioActive(true);
   };
   
   const stop = () => {
@@ -206,8 +258,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       
       const result = await analyzerRef.current.guessBeat();
       setBeatInfo(result);
-      setTempo(result.bpm);
-      console.log('Beat guessing result:', result);
+      console.log('Guessed beat:', result);
       return result;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');

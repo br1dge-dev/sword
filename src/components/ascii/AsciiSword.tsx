@@ -9,6 +9,10 @@
 import { AsciiSwordProps } from './sword-modules/types/swordTypes';
 import AsciiSwordModular from './sword-modules/AsciiSwordModular';
 
-export default function AsciiSword({ level = 1 }: AsciiSwordProps) {
-  return <AsciiSwordModular level={level} />;
+export default function AsciiSword({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
+  return <AsciiSwordModular 
+    level={level} 
+    directEnergy={directEnergy} 
+    directBeat={directBeat}
+  />;
 } 

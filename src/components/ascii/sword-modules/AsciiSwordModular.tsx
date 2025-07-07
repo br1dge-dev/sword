@@ -58,18 +58,43 @@ import {
 } from './effects/glitchEffects';
 import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects';
 
-export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
+export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
   const { currentLevel, chargeLevel, glitchLevel } = usePowerUpStore();
   
   // Audio-Reaktionsdaten abrufen
-  const { energy, beatDetected } = useAudioReactionStore();
+  const { energy: storeEnergy, beatDetected: storeBeat } = useAudioReactionStore();
+  
+  // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
+  const energy = directEnergy !== undefined ? directEnergy : storeEnergy;
+  const beatDetected = directBeat !== undefined ? directBeat : storeBeat;
   
   // Automatisches Beat-Reset aktivieren
   useBeatReset(100);
   
   // Fallback-Animation aktivieren, wenn keine Audio-Reaktivität vorhanden ist
   useFallbackAnimation();
+  
+  // Funktion zur Berechnung der optimalen Hintergrundgröße basierend auf Viewport
+  const getBackgroundDimensions = () => {
+    // Verwende window.innerWidth/innerHeight, falls verfügbar (Client-Side), sonst Standard-Werte
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 768;
+    
+    // Berechne Dimensionen basierend auf Viewport-Größe
+    // Für größere Bildschirme mehr Zeichen
+    const baseWidth = 160;
+    const baseHeight = 100;
+    
+    // Skaliere basierend auf Bildschirmgröße, begrenzt auf 125%
+    const widthFactor = Math.min(1.25, Math.max(1, viewportWidth / 1024));
+    const heightFactor = Math.min(1.25, Math.max(1, viewportHeight / 768));
+    
+    return {
+      width: Math.floor(baseWidth * widthFactor),
+      height: Math.floor(baseHeight * heightFactor)
+    };
+  };
   
   // Zustände für visuelle Effekte
   const [glowIntensity, setGlowIntensity] = useState(0);
@@ -116,6 +141,13 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
     });
   };
   
+  // Funktion zum Bereinigen des Hintergrund-Caches
+  const clearBackgroundCache = () => {
+    setCaveBackground([]);
+    setColoredVeins([]);
+    console.log('[MEMORY] Background cache cleared');
+  };
+  
   // Finde alle nicht-leeren Positionen im Schwert (nur einmal berechnen)
   const getSwordPositions = (): Array<SwordPosition> => {
     const positions: Array<SwordPosition> = [];
@@ -144,14 +176,13 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
   
   // Hintergrund initialisieren
   useEffect(() => {
-    // Größe für den Hintergrund bestimmen
-    const bgWidth = 120;
-    const bgHeight = 80;
+    // Größe für den Hintergrund dynamisch bestimmen
+    const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
     
     // Logging-Funktion mit Zeitstempel
     const logWithTimestamp = (message: string, color: string) => {
       const timestamp = new Date().toISOString().substr(11, 8); // HH:MM:SS
-      console.log(`%c[${timestamp}] ${message}`, `color: ${color}; font-weight: bold;`);
+      console.log(`[${timestamp}] ${message}`);
     };
     
     // Generiere den Höhlenhintergrund
@@ -167,137 +198,106 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
     // Aufräumen beim Unmounten
     return () => {
       clearAllIntervals();
+      clearBackgroundCache();
     };
   }, [glitchLevel]);
   
-  // Audio-reaktive Glow-Effekte (ersetzt intervalsRef.current.glow)
+  // Aktualisiere Hintergrund bei Änderung der Fenstergröße
   useEffect(() => {
-    if (beatDetected) {
+    // Nur auf Client-Seite ausführen
+    if (typeof window === 'undefined') return;
+    
+    // Funktion zur Aktualisierung des Hintergrunds
+    const handleResize = () => {
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      
+      // Aktualisiere Hintergrund mit neuen Dimensionen
+      setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+      
+      // Aktualisiere Adern mit neuen Dimensionen
+      const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
+      const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
+      setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
+      
+      console.log(`[RESIZE] Background updated to ${bgWidth}x${bgHeight}`);
+    };
+    
+    // Debounce-Funktion, um zu häufige Aktualisierungen zu vermeiden
+    let resizeTimeout: NodeJS.Timeout | null = null;
+    const debouncedResize = () => {
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+      resizeTimeout = setTimeout(handleResize, 500); // 500ms Verzögerung
+    };
+    
+    // Event-Listener für Fenstergrößenänderungen
+    window.addEventListener('resize', debouncedResize);
+    
+    // Bereinigung beim Unmounten
+    return () => {
+      window.removeEventListener('resize', debouncedResize);
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+    };
+  }, [glitchLevel]);
+  
+  // Audio-reaktive Glow-Effekte
+  useEffect(() => {
+    if (beatDetected || energy > 0.2) { // Reduzierter Schwellenwert von 0.5 auf 0.2
       // Bestehende Glow-Logik bei Beat-Erkennung auslösen
       const randomIntensity = Math.random() * 0.7 + 0.3;
       setGlowIntensity(randomIntensity);
-    }
-  }, [beatDetected]);
-  
-  // Audio-reaktive Farb-Effekte (ersetzt intervalsRef.current.colorChange)
-  useEffect(() => {
-    // Bei hoher Energie oder Beat Farbwechsel auslösen
-    if (energy > 0.6 || beatDetected) {
-      const now = Date.now();
-      const timeSinceLastChange = now - lastColorChangeTime;
-      
-      // Nur Farbwechsel erlauben, wenn die minimale Stabilitätszeit überschritten ist
-      if (timeSinceLastChange >= colorStability) {
-        // Erzeuge eine harmonische Farbkombination
-        const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
-        
-        // Setze die neuen Farben
-        setBaseColor(swordColor);
-        setBgColor(newBgColor);
-        
-        // Aktualisiere den Zeitstempel für den letzten Farbwechsel
-        setLastColorChangeTime(now);
-        
-        // Setze eine neue zufällige Stabilitätszeit
-        setColorStability(Math.floor(Math.random() * 1200) + 300);
-        
-        // Logging
-        const logWithTimestamp = (message: string, color: string) => {
-          const timestamp = new Date().toISOString().substr(11, 8);
-          console.log(`%c[${timestamp}] ${message}`, `color: ${color}; font-weight: bold;`);
-        };
-        
-        logWithTimestamp(`[COLOR_CHANGE] New color: ${swordColor}, BG: ${newBgColor}, Stability: ${colorStability}ms`, '#00FCA6');
-      }
-    }
-  }, [energy, beatDetected, lastColorChangeTime, colorStability]);
-  
-  // Audio-reaktive Tile-Farben (ersetzt intervalsRef.current.tileColors)
-  useEffect(() => {
-    if (beatDetected || energy > 0.5) {
-      // Zufällige Tiles mit Akzentfarben einfärben
-      const newColoredTiles: Array<{x: number, y: number, color: string}> = [];
-      const swordPositions = getSwordPositions();
-      
-      // Anzahl der Cluster basierend auf glitchLevel
-      const numClusters = Math.floor(Math.random() * 4) + 3 + (colorEffectIntensity[glitchLevel as keyof typeof colorEffectIntensity] || 2) + 2;
-      
-      for (let i = 0; i < numClusters; i++) {
-        // Wähle eine zufällige Position und Clustergröße
-        if (swordPositions.length === 0) continue;
-        
-        const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
-        const basePos = swordPositions[randomPosIndex];
-        
-        // Clustergröße: 2-8 zusammenhängende Tiles
-        const clusterSize = Math.floor(Math.random() * 7) + 2;
-        
-        // Generiere Cluster
-        const cluster = generateCluster(
-          basePos.x, 
-          basePos.y, 
-          clusterSize,
-          20, // maxWidth
-          centeredSwordLines.length // maxHeight
-        );
-        
-        // Wähle eine zufällige Akzentfarbe für dieses Cluster
-        const accentColor = accentColors[Math.floor(Math.random() * accentColors.length)];
-        
-        // Füge alle Positionen im Cluster hinzu
-        cluster.forEach((pos: {x: number, y: number}) => {
-          // Prüfe, ob an dieser Position tatsächlich ein Schwert-Tile ist
-          if (centeredSwordLines[pos.y] && 
-              centeredSwordLines[pos.y][pos.x] && 
-              centeredSwordLines[pos.y][pos.x] !== ' ') {
-            newColoredTiles.push({
-              x: pos.x,
-              y: pos.y,
-              color: accentColor
-            });
-          }
-        });
-      }
-      
-      setColoredTiles(newColoredTiles);
-    }
-  }, [beatDetected, energy, glitchLevel]);
-  
-  // Audio-reaktive Glitch-Effekte (ersetzt intervalsRef.current.glitch)
-  useEffect(() => {
-    if (beatDetected || energy > 0.5) {
-      // Generiere Glitch-Zeichen
-      const swordPositions = getSwordPositions();
-      const newGlitches: Array<{x: number, y: number, char: string}> = [];
-      // Anzahl der Glitches basierend auf Energie
-      const numGlitches = Math.floor(Math.random() * 9) + 2;
-      
-      for (let i = 0; i < numGlitches; i++) {
-        // Wähle eine zufällige Position aus den Schwert-Positionen
-        if (swordPositions.length === 0) continue;
-        
-        const randomPosIndex = Math.floor(Math.random() * swordPositions.length);
-        const pos = swordPositions[randomPosIndex];
-        
-        newGlitches.push({
-          x: pos.x,
-          y: pos.y,
-          char: glitchSymbols[Math.floor(Math.random() * glitchSymbols.length)]
-        });
-      }
-      
-      setGlitchChars(newGlitches);
-      
-      // Glitches nach kurzer Zeit zurücksetzen
-      setTimeout(() => {
-        setGlitchChars([]);
-      }, 80);
+      console.log(`[GLOW] Glow-Effekt ausgelöst mit Intensität ${randomIntensity.toFixed(2)}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
     }
   }, [beatDetected, energy]);
   
+  // Audio-reaktive Farb-Effekte
+  useEffect(() => {
+    // Bei hoher Energie oder Beat Farbwechsel auslösen
+    if ((energy > 0.40 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) { // Erhöhter Schwellenwert von 0.25 auf 0.40
+      // Erzeuge eine harmonische Farbkombination
+      const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
+      
+      // Setze die neuen Farben
+      setBaseColor(swordColor);
+      setBgColor(newBgColor);
+      
+      // Aktualisiere den Zeitstempel für den letzten Farbwechsel
+      setLastColorChangeTime(Date.now());
+      
+      console.log(`[${new Date().toLocaleTimeString()}] [COLOR_CHANGE] New color: ${swordColor}, BG: ${newBgColor}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
+    }
+  }, [beatDetected, energy, lastColorChangeTime, colorStability]);
+  
+  // Audio-reaktive Tile-Effekte
+  useEffect(() => {
+    if (beatDetected || energy > 0.2) { // Reduzierter Schwellenwert von 0.3 auf 0.2
+      // Temporär erhöhte Farbeffekte
+      const tempIntensity = { ...colorEffectIntensity };
+      for (const level in tempIntensity) {
+        if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
+          const numLevel = Number(level) as keyof typeof colorEffectIntensity;
+          tempIntensity[numLevel] = Math.min(3, tempIntensity[numLevel] + Math.floor(energy * 2));
+        }
+      }
+      
+      setColoredTiles(generateColoredTiles(getSwordPositions(), glitchLevel, tempIntensity));
+      console.log(`[TILES] Tile-Effekte ausgelöst, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}, Tiles: ${coloredTiles.length}`);
+      
+      // Zurücksetzen nach kurzer Zeit
+      const timeout = setTimeout(() => {
+        setColoredTiles(generateColoredTiles(getSwordPositions(), glitchLevel, colorEffectIntensity));
+      }, 800);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [beatDetected, energy, glitchLevel]);
+  
   // Audio-reaktive Edge-Effekte (ersetzt intervalsRef.current.edge)
   useEffect(() => {
-    if (beatDetected || energy > 0.4) {
+    if (beatDetected || energy > 0.2) { // Reduzierter Schwellenwert von 0.4 auf 0.2
       // Wenn keine Kanten vorhanden sind, nichts tun
       const edgePositions = getEdgePositions();
       if (edgePositions.length === 0) return;
@@ -313,10 +313,18 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
       // Multiplier für Level 2 (erhöht die Chance um 50%)
       const glitchMultiplier = chargeLevel === 2 ? 1.5 : 1;
       
+      // Erhöhe die Chancen basierend auf der Energie
+      const energyMultiplier = 1 + (energy * 1.5);
+      const effectiveVibrationChance = Math.min(0.95, vibrationChance * energyMultiplier);
+      const effectiveGlitchChance = Math.min(0.95, glitchChance * glitchMultiplier * energyMultiplier);
+      const effectiveColorChance = Math.min(0.95, colorChance * energyMultiplier);
+      
+      console.log(`[EDGE] Edge-Effekte berechnet - Vibration: ${effectiveVibrationChance.toFixed(2)}, Glitch: ${effectiveGlitchChance.toFixed(2)}, Color: ${effectiveColorChance.toFixed(2)}, Energy: ${energy.toFixed(2)}`);
+      
       // Durchlaufe alle Kantenpositionen
       edgePositions.forEach(pos => {
         // Vibrations-Effekt (Verschiebung)
-        if (Math.random() < vibrationChance) {
+        if (Math.random() < effectiveVibrationChance) {
           const offsetX = Math.random() < 0.5 ? -1 : 1;
           const offsetY = Math.random() < 0.5 ? -1 : 1;
           
@@ -328,7 +336,7 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
         }
         
         // Glitch-Effekt (Zeichenersetzung)
-        if (Math.random() < glitchChance * glitchMultiplier) {
+        if (Math.random() < effectiveGlitchChance) {
           // Korrekte Typbehandlung für edgeGlitchChars
           const glitchCharSet = Math.floor(Math.random() * edgeGlitchChars[1].length);
           const glitchChar = edgeGlitchChars[1][glitchCharSet];
@@ -341,7 +349,7 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
         }
         
         // Farb-Effekt
-        if (Math.random() < colorChance) {
+        if (Math.random() < effectiveColorChance) {
           const colorIndex = Math.floor(Math.random() * accentColors.length);
           const edgeColor = accentColors[colorIndex];
           
@@ -355,6 +363,7 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
       
       // Setze die neuen Edge-Effekte
       setEdgeEffects(newEdgeEffects);
+      console.log(`[EDGE] ${newEdgeEffects.length} Edge-Effekte angewendet, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
       
       // Zurücksetzen nach kurzer Zeit
       setTimeout(() => {
@@ -363,58 +372,52 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
     }
   }, [beatDetected, energy, chargeLevel]);
   
-  // Audio-reaktive Unicode-Glitch-Effekte (ersetzt intervalsRef.current.unicodeGlitch)
+  // Audio-reaktive Unicode-Glitch-Effekte
   useEffect(() => {
-    if (beatDetected || energy > 0.7) {
-      // Wahrscheinlichkeit für Unicode-Glitches basierend auf glitchLevel
-      const glitchChance = 0.3 + (glitchLevel * 0.1); // 30%, 40%, 50%, 60%
+    if (beatDetected || energy > 0.25) { // Reduzierter Schwellenwert von 0.35 auf 0.25
+      // Erhöhe temporär den Glitch-Level
+      const tempGlitchLevel = Math.min(3, Math.floor(glitchLevel + (energy * 2)));
+      setUnicodeGlitches(generateUnicodeGlitches(getSwordPositions(), tempGlitchLevel));
       
-      if (Math.random() < glitchChance) {
-        // Anzahl der Glitches basierend auf glitchLevel
-        const numGlitches = glitchLevel * 3 + glitchLevel; // 4, 8, 12
-        
-        // Generiere Unicode-Glitches
-        const swordPositions = getSwordPositions();
-        const newUnicodeGlitches = generateUnicodeGlitches(
-          swordPositions,
-          numGlitches
-        );
-        
-        setUnicodeGlitches(newUnicodeGlitches);
-        
-        // Zurücksetzen nach kurzer Zeit
-        setTimeout(() => {
-          setUnicodeGlitches([]);
-        }, 100 + (glitchLevel * 20)); // Längere Dauer bei höherem glitchLevel
-      }
+      console.log(`[${new Date().toLocaleTimeString()}] [GLITCH] Unicode glitch triggered, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}, Glitches: ${unicodeGlitches.length}`);
+      
+      // Zurücksetzen nach kurzer Zeit
+      const timeout = setTimeout(() => {
+        setUnicodeGlitches([]);
+      }, 160);
+      
+      return () => clearTimeout(timeout);
     }
   }, [beatDetected, energy, glitchLevel]);
   
-  // Audio-reaktive Hintergrund-Effekte (ersetzt intervalsRef.current.background)
+  // Audio-reaktive Hintergrund-Effekte
   useEffect(() => {
-    if (beatDetected) {
-      // Größe für den Hintergrund bestimmen
-      const bgWidth = 120;
-      const bgHeight = 80;
+    if ((beatDetected && Math.random() < 0.15) || energy > 0.65) { // Reduzierte Wahrscheinlichkeit von 0.3 auf 0.15 und erhöhter Energieschwellenwert von 0.4 auf 0.65
+      // Größe für den Hintergrund dynamisch bestimmen
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       
-      // Generiere den Höhlenhintergrund
-      setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+      // Gelegentlich den Hintergrund aktualisieren
+      const newBackground = generateCaveBackground(bgWidth, bgHeight);
+      setCaveBackground(newBackground);
+      
+      console.log(`[${new Date().toLocaleTimeString()}] [BACKGROUND] Background updated, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
     }
-  }, [beatDetected]);
+  }, [beatDetected, energy]);
   
-  // Audio-reaktive Adern-Effekte (ersetzt intervalsRef.current.veins)
+  // Audio-reaktive Adern-Effekte
   useEffect(() => {
-    if (beatDetected || energy > 0.6) {
-      // Größe für den Hintergrund bestimmen
-      const bgWidth = 120;
-      const bgHeight = 80;
+    if (beatDetected || energy > 0.30) { // Erhöhter Schwellenwert von 0.15 auf 0.30
+      // Größe für den Hintergrund dynamisch bestimmen
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       
-      // Generiere farbige Äderchen basierend auf glitchLevel
-      const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
-      const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
-      setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
+      // Mehr Veins bei höherer Energie
+      const numVeins = Math.floor(10 + energy * 30); // Erhöht von 20 auf 30 für mehr Veins
+      const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins);
+      setColoredVeins(newVeins);
+      
+      console.log(`[${new Date().toLocaleTimeString()}] [VEINS] Veins updated: ${numVeins}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
     }
-  }, [beatDetected, energy, glitchLevel]);
+  }, [beatDetected, energy]);
   
   // Berechne Schatten basierend auf Glow-Intensität
   const shadowSize = Math.floor(glowIntensity * 20);
@@ -424,7 +427,7 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
   const backgroundColor = getDarkerColor(bgColor);
   // Hellere Version der Komplementärfarbe für den Höhlenhintergrund
   const lighterBgColor = getLighterColor(bgColor);
-  
+
   return (
     <div 
       className="relative flex items-center justify-center w-full h-full overflow-hidden"
@@ -461,17 +464,18 @@ export default function AsciiSwordModular({ level = 1 }: AsciiSwordProps) {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            transform: 'scale(1.3)', // Optimale Skalierung für Schärfe
+            transform: 'scale(1.5)', // Erhöhte Skalierung von 1.3 auf 1.5 für bessere Abdeckung
             position: 'absolute',
             top: 0,
             left: 0,
             width: '100%',
-            height: '100%'
+            height: '100%',
+            overflow: 'hidden' // Hinzugefügt, um sicherzustellen, dass Inhalte nicht über den Container hinausragen
           }}
         >
-          <pre className="font-mono text-sm sm:text-base leading-[0.9] whitespace-pre select-none">
+          <pre className="font-mono text-sm sm:text-base leading-[0.9] whitespace-pre select-none" style={{ width: '100%', height: '100%' }}>
                           {caveBackground.map((row, y) => (
-              <div key={y} style={{ lineHeight: '0.9' }}>
+              <div key={y} style={{ lineHeight: '0.9', width: '100%' }}>
                 {row.map((char, x) => {
                   // Prüfe, ob an dieser Position eine farbige Ader ist
                   const vein = coloredVeins.find(v => v.x === x && v.y === y);

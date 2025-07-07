@@ -9,6 +9,8 @@
  */
 export interface AsciiSwordProps {
   level?: number;
+  directEnergy?: number;  // Direkte Energie-Werte vom Audio-Analyzer
+  directBeat?: boolean;   // Direkte Beat-Erkennung vom Audio-Analyzer
 }
 
 /**
