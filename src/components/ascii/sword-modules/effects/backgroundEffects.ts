@@ -410,6 +410,71 @@ export function generateCaveBackground(width: number, height: number): string[][
 }
 
 /**
+ * Generiert einen ASCII-Hintergrund, bei dem Muster nur innerhalb eines zentralen Kreises erscheinen.
+ * Die Dichte nimmt zum Rand des Kreises smooth ab. Außerhalb bleibt alles leer/einfarbig.
+ * @param width Breite des Hintergrunds
+ * @param height Höhe des Hintergrunds
+ * @param densityMax Maximale Dichte im Zentrum (0-1, Standard 0.35)
+ * @param radiusFactor Anteil des Radius an der kleineren Dimension (Standard 0.8)
+ * @returns 2D-Array mit Hintergrund-Zeichen
+ */
+export function generateCircularBackground(
+  width: number,
+  height: number,
+  densityMax: number = 0.35,
+  radiusFactor: number = 0.8
+): string[][] {
+  const background: string[][] = [];
+  const adjustedWidth = Math.min(Math.max(width, 160), MAX_BG_WIDTH);
+  const adjustedHeight = Math.min(Math.max(height, 100), MAX_BG_HEIGHT);
+
+  // Mittelpunkt und Radius des Kreises
+  const centerX = adjustedWidth / 2;
+  const centerY = adjustedHeight / 2;
+  const radius = (Math.min(adjustedWidth, adjustedHeight) / 2) * radiusFactor;
+  const fadeZone = radius * 0.18; // Übergangsbereich (18% des Radius)
+
+  // Zeichen für Muster
+  const caveChars = [
+    '·', ':', '.', '˙', '°', '╱', '╲', '╳', '┌', '┐', '└', '┘',
+    '│', '─', '┬', '┴', '┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻',
+    '┃', '━', '╸', '╹', '╺', '╻', '◇', '◆', '◊', '◈', '◦', '◎', '○'
+  ];
+
+  for (let y = 0; y < adjustedHeight; y++) {
+    background[y] = [];
+    for (let x = 0; x < adjustedWidth; x++) {
+      // Abstand zum Mittelpunkt
+      const dx = x - centerX;
+      const dy = y - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > radius + fadeZone) {
+        // Komplett außerhalb: leer
+        background[y][x] = ' ';
+        continue;
+      }
+
+      // Dichte-Faktor: 1 im Zentrum, 0 am Rand des fadeZone
+      let density = densityMax;
+      if (dist > radius - fadeZone) {
+        // Im Übergangsbereich: linearer Fade
+        density = densityMax * (1 - (dist - (radius - fadeZone)) / (fadeZone));
+        density = Math.max(0, density);
+      }
+
+      // Setze Zeichen mit Wahrscheinlichkeit = density
+      if (Math.random() < density) {
+        background[y][x] = caveChars[Math.floor(Math.random() * caveChars.length)];
+      } else {
+        background[y][x] = ' ';
+      }
+    }
+  }
+  return background;
+}
+
+/**
  * Generiert farbige Äderchen für den Hintergrund
  * Angepasst für dezentere Effekte
  * @param width Breite des Hintergrunds
@@ -472,4 +537,232 @@ export function generateColoredVeins(
   }
   
   return veins;
+} 
+
+/**
+ * Generiert Veins (farbige Linien) nur innerhalb eines zentralen Kreises mit smooth fade zum Rand.
+ * @param width Breite des Hintergrunds
+ * @param height Höhe des Hintergrunds
+ * @param numVeins Anzahl der Veins
+ * @param radiusFactor Anteil des Radius an der kleineren Dimension (Standard 0.8)
+ * @returns Array mit Vein-Positionen und -Farben
+ */
+export function generateCircularVeins(
+  width: number,
+  height: number,
+  numVeins: number,
+  radiusFactor: number = 0.8
+): Array<{x: number, y: number, color: string}> {
+  const veins: Array<{x: number, y: number, color: string}> = [];
+  const adjustedWidth = Math.min(width, MAX_BG_WIDTH);
+  const adjustedHeight = Math.min(height, MAX_BG_HEIGHT);
+  const centerX = adjustedWidth / 2;
+  const centerY = adjustedHeight / 2;
+  const radius = (Math.min(adjustedWidth, adjustedHeight) / 2) * radiusFactor;
+  const fadeZone = radius * 0.18;
+
+  for (let i = 0; i < numVeins; i++) {
+    // Position im Kreis generieren
+    let x, y, dist;
+    let attempts = 0;
+    do {
+      x = Math.floor(Math.random() * adjustedWidth);
+      y = Math.floor(Math.random() * adjustedHeight);
+      const dx = x - centerX;
+      const dy = y - centerY;
+      dist = Math.sqrt(dx * dx + dy * dy);
+      attempts++;
+    } while (dist > radius + fadeZone && attempts < 10);
+
+    if (dist > radius + fadeZone) continue; // Falls nach 10 Versuchen immer noch außerhalb, skip
+
+    // Fade-Out zum Rand
+    let density = 1;
+    if (dist > radius - fadeZone) {
+      density = 1 - (dist - (radius - fadeZone)) / fadeZone;
+      density = Math.max(0, density);
+    }
+    if (Math.random() > density) continue;
+
+    // Farbe wählen
+    const colorIndex = Math.floor(Math.random() * accentColors.length);
+    const color = accentColors[colorIndex];
+
+    veins.push({ x, y, color });
+  }
+  return veins;
+}
+
+/**
+ * Diff-basierte Update-Funktionen für bessere Performance
+ * Statt kompletter Neugenerierung werden nur 5-15% der Elemente geändert
+ */
+
+/**
+ * Aktualisiert nur einen kleinen Teil des Hintergrunds für bessere Performance
+ * @param prevBackground Vorheriger Hintergrund
+ * @param energy Aktuelle Audio-Energie (0-1)
+ * @param beatDetected Ob ein Beat erkannt wurde
+ * @returns Aktualisierter Hintergrund
+ */
+export function updateBackgroundDiff(
+  prevBackground: string[][], 
+  energy: number, 
+  beatDetected: boolean
+): string[][] {
+  if (!prevBackground.length || !prevBackground[0].length) {
+    return prevBackground;
+  }
+
+  const height = prevBackground.length;
+  const width = prevBackground[0].length;
+  
+  // Berechne Anzahl der Änderungen basierend auf Energie und Beat
+  const baseChangeRate = 0.05; // 5% Basis-Änderungsrate
+  const energyMultiplier = 1 + (energy * 2); // 1x bis 3x bei hoher Energie
+  const beatMultiplier = beatDetected ? 1.5 : 1; // 50% mehr bei Beat
+  
+  const changeRate = baseChangeRate * energyMultiplier * beatMultiplier;
+  const numChanges = Math.max(1, Math.floor(width * height * changeRate));
+  
+  // Erstelle eine Kopie des vorherigen Hintergrunds
+  const newBackground = prevBackground.map(row => [...row]);
+  
+  // Verfügbare Zeichen für Updates
+  const updateChars = [
+    '·', ':', '.', '˙', '°', '╱', '╲', '╳', '┌', '┐', '└', '┘', 
+    '│', '─', '┬', '┴', '┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻',
+    '┃', '━', '╸', '╹', '╺', '╻', '◇', '◆', '◊', '◈', '◦', '◎', '○'
+  ];
+  
+  // Führe die Änderungen durch
+  for (let i = 0; i < numChanges; i++) {
+    const x = Math.floor(Math.random() * width);
+    const y = Math.floor(Math.random() * height);
+    
+    // 70% Chance für neues Zeichen, 30% Chance für Leerzeichen
+    if (Math.random() < 0.7) {
+      newBackground[y][x] = updateChars[Math.floor(Math.random() * updateChars.length)];
+    } else {
+      newBackground[y][x] = ' ';
+    }
+  }
+  
+  return newBackground;
+}
+
+/**
+ * Aktualisiert nur einen kleinen Teil der Veins für bessere Performance
+ * @param prevVeins Vorherige Veins
+ * @param energy Aktuelle Audio-Energie (0-1)
+ * @param beatDetected Ob ein Beat erkannt wurde
+ * @param width Hintergrund-Breite
+ * @param height Hintergrund-Höhe
+ * @returns Aktualisierte Veins
+ */
+export function updateVeinsDiff(
+  prevVeins: Array<{x: number, y: number, color: string}>,
+  energy: number,
+  beatDetected: boolean,
+  width: number,
+  height: number
+): Array<{x: number, y: number, color: string}> {
+  if (!prevVeins.length) {
+    return prevVeins;
+  }
+  
+  // Berechne Anzahl der zu ersetzenden Veins
+  const baseReplaceRate = 0.2; // 20% Basis-Ersetzungsrate
+  const energyMultiplier = 1 + (energy * 1.5); // 1x bis 2.5x bei hoher Energie
+  const beatMultiplier = beatDetected ? 1.3 : 1; // 30% mehr bei Beat
+  
+  const replaceRate = baseReplaceRate * energyMultiplier * beatMultiplier;
+  const replaceCount = Math.max(1, Math.floor(prevVeins.length * replaceRate));
+  
+  // Behalte die meisten Veins und ersetze nur einen Teil
+  const keepCount = prevVeins.length - replaceCount;
+  const kept = prevVeins.slice(0, keepCount);
+  
+  // Generiere neue Veins für die ersetzten
+  const newVeins = generateColoredVeins(width, height, replaceCount);
+  
+  return [...kept, ...newVeins];
+}
+
+/**
+ * Generiert ein einzelnes zufälliges Höhlenzeichen für diff-Updates
+ * @returns Ein zufälliges Zeichen aus dem Höhlen-Zeichensatz
+ */
+export function getRandomCaveChar(): string {
+  const caveChars = [
+    '·', ':', '.', '˙', '°', '╱', '╲', '╳', '┌', '┐', '└', '┘', 
+    '│', '─', '┬', '┴', '┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻',
+    '┃', '━', '╸', '╹', '╺', '╻', '◇', '◆', '◊', '◈', '◦', '◎', '○'
+  ];
+  
+  return caveChars[Math.floor(Math.random() * caveChars.length)];
+}
+
+/**
+ * Optimierte Hintergrund-Generierung für bessere Performance
+ * Vereinfachte Version mit weniger komplexen Berechnungen
+ * @param width Breite des Hintergrunds
+ * @param height Höhe des Hintergrunds
+ * @returns 2D-Array mit Hintergrund-Zeichen
+ */
+export function generateSimpleBackground(width: number, height: number): string[][] {
+  const background: string[][] = [];
+  
+  // Begrenze die Dimensionen
+  const adjustedWidth = Math.min(Math.max(width, 160), MAX_BG_WIDTH);
+  const adjustedHeight = Math.min(Math.max(height, 100), MAX_BG_HEIGHT);
+  
+  // Initialisiere mit Leerzeichen
+  for (let y = 0; y < adjustedHeight; y++) {
+    background[y] = Array(adjustedWidth).fill(' ');
+  }
+  
+  // Fülle nur 30% der Positionen mit Zeichen für bessere Performance
+  const numChars = Math.floor(adjustedWidth * adjustedHeight * 0.3);
+  const caveChars = [
+    '·', ':', '.', '˙', '°', '╱', '╲', '╳', '┌', '┐', '└', '┘', 
+    '│', '─', '┬', '┴', '┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻'
+  ];
+  
+  for (let i = 0; i < numChars; i++) {
+    const x = Math.floor(Math.random() * adjustedWidth);
+    const y = Math.floor(Math.random() * adjustedHeight);
+    background[y][x] = caveChars[Math.floor(Math.random() * caveChars.length)];
+  }
+  
+  return background;
+} 
+
+/**
+ * Prüft, ob eine Position (x, y) innerhalb eines Kreises mit Fade-Zone liegt und gibt den Dichtewert (0-1) zurück.
+ * @param x X-Position
+ * @param y Y-Position
+ * @param width Hintergrund-Breite
+ * @param height Hintergrund-Höhe
+ * @param radiusFactor Anteil des Radius an der kleineren Dimension (Standard 0.8)
+ * @returns density: 0 (außerhalb), 0-1 (im Fade), 1 (im Kern)
+ */
+export function isInCircleWithFade(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radiusFactor: number = 0.8
+): number {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = (Math.min(width, height) / 2) * radiusFactor;
+  const fadeZone = radius * 0.18;
+  const dx = x - centerX;
+  const dy = y - centerY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > radius + fadeZone) return 0;
+  if (dist <= radius - fadeZone) return 1;
+  // Im Fade-Bereich
+  return 1 - (dist - (radius - fadeZone)) / fadeZone;
 } 

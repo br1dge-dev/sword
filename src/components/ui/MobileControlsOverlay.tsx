@@ -11,21 +11,25 @@ interface MobileControlsOverlayProps {
   beatDetected: boolean;
   onBeat: () => void;
   onEnergyChange: (energy: number) => void;
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
 }
 
 export default function MobileControlsOverlay({
   audioEnergy,
   beatDetected,
   onBeat,
-  onEnergyChange
+  onEnergyChange,
+  isOpen,
+  setIsOpen
 }: MobileControlsOverlayProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  // const [isOpen, setIsOpen] = useState(false); // ENTFERNT
 
   return (
     <>
       {/* Overlay-Button (immer sichtbar) */}
       <button
-        onClick={() => setIsOpen(prev => !prev)}
+        onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
         style={{
           boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
