@@ -6,7 +6,7 @@
  * Diese Komponente rendert ein ASCII-Art-Schwert mit verschiedenen visuellen Effekten.
  * Die Funktionalität wurde in separate Module aufgeteilt für bessere Wartbarkeit.
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
 import { useAudioReactionStore, useBeatReset, useFallbackAnimation } from '@/store/audioReactionStore';
 
@@ -114,13 +114,17 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const [colorStability, setColorStability] = useState<number>(2000); // Minimale Zeit für Farbstabilität
   const [coloredTiles, setColoredTiles] = useState<Array<{x: number, y: number, color: string}>>([]);
   const [glitchChars, setGlitchChars] = useState<Array<{x: number, y: number, char: string}>>([]);
-  const [caveBackground, setCaveBackground] = useState<string[][]>([]);
-  const [coloredVeins, setColoredVeins] = useState<Array<{x: number, y: number, color: string}>>([]);
   const [edgeEffects, setEdgeEffects] = useState<Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}>>([]);
   const [unicodeGlitches, setUnicodeGlitches] = useState<Array<{x: number, y: number, char: string}>>([]);
   const [blurredChars, setBlurredChars] = useState<Array<{x: number, y: number}>>([]);
   const [skewedChars, setSkewedChars] = useState<Array<{x: number, y: number, angle: number}>>([]);
   const [fadedChars, setFadedChars] = useState<Array<{x: number, y: number, opacity: number}>>([]);
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => { setIsClient(true); }, []);
+  
+  // --- STATE für animierbare Arrays wiederherstellen ---
+  const [caveBackground, setCaveBackground] = useState<string[][]>([]);
+  const [coloredVeins, setColoredVeins] = useState<Array<{x: number, y: number, color: string}>>([]);
   
   // Refs für Intervalle, um Speicherlecks zu vermeiden
   const intervalsRef = useRef<IntervalRefs>({
@@ -153,8 +157,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // Funktion zum Bereinigen des Hintergrund-Caches
   const clearBackgroundCache = () => {
-    setCaveBackground([]);
-    setColoredVeins([]);
+    // setCaveBackground([]); // Entfernt
+    // setColoredVeins([]); // Entfernt
     console.log('[MEMORY] Background cache cleared');
   };
   
@@ -184,74 +188,46 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     return positions;
   };
   
-  // Hintergrund initialisieren
+  // --- Initialisierung auf Client ---
   useEffect(() => {
-    // Größe für den Hintergrund dynamisch bestimmen
+    if (!isClient) return;
     const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-    
-    // Logging-Funktion mit Zeitstempel
-    const logWithTimestamp = (message: string, color: string) => {
-      const timestamp = new Date().toISOString().substr(11, 8); // HH:MM:SS
-      console.log(`[${timestamp}] ${message}`);
-    };
-    
-    // Generiere den Höhlenhintergrund
     setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
-    logWithTimestamp('[BACKGROUND] Initial background generated', '#00AA55');
-    
-    // Generiere farbige Äderchen basierend auf glitchLevel
     const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
     const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
     setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
-    logWithTimestamp('[VEINS] Initial veins generated', '#44AAFF');
-    
-    // Aufräumen beim Unmounten
+    // Logging
+    const timestamp = new Date().toISOString().substr(11, 8);
+    console.log(`[${timestamp}] [BACKGROUND] Initial background generated`);
+    console.log(`[${timestamp}] [VEINS] Initial veins generated`);
     return () => {
       clearAllIntervals();
       clearBackgroundCache();
     };
-  }, [glitchLevel]);
+  }, [glitchLevel, isClient]);
   
-  // Aktualisiere Hintergrund bei Änderung der Fenstergröße
+  // --- Hintergrund und Veins bei Resize aktualisieren ---
   useEffect(() => {
-    // Nur auf Client-Seite ausführen
-    if (typeof window === 'undefined') return;
-    
-    // Funktion zur Aktualisierung des Hintergrunds
+    if (!isClient) return;
     const handleResize = () => {
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      
-      // Aktualisiere Hintergrund mit neuen Dimensionen
       setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
-      
-      // Aktualisiere Adern mit neuen Dimensionen
       const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
       const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
       setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
-      
       console.log(`[RESIZE] Background updated to ${bgWidth}x${bgHeight}`);
     };
-    
-    // Debounce-Funktion, um zu häufige Aktualisierungen zu vermeiden
     let resizeTimeout: NodeJS.Timeout | null = null;
     const debouncedResize = () => {
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-      }
-      resizeTimeout = setTimeout(handleResize, 500); // 500ms Verzögerung
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(handleResize, 500);
     };
-    
-    // Event-Listener für Fenstergrößenänderungen
     window.addEventListener('resize', debouncedResize);
-    
-    // Bereinigung beim Unmounten
     return () => {
       window.removeEventListener('resize', debouncedResize);
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-      }
+      if (resizeTimeout) clearTimeout(resizeTimeout);
     };
-  }, [glitchLevel]);
+  }, [glitchLevel, isClient]);
   
   // Audio-reaktive Glow-Effekte
   useEffect(() => {
@@ -413,41 +389,27 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     }
   }, [beatDetected, energy, glitchLevel]);
   
-  // Audio-reaktive Hintergrund-Effekte - Deutlich dezentere Reaktion
+  // --- Hintergrund-Musterwechsel bei Beat/Energie ---
   useEffect(() => {
-    // Deutlich reduzierte Wahrscheinlichkeit und erhöhter Energieschwellenwert
-    // Hintergrund soll nur bei signifikanten Stimmungsänderungen wechseln
+    if (!isClient) return;
     if ((beatDetected && Math.random() < 0.15) || energy > 0.75) {
-      // Größe für den Hintergrund dynamisch bestimmen
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      
-      // Gelegentlich den Hintergrund aktualisieren
-      const newBackground = generateCaveBackground(bgWidth, bgHeight);
-      setCaveBackground(newBackground);
-      
+      setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
+      setLastColorChangeTime(Date.now() + 10000);
       console.log(`[${new Date().toLocaleTimeString()}] [BACKGROUND] Background updated, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
-      
-      // Zusätzlich einen Timer setzen, der verhindert, dass der Hintergrund zu oft aktualisiert wird
-      setLastColorChangeTime(Date.now() + 10000); // Mindestens 10 Sekunden Stabilität (reduziert von 30s)
     }
-  }, [beatDetected, energy]);
+  }, [beatDetected, energy, isClient]);
   
-  // Audio-reaktive Adern-Effekte - Dezentere Reaktion
+  // --- Veins bei Beat/Energie ---
   useEffect(() => {
-    // Höherer Schwellenwert für dezentere Reaktion
-    // Adern sollen nicht zu oft aktualisiert werden
+    if (!isClient) return;
     if ((beatDetected && Math.random() < 0.3) || energy > 0.45) {
-      // Größe für den Hintergrund dynamisch bestimmen
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      
-      // Moderate Anzahl von Veins
       const numVeins = Math.floor(10 + energy * 20);
-      const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins);
-      setColoredVeins(newVeins);
-      
+      setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
       console.log(`[${new Date().toLocaleTimeString()}] [VEINS] Veins updated: ${numVeins}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
     }
-  }, [beatDetected, energy]);
+  }, [beatDetected, energy, isClient]);
   
   // Berechne Schatten basierend auf Glow-Intensität
   const shadowSize = Math.floor(glowIntensity * 20);
@@ -457,6 +419,23 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const backgroundColor = getDarkerColor(bgColor);
   // Hellere Version der Komplementärfarbe für den Höhlenhintergrund
   const lighterBgColor = getLighterColor(bgColor);
+
+  // Hintergrund-Dimensionen berechnen
+  const { width: bgWidth, height: bgHeight } = useMemo(() => isClient ? getBackgroundDimensions() : { width: 0, height: 0 }, [glitchLevel, isClient]);
+
+  // Memoisiere caveBackground und coloredVeins
+  // const caveBackground = useMemo(() => isClient && bgWidth && bgHeight ? generateCaveBackground(bgWidth, bgHeight) : [], [bgWidth, bgHeight, glitchLevel, isClient]);
+  // const coloredVeins = useMemo(() => {
+  //   if (!isClient || !bgWidth || !bgHeight) return [];
+  //   const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
+  //   const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
+  //   return generateColoredVeins(bgWidth, bgHeight, numVeins);
+  // }, [bgWidth, bgHeight, glitchLevel, isClient]);
+
+  if (!isClient) {
+    // Optional: Lade- oder Platzhalteranzeige
+    return <div style={{width: '100vw', height: '100vh', background: '#111'}} />;
+  }
 
   return (
     <div 
