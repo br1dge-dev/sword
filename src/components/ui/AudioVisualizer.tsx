@@ -58,9 +58,7 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
       <div 
         className="h-6 border border-gray-700 bg-gray-900 flex items-end p-0.5 overflow-hidden"
         style={{ 
-          boxShadow: visualBeatActive 
-            ? 'inset 0 0 8px rgba(62,230,255,0.8), 0 0 12px rgba(62,230,255,0.4)' 
-            : 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
+          boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
           transition: 'box-shadow 0.1s ease-out',
           width: '100%', // Volle Breite des Containers
           maxWidth: '200px' // Maximale Breite begrenzen
@@ -69,7 +67,7 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
         {isFallbackActive ? (
           // IDLE-Anzeige für Fallback-Modus
           <div className="w-full h-full flex items-center justify-center">
-            <span className="text-[#3EE6FF] text-xs font-mono">IDLE</span>
+            <span className="text-xs font-press-start-2p text-[#3EE6FF]">IDLE</span>
           </div>
         ) : (
           // Normale Visualisierungs-Balken

@@ -388,7 +388,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         >
           <div className="truncate mr-2">{currentTrack.name}</div>
           {!isPlaying && !isAnalyzing && (
-            <div className="text-[#FF3EC8] text-[8px] whitespace-nowrap">KLICK PLAY</div>
+            <div className="text-[#FF3EC8] text-[8px] whitespace-nowrap">PRESS PLAY</div>
           )}
         </div>
         
