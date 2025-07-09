@@ -6,7 +6,7 @@
  * Diese Komponente rendert ein ASCII-Art-Schwert mit verschiedenen visuellen Effekten.
  * Die Funktionalität wurde in separate Module aufgeteilt für bessere Wartbarkeit.
  */
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
 import { useAudioReactionStore, useBeatReset, useFallbackAnimation } from '@/store/audioReactionStore';
 
@@ -48,23 +48,15 @@ import {
 
 // Importiere Effekt-Generatoren
 import { generateCaveBackground, generateColoredVeins } from './effects/backgroundEffects';
+import { generateHarmonicColorPair } from './effects/colorEffects';
 import {
-  calculateDynamicColors,
-  calculatePulsingColor,
-  selectDynamicColor,
-  generateDynamicGradient,
-  ColorEffectConfig
-} from './effects/colorEffects';
-import {
-  generateGlitchChars,
+  generateEdgeGlitches,
   generateUnicodeGlitches,
-  calculateGlitchDuration,
-  GlitchEffectConfig
+  generateBlurredChars,
+  generateSkewedChars,
+  generateFadedChars
 } from './effects/glitchEffects';
-import { 
-  generateColoredTiles,
-  TileEffectConfig
-} from './effects/tileEffects';
+import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects';
 
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
@@ -76,6 +68,28 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
   const energy = directEnergy !== undefined ? directEnergy : storeEnergy;
   const beatDetected = directBeat !== undefined ? directBeat : storeBeat;
+  
+  // Performance-Optimierung: Throttle Updates für bessere FPS
+  const [throttledEnergy, setThrottledEnergy] = useState(energy);
+  const [throttledBeat, setThrottledBeat] = useState(beatDetected);
+  
+  // Throttle Energy-Updates (max 30fps)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setThrottledEnergy(energy);
+    }, 33); // ~30fps
+    
+    return () => clearTimeout(timeout);
+  }, [energy]);
+  
+  // Throttle Beat-Updates (max 60fps)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setThrottledBeat(beatDetected);
+    }, 16); // ~60fps
+    
+    return () => clearTimeout(timeout);
+  }, [beatDetected]);
   
   // Automatisches Beat-Reset aktivieren
   useBeatReset(100);
@@ -170,8 +184,29 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     console.log('[MEMORY] Background cache cleared');
   };
   
-  // Finde alle nicht-leeren Positionen im Schwert (nur einmal berechnen)
-  const getSwordPositions = (): Array<SwordPosition> => {
+  // Ref für alle aktiven Timeouts
+  const activeTimeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
+  
+  // Hilfsfunktion zum sicheren Hinzufügen von Timeouts
+  const addTimeout = useCallback((callback: () => void, delay: number) => {
+    const timeout = setTimeout(() => {
+      activeTimeoutsRef.current.delete(timeout);
+      callback();
+    }, delay);
+    activeTimeoutsRef.current.add(timeout);
+    return timeout;
+  }, []);
+  
+  // Hilfsfunktion zum Aufräumen aller Timeouts
+  const clearAllTimeouts = useCallback(() => {
+    activeTimeoutsRef.current.forEach(timeout => {
+      clearTimeout(timeout);
+    });
+    activeTimeoutsRef.current.clear();
+  }, []);
+  
+  // Memoisierte Schwert-Positionen (teure Berechnung)
+  const swordPositions = useMemo((): Array<SwordPosition> => {
     const positions: Array<SwordPosition> = [];
     centeredSwordLines.forEach((line, y) => {
       Array.from(line).forEach((char, x) => {
@@ -181,10 +216,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       });
     });
     return positions;
-  };
+  }, [centeredSwordLines]);
   
-  // Finde alle dünnen Linien im Schwert (nur einmal berechnen)
-  const getEdgePositions = (): Array<EdgePosition> => {
+  // Memoisierte Kanten-Positionen (teure Berechnung)
+  const edgePositions = useMemo((): Array<EdgePosition> => {
     const positions: Array<EdgePosition> = [];
     centeredSwordLines.forEach((line, y) => {
       Array.from(line).forEach((char, x) => {
@@ -194,7 +229,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       });
     });
     return positions;
-  };
+  }, [centeredSwordLines]);
+  
+  // Callback-Funktionen für bessere Performance
+  const getSwordPositions = useCallback((): Array<SwordPosition> => {
+    return swordPositions;
+  }, [swordPositions]);
+  
+  const getEdgePositions = useCallback((): Array<EdgePosition> => {
+    return edgePositions;
+  }, [edgePositions]);
   
   // --- Initialisierung auf Client ---
   useEffect(() => {
@@ -210,6 +254,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     console.log(`[${timestamp}] [VEINS] Initial veins generated`);
     return () => {
       clearAllIntervals();
+      clearAllTimeouts();
       clearBackgroundCache();
     };
   }, [glitchLevel, isClient]);
@@ -239,145 +284,211 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // Audio-reaktive Glow-Effekte
   useEffect(() => {
-    if (beatDetected || energy > 0.2) { // Reduzierter Schwellenwert von 0.5 auf 0.2
+    if (throttledBeat || throttledEnergy > 0.2) { // Reduzierter Schwellenwert von 0.5 auf 0.2
       // Bestehende Glow-Logik bei Beat-Erkennung auslösen
       const randomIntensity = Math.random() * 0.7 + 0.3;
       setGlowIntensity(randomIntensity);
-      console.log(`[GLOW] Glow-Effekt ausgelöst mit Intensität ${randomIntensity.toFixed(2)}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
+      console.log(`[GLOW] Glow-Effekt ausgelöst mit Intensität ${randomIntensity.toFixed(2)}, Energy: ${throttledEnergy.toFixed(2)}, Beat: ${throttledBeat}`);
     }
-  }, [beatDetected, energy]);
+  }, [throttledBeat, throttledEnergy]);
   
   // Audio-reaktive Farb-Effekte
   useEffect(() => {
     // Bei Beat oder hoher Energie Farbwechsel auslösen
     // Erhöhte Reaktivität für Schwert und äußeren Ring
-    if ((energy > 0.30 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) {
-      // Konfiguration für Farbeffekte
-      const colorConfig: Partial<ColorEffectConfig> = {
-        baseIntensity: 0.6 + (energy * 0.4),
-        energyMultiplier: 2.0,
-        beatBoost: beatDetected ? 1.5 : 1.0,
-        pulseSpeed: 3 + (energy * 5),
-        colorShift: energy > 0.5,
-        hueShift: 0.3
-      };
-      
-      // Berechne dynamische Farben basierend auf Musik-Intensität
-      const { baseColor: newBaseColor, accentColor, edgeColor } = calculateDynamicColors(
-        getSwordPositions(),
-        energy,
-        beatDetected,
-        colorConfig
-      );
+    if ((throttledEnergy > 0.30 || throttledBeat) && Date.now() - lastColorChangeTime > colorStability) {
+      // Erzeuge eine harmonische Farbkombination
+      const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
       
       // Setze die neuen Farben
-      setBaseColor(newBaseColor);
-      setBgColor(accentColor);
+      setBaseColor(swordColor);
+      setBgColor(newBgColor);
       
       // Aktualisiere den Zeitstempel für den letzten Farbwechsel
       setLastColorChangeTime(Date.now());
       
       // Dynamische Farbstabilität basierend auf Energielevel
       // Bei hoher Energie schnellere Farbwechsel erlauben
-      const newStability = energy > 0.7 
-        ? Math.max(300, Math.floor(1000 - (energy * 800))) // Minimum 300ms bei hoher Energie
+      const newStability = throttledEnergy > 0.7 
+        ? Math.max(300, Math.floor(1000 - (throttledEnergy * 800))) // Minimum 300ms bei hoher Energie
         : Math.floor(1000 + Math.random() * 1500); // 1-2.5 Sekunden bei normaler Energie
       
       setColorStability(newStability);
       
-      console.log(`[${new Date().toLocaleTimeString()}] [COLOR_CHANGE] New color: ${newBaseColor}, BG: ${accentColor}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}, Stability: ${newStability}ms`);
+      console.log(`[${new Date().toLocaleTimeString()}] [COLOR_CHANGE] New color: ${swordColor}, BG: ${newBgColor}, Energy: ${throttledEnergy.toFixed(2)}, Beat: ${throttledBeat}, Stability: ${newStability}ms`);
     }
-  }, [beatDetected, energy, lastColorChangeTime, colorStability]);
+  }, [throttledBeat, throttledEnergy, lastColorChangeTime, colorStability]);
+  
+  // Animation-Frequenz-Schutz: Verhindert rekursive Beschleunigung
+  const lastAnimationTimestampRef = useRef<{[key: string]: number}>({
+    colorChange: 0,
+    tileEffect: 0,
+    edgeEffect: 0,
+    unicodeGlitch: 0,
+    backgroundUpdate: 0,
+    veinUpdate: 0
+  });
+  
+  // Hilfsfunktion zum Überprüfen der Animation-Frequenz
+  const checkAnimationFrequency = (type: string, minInterval: number): boolean => {
+    const now = Date.now();
+    const lastTimestamp = lastAnimationTimestampRef.current[type] || 0;
+    
+    // Wenn die letzte Animation zu kurz her ist, Animation überspringen
+    if (now - lastTimestamp < minInterval) {
+      return false;
+    }
+    
+    // Aktualisiere den Timestamp
+    lastAnimationTimestampRef.current[type] = now;
+    return true;
+  };
   
   // Audio-reaktive Tile-Effekte - Erhöhte Reaktivität für Schwert
   useEffect(() => {
-    // Niedrigerer Schwellenwert für bessere Reaktivität
-    if (beatDetected || energy > 0.15) {
-      // Konfiguration für Tile-Effekte
-      const tileConfig: Partial<TileEffectConfig> = {
-        minCount: Math.max(2, Math.floor(energy * 5)),
-        maxPercent: Math.min(0.5, 0.1 + energy * 0.4),
-        beatBoost: beatDetected ? 1.5 : 1.0,
-        energyCurve: 2.0,
-        waveForm: energy > 0.4 // Wellenform nur bei höherer Energie aktivieren
-      };
+    // Prüfe Animation-Frequenz (mindestens 100ms zwischen Animationen)
+    if (!checkAnimationFrequency('tileEffect', 100)) return;
+    
+    // Deutlich höherer Schwellenwert für niedrige Energie, damit bei Ruhe kaum Effekte auftreten
+    if (throttledBeat || throttledEnergy > 0.25) {
+      // Temporär erhöhte Farbeffekte - stärkere Reaktion auf Beats
+      const tempIntensity = { ...colorEffectIntensity };
+      for (const level in tempIntensity) {
+        if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
+          const numLevel = Number(level) as keyof typeof colorEffectIntensity;
+          // Stärkere Intensitätssteigerung bei Beats, sonst progressive Skalierung mit Energie
+          tempIntensity[numLevel] = Math.min(3, tempIntensity[numLevel] + Math.floor(throttledEnergy * (throttledBeat ? 3 : 2)));
+        }
+      }
       
-      // Generiere farbige Tiles basierend auf Musik-Intensität
-      setColoredTiles(generateColoredTiles(
-        getSwordPositions(),
-        energy,
-        beatDetected,
-        glitchLevel,
-        tileConfig
-      ));
+      setColoredTiles(generateColoredTiles(getSwordPositions(), glitchLevel, tempIntensity));
       
       // Längere Dauer für flüssigeren Übergang
       const timeout = setTimeout(() => {
-        setColoredTiles([]);
-      }, calculateGlitchDuration(energy, beatDetected));
+        setColoredTiles(generateColoredTiles(getSwordPositions(), glitchLevel, colorEffectIntensity));
+      }, throttledBeat ? 1000 : 800); // Längere Dauer bei Beat-Erkennung
       
       return () => clearTimeout(timeout);
+    } else if (throttledEnergy <= 0.15) {
+      // Bei sehr niedriger Energie: Setze auf minimale Effekte oder leere das Array
+      setColoredTiles([]);
     }
-  }, [beatDetected, energy, glitchLevel]);
-
-  // Audio-reaktive Glitch-Effekte - Erhöhte Reaktivität für Schwert
+  }, [throttledBeat, throttledEnergy, glitchLevel, colorEffectIntensity]);
+  
+  // Audio-reaktive Edge-Effekte - Erhöhte Reaktivität für Schwert
   useEffect(() => {
-    // Niedrigerer Schwellenwert für bessere Reaktivität
-    if (beatDetected || energy > 0.15) {
-      // Konfiguration für Glitch-Effekte
-      const glitchConfig: Partial<GlitchEffectConfig> = {
-        minCount: Math.max(1, Math.floor(energy * 3)),
-        maxPercent: Math.min(0.2, 0.05 + energy * 0.15),
-        beatBoost: beatDetected ? 2.0 : 1.0,
-        energyCurve: 1.5,
-        glitchIntensity: 1.0 + (glitchLevel * 0.3)
-      };
+    // Prüfe Animation-Frequenz (mindestens 120ms zwischen Animationen)
+    if (!checkAnimationFrequency('edgeEffect', 120)) return;
+    
+    // Höherer Schwellenwert für niedrige Energie
+    if (throttledBeat || throttledEnergy > 0.25) {
+      // Wenn keine Kanten vorhanden sind, nichts tun
+      const edgePositions = getEdgePositions();
+      if (edgePositions.length === 0) return;
       
-      // Generiere Glitch-Effekte basierend auf Musik-Intensität
-      setGlitchChars(generateGlitchChars(
-        getSwordPositions(),
-        energy,
-        beatDetected,
-        glitchLevel,
-        glitchConfig
-      ));
+      // Neue Edge-Effekte basierend auf chargeLevel
+      const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}> = [];
+      
+      // Intensität basierend auf chargeLevel
+      const vibrationChance = vibrationIntensity[chargeLevel as keyof typeof vibrationIntensity] || 0.2;
+      const glitchChance = glitchFrequency[chargeLevel as keyof typeof glitchFrequency] || 0.1;
+      const colorChance = colorEffectFrequency[chargeLevel as keyof typeof colorEffectFrequency] || 0.15;
+      
+      // Multiplier für Level 2 (erhöht die Chance um 50%)
+      const glitchMultiplier = chargeLevel === 2 ? 1.5 : 1;
+      
+      // Progressive Skalierung basierend auf der Energie
+      // Bei niedriger Energie kaum Effekte, bei hoher Energie deutlich mehr
+      const energyMultiplier = throttledEnergy < 0.3 ? 
+        throttledEnergy * 1.5 : // Niedrige Energie: lineare Skalierung
+        1 + (throttledEnergy * 2.0); // Hohe Energie: stärkere Skalierung
+        
+      const effectiveVibrationChance = Math.min(0.95, vibrationChance * energyMultiplier);
+      const effectiveGlitchChance = Math.min(0.95, glitchChance * glitchMultiplier * energyMultiplier);
+      const effectiveColorChance = Math.min(0.95, colorChance * energyMultiplier);
+      
+      // Begrenze die Anzahl der Effekte bei niedriger Energie
+      const maxEffects = throttledEnergy < 0.3 ? 
+        Math.max(1, Math.floor(edgePositions.length * 0.05)) : // Max 5% bei niedriger Energie
+        Math.floor(edgePositions.length * 0.4); // Max 40% bei hoher Energie
+      
+      // Durchlaufe alle Kantenpositionen
+      edgePositions.forEach((pos: EdgePosition) => {
+        // Wenn wir bereits die maximale Anzahl an Effekten haben, abbrechen
+        if (newEdgeEffects.length >= maxEffects) return;
+        
+        // Vibrations-Effekt (Verschiebung)
+        if (Math.random() < effectiveVibrationChance) {
+          const offsetX = Math.random() < 0.5 ? -1 : 1;
+          const offsetY = Math.random() < 0.5 ? -1 : 1;
+          
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            offset: { x: offsetX, y: offsetY }
+          });
+        }
+        
+        // Glitch-Effekt (Zeichenersetzung)
+        if (Math.random() < effectiveGlitchChance && newEdgeEffects.length < maxEffects) {
+          // Korrekte Typbehandlung für edgeGlitchChars
+          const glitchCharSet = Math.floor(Math.random() * edgeGlitchChars[1].length);
+          const glitchChar = edgeGlitchChars[1][glitchCharSet];
+          
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            char: glitchChar
+          });
+        }
+        
+        // Farb-Effekt
+        if (Math.random() < effectiveColorChance && newEdgeEffects.length < maxEffects) {
+          const colorIndex = Math.floor(Math.random() * accentColors.length);
+          const edgeColor = accentColors[colorIndex];
+          
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            color: edgeColor
+          });
+        }
+      });
+      
+      // Setze die neuen Edge-Effekte
+      setEdgeEffects(newEdgeEffects);
       
       // Längere Dauer bei höherer Energie für flüssigeren Effekt
-      const duration = calculateGlitchDuration(energy, beatDetected);
+      const duration = throttledBeat ? 150 : Math.max(100, Math.min(200, Math.floor(throttledEnergy * 200)));
       
-      // Zurücksetzen nach berechneter Zeit
+      // Zurücksetzen nach berechneter Zeit mit Cleanup
       const timeout = setTimeout(() => {
-        setGlitchChars([]);
+        setEdgeEffects([]);
       }, duration);
       
       return () => clearTimeout(timeout);
+    } else if (throttledEnergy <= 0.15) {
+      // Bei sehr niedriger Energie: Setze auf leeres Array
+      setEdgeEffects([]);
     }
-  }, [beatDetected, energy, glitchLevel]);
-
+  }, [throttledBeat, throttledEnergy, chargeLevel, vibrationIntensity, glitchFrequency, colorEffectFrequency, accentColors, edgeGlitchChars]);
+  
   // Audio-reaktive Unicode-Glitch-Effekte - Erhöhte Reaktivität für Schwert
   useEffect(() => {
-    // Niedrigerer Schwellenwert für bessere Reaktivität
-    if (beatDetected || energy > 0.20) {
-      // Konfiguration für Unicode-Glitch-Effekte
-      const glitchConfig: Partial<GlitchEffectConfig> = {
-        minCount: Math.max(1, Math.floor(energy * 2)),
-        maxPercent: Math.min(0.1, 0.02 + energy * 0.08),
-        beatBoost: beatDetected ? 2.0 : 1.0,
-        energyCurve: 1.5,
-        glitchIntensity: 1.0 + (glitchLevel * 0.3)
-      };
+    // Prüfe Animation-Frequenz (mindestens 150ms zwischen Animationen)
+    if (!checkAnimationFrequency('unicodeGlitch', 150)) return;
+    
+    // Höherer Schwellenwert für niedrige Energie
+    if (throttledBeat || throttledEnergy > 0.30) {
+      // Erhöhe temporär den Glitch-Level basierend auf Energie
+      // Bei niedriger Energie kaum Erhöhung, bei hoher Energie deutliche Erhöhung
+      const energyFactor = Math.min(2, throttledEnergy * 2.5);
+      const tempGlitchLevel = Math.min(3, Math.floor(glitchLevel + energyFactor));
       
-      // Generiere Unicode-Glitch-Effekte basierend auf Musik-Intensität
-      setUnicodeGlitches(generateUnicodeGlitches(
-        getSwordPositions(),
-        energy,
-        beatDetected,
-        glitchLevel,
-        glitchConfig
-      ));
+      setUnicodeGlitches(generateUnicodeGlitches(getSwordPositions(), tempGlitchLevel));
       
       // Längere Dauer bei höherer Energie für flüssigeren Effekt
-      const duration = calculateGlitchDuration(energy, beatDetected);
+      const duration = throttledBeat ? 200 : Math.max(160, Math.min(300, Math.floor(throttledEnergy * 250)));
       
       // Zurücksetzen nach berechneter Zeit
       const timeout = setTimeout(() => {
@@ -385,51 +496,121 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       }, duration);
       
       return () => clearTimeout(timeout);
+    } else if (throttledEnergy <= 0.15) {
+      // Bei sehr niedriger Energie: Setze auf leeres Array
+      setUnicodeGlitches([]);
     }
-  }, [beatDetected, energy, glitchLevel]);
+  }, [throttledBeat, throttledEnergy, glitchLevel]);
   
-  // --- Hintergrund-Musterwechsel bei Beat/Energie ---
+  // --- Hintergrund-Musterwechsel bei Beat/Energie (REDUZIERTE HÄUFIGKEIT) ---
   useEffect(() => {
     if (!isClient) return;
-    if ((beatDetected && Math.random() < 0.15) || energy > 0.75) {
+    
+    // Prüfe Animation-Frequenz (mindestens 2000ms zwischen Animationen)
+    if (!checkAnimationFrequency('backgroundUpdate', 2000)) return;
+    
+    // Reduzierte Häufigkeit: Nur bei Beat (5% Chance) oder sehr hoher Energie (>0.85)
+    if ((throttledBeat && Math.random() < 0.05) || throttledEnergy > 0.85) {
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       setCaveBackground(generateCaveBackground(bgWidth, bgHeight));
       setLastColorChangeTime(Date.now() + 10000);
-      console.log(`[${new Date().toLocaleTimeString()}] [BACKGROUND] Background updated, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
+      console.log(`[${new Date().toLocaleTimeString()}] [BACKGROUND] Background updated, Energy: ${throttledEnergy.toFixed(2)}, Beat: ${throttledBeat}`);
     }
-  }, [beatDetected, energy, isClient]);
+  }, [throttledBeat, throttledEnergy, isClient]);
   
-  // --- Veins bei Beat/Energie ---
+  // --- Veins bei Beat/Energie (ERHÖHTE ABHÄNGIGKEIT VON MUSIKINTENSITÄT) ---
   useEffect(() => {
     if (!isClient) return;
-    if ((beatDetected && Math.random() < 0.3) || energy > 0.45) {
+    
+    // Prüfe Animation-Frequenz (mindestens 1000ms zwischen Animationen)
+    if (!checkAnimationFrequency('veinUpdate', 1000)) return;
+    
+    if ((throttledBeat && Math.random() < 0.3) || throttledEnergy > 0.45) {
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      const numVeins = Math.floor(10 + energy * 20);
+      // Erhöhte Abhängigkeit von Musikintensität: Basis + Energie-basierte Skalierung
+      const baseVeins = 15; // Erhöhte Basis-Anzahl
+      const energyMultiplier = 1 + (throttledEnergy * 3); // 1x bis 4x bei hoher Energie
+      const beatMultiplier = throttledBeat ? 1.5 : 1; // 50% mehr bei Beat
+      const glitchMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
+      
+      const numVeins = Math.floor(baseVeins * energyMultiplier * beatMultiplier * glitchMultiplier);
       setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins));
-      console.log(`[${new Date().toLocaleTimeString()}] [VEINS] Veins updated: ${numVeins}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
+      console.log(`[${new Date().toLocaleTimeString()}] [VEINS] Veins updated: ${numVeins}, Energy: ${throttledEnergy.toFixed(2)}, Beat: ${throttledBeat}, EnergyMultiplier: ${energyMultiplier.toFixed(2)}`);
     }
-  }, [beatDetected, energy, isClient]);
+  }, [throttledBeat, throttledEnergy, glitchLevel, isClient]);
   
-  // Berechne Schatten basierend auf Glow-Intensität
-  const shadowSize = Math.floor(glowIntensity * 20);
-  const textShadow = `0 0 ${shadowSize + (glitchLevel * 2)}px ${baseColor}`;
+  // Memoisierte Berechnungen für bessere Performance
+  const shadowSize = useMemo(() => Math.floor(glowIntensity * 20), [glowIntensity]);
+  const textShadow = useMemo(() => `0 0 ${shadowSize + (glitchLevel * 2)}px ${baseColor}`, [shadowSize, glitchLevel, baseColor]);
   
-  // Hintergrundfarbe (dunklere Version der Komplementärfarbe)
-  const backgroundColor = getDarkerColor(bgColor);
-  // Hellere Version der Komplementärfarbe für den Höhlenhintergrund
-  const lighterBgColor = getLighterColor(bgColor);
+  // Hintergrundfarben memoisieren
+  const backgroundColor = useMemo(() => getDarkerColor(bgColor), [bgColor]);
+  const lighterBgColor = useMemo(() => getLighterColor(bgColor), [bgColor]);
 
   // Hintergrund-Dimensionen berechnen
-  const { width: bgWidth, height: bgHeight } = useMemo(() => isClient ? getBackgroundDimensions() : { width: 0, height: 0 }, [glitchLevel, isClient]);
+  const { width: bgWidth, height: bgHeight } = useMemo(() => isClient ? getBackgroundDimensions() : { width: 0, height: 0 }, [isClient]);
 
-  // Memoisiere caveBackground und coloredVeins
-  // const caveBackground = useMemo(() => isClient && bgWidth && bgHeight ? generateCaveBackground(bgWidth, bgHeight) : [], [bgWidth, bgHeight, glitchLevel, isClient]);
-  // const coloredVeins = useMemo(() => {
-  //   if (!isClient || !bgWidth || !bgHeight) return [];
-  //   const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
-  //   const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
-  //   return generateColoredVeins(bgWidth, bgHeight, numVeins);
-  // }, [bgWidth, bgHeight, glitchLevel, isClient]);
+  // Optimierte Maps für schnelle Lookups (O(1) statt O(n))
+  const veinMap = useMemo(() => {
+    const map = new Map<string, {x: number, y: number, color: string}>();
+    coloredVeins.forEach(vein => {
+      map.set(`${vein.x},${vein.y}`, vein);
+    });
+    return map;
+  }, [coloredVeins]);
+  
+  const skewMap = useMemo(() => {
+    const map = new Map<string, {x: number, y: number, angle: number}>();
+    skewedChars.forEach(skew => {
+      map.set(`${skew.x},${skew.y}`, skew);
+    });
+    return map;
+  }, [skewedChars]);
+  
+  const fadeMap = useMemo(() => {
+    const map = new Map<string, {x: number, y: number, opacity: number}>();
+    fadedChars.forEach(fade => {
+      map.set(`${fade.x},${fade.y}`, fade);
+    });
+    return map;
+  }, [fadedChars]);
+  
+  // Maps für Schwert-Effekte
+  const glitchMap = useMemo(() => {
+    const map = new Map<string, {x: number, y: number, char: string}>();
+    glitchChars.forEach(glitch => {
+      map.set(`${glitch.x},${glitch.y}`, glitch);
+    });
+    return map;
+  }, [glitchChars]);
+  
+  const unicodeGlitchMap = useMemo(() => {
+    const map = new Map<string, {x: number, y: number, char: string}>();
+    unicodeGlitches.forEach(glitch => {
+      map.set(`${glitch.x},${glitch.y}`, glitch);
+    });
+    return map;
+  }, [unicodeGlitches]);
+  
+  const coloredTileMap = useMemo(() => {
+    const map = new Map<string, {x: number, y: number, color: string}>();
+    coloredTiles.forEach(tile => {
+      map.set(`${tile.x},${tile.y}`, tile);
+    });
+    return map;
+  }, [coloredTiles]);
+  
+  const edgeEffectMap = useMemo(() => {
+    const map = new Map<string, {x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}>();
+    edgeEffects.forEach(effect => {
+      map.set(`${effect.x},${effect.y}`, effect);
+    });
+    return map;
+  }, [edgeEffects]);
+  
+  const blurredCharSet = useMemo(() => {
+    return new Set(blurredChars.map(c => `${c.x},${c.y}`));
+  }, [blurredChars]);
 
   if (!isClient) {
     // Optional: Lade- oder Platzhalteranzeige
@@ -485,8 +666,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             {caveBackground.map((row, y) => (
               <div key={y} style={{ lineHeight: '0.9', width: '100%', textAlign: 'center' }}>
                 {row.map((char, x) => {
-                  // Prüfe, ob an dieser Position eine farbige Ader ist
-                  const vein = coloredVeins.find(v => v.x === x && v.y === y);
+                  // Optimierte Lookups mit Maps (O(1) statt O(n))
+                  const key = `${x},${y}`;
+                  const vein = veinMap.get(key);
+                  const skewEffect = skewMap.get(key);
+                  const fadeEffect = fadeMap.get(key);
                   
                   // Stil für dieses Zeichen
                   const style: React.CSSProperties = vein ? {
@@ -501,13 +685,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                   };
                   
                   // Prüfe, ob dieses Zeichen verzerrt werden soll
-                  const skewEffect = skewedChars.find(c => c.x === x && c.y === y);
                   if (skewEffect) {
                     style.transform = `${style.transform || ''} skewX(${skewEffect.angle}deg)`.trim();
                   }
                   
                   // Prüfe, ob dieses Zeichen verblasst werden soll
-                  const fadeEffect = fadedChars.find(c => c.x === x && c.y === y);
                   if (fadeEffect) {
                     style.opacity = String(fadeEffect.opacity);
                   }
@@ -553,17 +735,13 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             width: '100%'
           }}>
             {Array.from(line).map((char, x) => {
-              // Finde Glitch-Effekt an dieser Position
-              const glitch = glitchChars.find(g => g.x === x && g.y === y);
-              
-              // Finde Unicode-Glitch an dieser Position
-              const unicodeGlitch = unicodeGlitches.find(g => g.x === x && g.y === y);
-              
-              // Finde farbiges Tile an dieser Position
-              const coloredTile = coloredTiles.find(t => t.x === x && t.y === y);
-              
-              // Finde Edge-Effekt an dieser Position
-              const edgeEffect = edgeEffects.find(e => e.x === x && e.y === y);
+              // Optimierte Lookups mit Maps (O(1) statt O(n))
+              const key = `${x},${y}`;
+              const glitch = glitchMap.get(key);
+              const unicodeGlitch = unicodeGlitchMap.get(key);
+              const coloredTile = coloredTileMap.get(key);
+              const edgeEffect = edgeEffectMap.get(key);
+              const isBlurred = blurredCharSet.has(key);
               
               // Prüfe, ob dieses Zeichen eine dünne Linie ist und nicht im Griff-Bereich
               const isEdge = isEdgeChar(char) && !isHandlePosition(x, y, centeredSwordLines);
@@ -593,7 +771,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               }
               
               // Prüfe, ob dieses Zeichen in der Liste der verschwommenen Zeichen ist
-              const isBlurred = blurredChars.some(c => c.x === x && c.y === y);
               if (isBlurred) {
                 style.filter = `${style.filter || ''} blur(1px)`.trim();
               }

@@ -2,240 +2,230 @@
  * glitchEffects.ts
  * 
  * Funktionen zur Generierung von Glitch-Effekten für die ASCII-Schwert-Komponente
- * Überarbeitet für bessere Musik-Reaktivität und dynamische Skalierung
  */
-import { edgeGlitchChars, unicodeGlitchChars } from '../constants/swordConstants';
-import { SwordPosition } from '../types/swordTypes';
-
-// Konfiguration für Glitch-Effekte (kann vom Modal überschrieben werden)
-export interface GlitchEffectConfig {
-  minCount: number;           // Minimale Anzahl Glitches bei niedriger Energie
-  maxPercent: number;         // Maximaler Prozentsatz der Positionen (0-1)
-  energyCurve: number;        // Wie stark die Energie den Anstieg beeinflusst (1=linear, >1=exponentiell)
-  beatBoost: number;          // Multiplikator für die Anzahl bei Beat
-  duration: {
-    min: number;              // Minimale Dauer in ms
-    max: number;              // Maximale Dauer in ms
-    energyMultiplier: number; // Wie stark die Energie die Dauer beeinflusst
-  };
-  glitchIntensity: number;    // Allgemeiner Intensitäts-Multiplikator (0-2)
-}
-
-// Standard-Konfiguration
-export const defaultGlitchConfig: GlitchEffectConfig = {
-  minCount: 1,
-  maxPercent: 0.2,
-  energyCurve: 1.5,
-  beatBoost: 2.0,
-  duration: {
-    min: 80,
-    max: 250,
-    energyMultiplier: 1.5
-  },
-  glitchIntensity: 1.0
-};
+import { edgeGlitchChars, unicodeGlitchChars, accentColors } from '../constants/swordConstants';
+import { getRandomOffset } from '../utils/swordUtils';
 
 /**
- * Generiert DOS-Style Glitch-Effekte basierend auf Musik-Intensität
- * @param positions Array von Schwertpositionen
- * @param energy Aktuelle Audio-Energie (0-1)
- * @param beatDetected Ob ein Beat erkannt wurde
- * @param glitchLevel Aktuelles Glitch-Level (0-3)
- * @param config Optionale Konfiguration für Glitch-Effekte
- * @returns Array von Glitch-Positionen mit Zeichen
+ * Generiert Glitch-Effekte für die Kanten des Schwerts
+ * @param edgePositions Positionen der Kanten
+ * @param glitchLevel Glitch-Level (0-3)
+ * @returns Array mit Glitch-Effekten für die Kanten
  */
-export function generateGlitchChars(
-  positions: Array<SwordPosition>,
-  energy: number,
-  beatDetected: boolean,
-  glitchLevel: number,
-  config: Partial<GlitchEffectConfig> = {}
-): Array<{x: number, y: number, char: string}> {
-  // Kombiniere Standard-Konfiguration mit übergebenen Werten
-  const effectiveConfig: GlitchEffectConfig = {
-    ...defaultGlitchConfig,
-    ...config,
-    duration: {
-      ...defaultGlitchConfig.duration,
-      ...(config.duration || {})
+export function generateEdgeGlitches(
+  edgePositions: Array<{x: number, y: number, char: string}>,
+  glitchLevel: number
+): Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}> {
+  const edgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}> = [];
+  
+  // Wenn kein Glitch-Level, keine Effekte
+  if (glitchLevel === 0) return [];
+  
+  // Wähle zufällige Kanten für Glitch-Effekte aus
+  const numGlitches = Math.floor(edgePositions.length * (0.05 + (glitchLevel * 0.05)));
+  
+  for (let i = 0; i < numGlitches; i++) {
+    if (edgePositions.length === 0) continue;
+    
+    // Wähle eine zufällige Kante
+    const randomIndex = Math.floor(Math.random() * edgePositions.length);
+    const edgePos = edgePositions[randomIndex];
+    
+    // Bestimme den Effekt-Typ (Zeichen, Farbe, Position)
+    const effectType = Math.floor(Math.random() * 3); // 0: Zeichen, 1: Farbe, 2: Position
+    
+    let effect: {x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}} = {
+      x: edgePos.x,
+      y: edgePos.y
+    };
+    
+    switch (effectType) {
+      case 0: // Zeichen-Glitch
+        {
+          // Wähle ein zufälliges Glitch-Zeichen
+          const glitchChars = edgeGlitchChars[glitchLevel as keyof typeof edgeGlitchChars] || edgeGlitchChars[1];
+          const randomChar = glitchChars[Math.floor(Math.random() * glitchChars.length)];
+          effect.char = randomChar;
+        }
+        break;
+        
+      case 1: // Farb-Glitch
+        {
+          // Wähle eine zufällige Akzentfarbe
+          const randomColor = accentColors[Math.floor(Math.random() * accentColors.length)];
+          effect.color = randomColor;
+        }
+        break;
+        
+      case 2: // Positions-Glitch
+        {
+          // Berechne einen zufälligen Offset basierend auf dem Glitch-Level
+          const intensity = 0.2 + (glitchLevel * 0.2); // 0.2-0.8
+          effect.offset = getRandomOffset(intensity);
+        }
+        break;
     }
-  };
-  
-  // Leeres Array für Glitch-Effekte
-  const glitchChars: Array<{x: number, y: number, char: string}> = [];
-  
-  // Wenn keine Positionen vorhanden sind, früh zurückkehren
-  if (!positions.length) return glitchChars;
-  
-  // ===== BERECHNUNG DER ANZAHL DER GLITCHES =====
-  
-  // Berechne den Energie-Faktor mit exponentieller Kurve für natürlichere Skalierung
-  const energyFactor = Math.pow(energy, effectiveConfig.energyCurve);
-  
-  // Berechne die Basis-Anzahl der Glitches basierend auf Energie
-  // Bei niedriger Energie: minCount, bei hoher Energie: bis zu maxPercent der Gesamtpositionen
-  const minGlitches = effectiveConfig.minCount;
-  const maxGlitches = Math.floor(positions.length * effectiveConfig.maxPercent);
-  let numGlitches = Math.floor(minGlitches + (maxGlitches - minGlitches) * energyFactor);
-  
-  // Boost bei Beat-Erkennung
-  if (beatDetected) {
-    numGlitches = Math.min(maxGlitches, Math.floor(numGlitches * effectiveConfig.beatBoost));
+    
+    edgeEffects.push(effect);
   }
   
-  // Zusätzlicher Boost bei höherem Glitch-Level
-  numGlitches += Math.floor(glitchLevel * positions.length * 0.03);
-  
-  // Globaler Intensitäts-Multiplikator
-  numGlitches = Math.floor(numGlitches * effectiveConfig.glitchIntensity);
-  
-  // Stelle sicher, dass die Anzahl im gültigen Bereich liegt
-  numGlitches = Math.max(minGlitches, Math.min(numGlitches, maxGlitches));
-  
-  // ===== AUSWAHL DER POSITIONEN =====
-  
-  // Wähle zufällige Positionen aus
-  const selectedPositions = [...positions]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, numGlitches);
-  
-  // Wähle für jede Position ein Glitch-Zeichen aus
-  selectedPositions.forEach(pos => {
-    // Wähle zufälliges Glitch-Zeichen basierend auf Energie und Glitch-Level
-    // Höhere Energie und Glitch-Level = komplexere Glitches
-    const glitchIndex = Math.min(3, Math.max(1, Math.floor(energy * 3))) as 1 | 2 | 3;
-    const charSet = edgeGlitchChars[glitchIndex];
-    const char = charSet[Math.floor(Math.random() * charSet.length)];
-    
-    // Füge Glitch hinzu
-    glitchChars.push({
-      x: pos.x,
-      y: pos.y,
-      char
-    });
-  });
-  
-  return glitchChars;
+  return edgeEffects;
 }
 
 /**
- * Generiert Unicode-Glitch-Effekte basierend auf Musik-Intensität
- * @param positions Array von Schwertpositionen
- * @param energy Aktuelle Audio-Energie (0-1)
- * @param beatDetected Ob ein Beat erkannt wurde
- * @param glitchLevel Aktuelles Glitch-Level (0-3)
- * @param config Optionale Konfiguration für Glitch-Effekte
- * @returns Array von Unicode-Glitch-Positionen mit Zeichen
+ * Generiert Unicode-Glitches für das Schwert
+ * @param swordPositions Positionen des Schwerts
+ * @param glitchLevel Glitch-Level (0-3)
+ * @returns Array mit Unicode-Glitches
  */
 export function generateUnicodeGlitches(
-  positions: Array<SwordPosition>,
-  energy: number,
-  beatDetected: boolean,
-  glitchLevel: number,
-  config: Partial<GlitchEffectConfig> = {}
+  swordPositions: Array<{x: number, y: number}>,
+  glitchLevel: number
 ): Array<{x: number, y: number, char: string}> {
-  // Kombiniere Standard-Konfiguration mit übergebenen Werten
-  const effectiveConfig: GlitchEffectConfig = {
-    ...defaultGlitchConfig,
-    ...config,
-    duration: {
-      ...defaultGlitchConfig.duration,
-      ...(config.duration || {})
-    }
-  };
+  const glitches: Array<{x: number, y: number, char: string}> = [];
   
-  // Leeres Array für Unicode-Glitches
-  const unicodeGlitches: Array<{x: number, y: number, char: string}> = [];
+  // Wenn kein Glitch-Level, keine Glitches
+  if (glitchLevel === 0) return [];
   
-  // Wenn keine Positionen vorhanden sind, früh zurückkehren
-  if (!positions.length) return unicodeGlitches;
+  // Anzahl der Glitches basierend auf dem Glitch-Level
+  // Stark reduzierte Werte für niedrige Glitch-Level
+  // Deutlich progressivere Skalierung für höhere Level
+  let glitchPercentage = 0;
   
-  // ===== BERECHNUNG DER ANZAHL DER UNICODE-GLITCHES =====
-  
-  // Berechne den Energie-Faktor mit exponentieller Kurve für natürlichere Skalierung
-  const energyFactor = Math.pow(energy, effectiveConfig.energyCurve);
-  
-  // Berechne die Basis-Anzahl der Unicode-Glitches basierend auf Energie
-  // Bei niedriger Energie: minCount, bei hoher Energie: bis zu maxPercent der Gesamtpositionen
-  const minGlitches = effectiveConfig.minCount;
-  const maxGlitches = Math.floor(positions.length * effectiveConfig.maxPercent * 0.5); // Unicode-Glitches sind auffälliger, daher weniger
-  let numGlitches = Math.floor(minGlitches + (maxGlitches - minGlitches) * energyFactor);
-  
-  // Boost bei Beat-Erkennung
-  if (beatDetected) {
-    numGlitches = Math.min(maxGlitches, Math.floor(numGlitches * effectiveConfig.beatBoost));
+  switch (glitchLevel) {
+    case 1: // Sehr wenige Glitches bei niedrigem Level
+      glitchPercentage = 0.002; // 0.2% der Schwertpositionen
+      break;
+    case 2: // Moderate Anzahl bei mittlerem Level
+      glitchPercentage = 0.01; // 1% der Schwertpositionen
+      break;
+    case 3: // Deutlich mehr bei hohem Level
+      glitchPercentage = 0.03; // 3% der Schwertpositionen
+      break;
+    default:
+      glitchPercentage = 0.001; // Fallback
   }
   
-  // Zusätzlicher Boost bei höherem Glitch-Level
-  numGlitches += Math.floor(glitchLevel * 3);
+  const numGlitches = Math.max(1, Math.floor(swordPositions.length * glitchPercentage));
   
-  // Globaler Intensitäts-Multiplikator
-  numGlitches = Math.floor(numGlitches * effectiveConfig.glitchIntensity);
-  
-  // Stelle sicher, dass die Anzahl im gültigen Bereich liegt
-  numGlitches = Math.max(minGlitches, Math.min(numGlitches, maxGlitches));
-  
-  // ===== AUSWAHL DER POSITIONEN =====
-  
-  // Wähle zufällige Positionen aus
-  const selectedPositions = [...positions]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, numGlitches);
-  
-  // Wähle für jede Position ein Unicode-Glitch-Zeichen aus
-  selectedPositions.forEach(pos => {
-    // Wähle zufälliges Unicode-Glitch-Zeichen basierend auf Energie und Glitch-Level
-    // Höhere Energie und Glitch-Level = komplexere Unicode-Glitches
-    const unicodeLevel = Math.min(3, Math.max(1, Math.floor(glitchLevel + (energy * 2)))) as 1 | 2 | 3;
+  // Wähle zufällige Positionen für Glitches
+  for (let i = 0; i < numGlitches; i++) {
+    if (swordPositions.length === 0) continue;
     
-    const charSet = unicodeGlitchChars[unicodeLevel];
-    const charIndex = Math.floor(Math.random() * charSet.length);
-    const char = charSet[charIndex];
+    // Wähle eine zufällige Position
+    const randomIndex = Math.floor(Math.random() * swordPositions.length);
+    const pos = swordPositions[randomIndex];
     
-    // Füge Unicode-Glitch hinzu
-    unicodeGlitches.push({
+    // Wähle ein zufälliges Unicode-Glitch-Zeichen
+    const chars = unicodeGlitchChars[glitchLevel as keyof typeof unicodeGlitchChars] || unicodeGlitchChars[1];
+    const randomChar = chars[Math.floor(Math.random() * chars.length)];
+    
+    glitches.push({
       x: pos.x,
       y: pos.y,
-      char
+      char: randomChar
     });
-  });
+  }
   
-  return unicodeGlitches;
+  return glitches;
 }
 
 /**
- * Berechnet die optimale Dauer für Glitch-Effekte basierend auf Energie und Beat
- * @param energy Aktuelle Audio-Energie (0-1)
- * @param beatDetected Ob ein Beat erkannt wurde
- * @param config Optionale Konfiguration für Glitch-Effekte
- * @returns Dauer in Millisekunden
+ * Generiert verschwommene Zeichen für das Schwert
+ * @param swordPositions Positionen des Schwerts
+ * @param glitchLevel Glitch-Level (0-3)
+ * @returns Array mit verschwommenen Zeichen
  */
-export function calculateGlitchDuration(
-  energy: number,
-  beatDetected: boolean,
-  config: Partial<GlitchEffectConfig> = {}
-): number {
-  // Kombiniere Standard-Konfiguration mit übergebenen Werten
-  const effectiveConfig: GlitchEffectConfig = {
-    ...defaultGlitchConfig,
-    ...config,
-    duration: {
-      ...defaultGlitchConfig.duration,
-      ...(config.duration || {})
-    }
-  };
+export function generateBlurredChars(
+  swordPositions: Array<{x: number, y: number}>,
+  glitchLevel: number
+): Array<{x: number, y: number}> {
+  // Wenn Glitch-Level unter 1, keine verschwommenen Zeichen
+  if (glitchLevel < 1) return [];
   
-  // Berechne Dauer basierend auf Energie
-  const minDuration = effectiveConfig.duration.min;
-  const maxDuration = effectiveConfig.duration.max;
-  const energyBoost = energy * effectiveConfig.duration.energyMultiplier;
-  let duration = minDuration + (maxDuration - minDuration) * energyBoost;
+  const blurredChars: Array<{x: number, y: number}> = [];
   
-  // Boost bei Beat-Erkennung
-  if (beatDetected) {
-    duration *= 1.2;
+  // Anzahl der verschwommenen Zeichen basierend auf dem Glitch-Level
+  const numBlurred = Math.floor(swordPositions.length * (glitchLevel * 0.01)); // 1-3% der Schwertpositionen
+  
+  // Wähle zufällige Positionen für verschwommene Zeichen
+  for (let i = 0; i < numBlurred; i++) {
+    if (swordPositions.length === 0) continue;
+    
+    // Wähle eine zufällige Position
+    const randomIndex = Math.floor(Math.random() * swordPositions.length);
+    blurredChars.push(swordPositions[randomIndex]);
   }
   
-  // Stelle sicher, dass die Dauer im gültigen Bereich liegt
-  return Math.max(minDuration, Math.min(Math.floor(duration), maxDuration));
+  return blurredChars;
+}
+
+/**
+ * Generiert verzerrte Zeichen für das Schwert
+ * @param swordPositions Positionen des Schwerts
+ * @param glitchLevel Glitch-Level (0-3)
+ * @returns Array mit verzerrten Zeichen
+ */
+export function generateSkewedChars(
+  swordPositions: Array<{x: number, y: number}>,
+  glitchLevel: number
+): Array<{x: number, y: number, angle: number}> {
+  // Wenn Glitch-Level unter 2, keine verzerrten Zeichen
+  if (glitchLevel < 2) return [];
+  
+  const skewedChars: Array<{x: number, y: number, angle: number}> = [];
+  
+  // Anzahl der verzerrten Zeichen basierend auf dem Glitch-Level
+  const numSkewed = Math.floor(swordPositions.length * (glitchLevel * 0.005)); // 0.5-1.5% der Schwertpositionen
+  
+  // Wähle zufällige Positionen für verzerrte Zeichen
+  for (let i = 0; i < numSkewed; i++) {
+    if (swordPositions.length === 0) continue;
+    
+    // Wähle eine zufällige Position
+    const randomIndex = Math.floor(Math.random() * swordPositions.length);
+    const angle = (Math.random() * 10) - 5; // -5 bis +5 Grad
+    
+    skewedChars.push({
+      ...swordPositions[randomIndex],
+      angle
+    });
+  }
+  
+  return skewedChars;
+}
+
+/**
+ * Generiert verblasste Zeichen für das Schwert
+ * @param swordPositions Positionen des Schwerts
+ * @param glitchLevel Glitch-Level (0-3)
+ * @returns Array mit verblassten Zeichen
+ */
+export function generateFadedChars(
+  swordPositions: Array<{x: number, y: number}>,
+  glitchLevel: number
+): Array<{x: number, y: number, opacity: number}> {
+  // Wenn Glitch-Level unter 3, keine verblassten Zeichen
+  if (glitchLevel < 3) return [];
+  
+  const fadedChars: Array<{x: number, y: number, opacity: number}> = [];
+  
+  // Anzahl der verblassten Zeichen basierend auf dem Glitch-Level
+  const numFaded = Math.floor(swordPositions.length * (glitchLevel * 0.003)); // 0.9% der Schwertpositionen bei Level 3
+  
+  // Wähle zufällige Positionen für verblasste Zeichen
+  for (let i = 0; i < numFaded; i++) {
+    if (swordPositions.length === 0) continue;
+    
+    // Wähle eine zufällige Position
+    const randomIndex = Math.floor(Math.random() * swordPositions.length);
+    const opacity = 0.7 + (Math.random() * 0.3); // 0.7-1.0
+    
+    fadedChars.push({
+      ...swordPositions[randomIndex],
+      opacity
+    });
+  }
+  
+  return fadedChars;
 } 

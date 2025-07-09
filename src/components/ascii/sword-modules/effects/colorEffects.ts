@@ -2,348 +2,267 @@
  * colorEffects.ts
  * 
  * Funktionen zur Generierung von Farbeffekten für die ASCII-Schwert-Komponente
- * Überarbeitet für bessere Musik-Reaktivität und dynamische Skalierung
  */
 import { baseColors, accentColors } from '../constants/swordConstants';
+import { getComplementaryColor, generateCluster } from '../utils/swordUtils';
 import { SwordPosition } from '../types/swordTypes';
 
-// Konfiguration für Farbeffekte (kann vom Modal überschrieben werden)
-export interface ColorEffectConfig {
-  baseIntensity: number;      // Basis-Intensität der Farben (0-1)
-  energyMultiplier: number;   // Wie stark die Energie die Intensität beeinflusst
-  beatBoost: number;          // Multiplikator für die Intensität bei Beat
-  pulseSpeed: number;         // Geschwindigkeit der Farbpulsation (1-10)
-  colorShift: boolean;        // Ob Farben bei höherer Energie wechseln sollen
-  hueShift: number;           // Stärke der Farbverschiebung (0-1)
-}
-
-// Standard-Konfiguration
-export const defaultColorConfig: ColorEffectConfig = {
-  baseIntensity: 0.6,
-  energyMultiplier: 2.0,
-  beatBoost: 1.5,
-  pulseSpeed: 3,
-  colorShift: true,
-  hueShift: 0.3
-};
-
 /**
- * Berechnet eine pulsierende Farbe basierend auf der Basis-Farbe und Audio-Energie
- * @param baseColor Basis-Farbe als Hex-String
- * @param energy Aktuelle Audio-Energie (0-1)
- * @param beatDetected Ob ein Beat erkannt wurde
- * @param config Optionale Konfiguration für Farbeffekte
- * @returns Neue Farbe als Hex-String
+ * Generiert ein harmonisches Farbpaar für Schwert und Hintergrund
+ * @returns Objekt mit Schwert- und Hintergrundfarbe
  */
-export function calculatePulsingColor(
-  baseColor: string,
-  energy: number,
-  beatDetected: boolean,
-  config: Partial<ColorEffectConfig> = {}
-): string {
-  // Kombiniere Standard-Konfiguration mit übergebenen Werten
-  const effectiveConfig: ColorEffectConfig = {
-    ...defaultColorConfig,
-    ...config
-  };
+export function generateHarmonicColorPair(): { swordColor: string, bgColor: string } {
+  // Wähle eine zufällige Basisfarbe für das Schwert
+  const swordColor = baseColors[Math.floor(Math.random() * baseColors.length)];
   
-  // Konvertiere Hex zu RGB
-  const r = parseInt(baseColor.slice(1, 3), 16);
-  const g = parseInt(baseColor.slice(3, 5), 16);
-  const b = parseInt(baseColor.slice(5, 7), 16);
+  // Wähle eine Strategie für die Hintergrundfarbe
+  const strategy = Math.floor(Math.random() * 4); // 0-3
+  let bgColor = '';
   
-  // Berechne Intensitäts-Faktor basierend auf Energie und Beat
-  let intensity = effectiveConfig.baseIntensity + (energy * effectiveConfig.energyMultiplier);
-  
-  // Boost bei Beat-Erkennung
-  if (beatDetected) {
-    intensity *= effectiveConfig.beatBoost;
+  switch (strategy) {
+    case 0: // Komplementärfarbe
+      bgColor = getComplementaryColor(swordColor);
+      break;
+      
+    case 1: // Leicht verschobene Farbe (ähnlich, aber anders)
+      {
+        // Konvertiere Hex zu RGB
+        const hex = swordColor.slice(1); // Entferne #
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        
+        // Verschiebe die Farbe um einen zufälligen Betrag
+        const newR = Math.min(255, Math.max(0, r + (Math.random() * 100) - 50));
+        const newG = Math.min(255, Math.max(0, g + (Math.random() * 100) - 50));
+        const newB = Math.min(255, Math.max(0, b + (Math.random() * 100) - 50));
+        
+        // Konvertiere zurück zu Hex
+        bgColor = `#${Math.floor(newR).toString(16).padStart(2, '0')}${Math.floor(newG).toString(16).padStart(2, '0')}${Math.floor(newB).toString(16).padStart(2, '0')}`;
+      }
+      break;
+      
+    case 2: // Verschobener Farbton (gleiche Sättigung und Helligkeit)
+      {
+        // Konvertiere Hex zu HSL
+        const hex = swordColor.slice(1); // Entferne #
+        const r = parseInt(hex.slice(0, 2), 16) / 255;
+        const g = parseInt(hex.slice(2, 4), 16) / 255;
+        const b = parseInt(hex.slice(4, 6), 16) / 255;
+        
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        let h = 0;
+        let s = 0;
+        const l = (max + min) / 2;
+        
+        if (max !== min) {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          
+          switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+          }
+          
+          h /= 6;
+        }
+        
+        // Verschiebe den Farbton um 90-180 Grad
+        const hueShift = 90 + Math.floor(Math.random() * 90); // 90-180 Grad
+        let newH = (h * 360 + hueShift) % 360;
+        
+        // Konvertiere zurück zu RGB
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        
+        const hue2rgb = (p: number, q: number, t: number) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        
+        const newR = Math.round(hue2rgb(p, q, (newH / 360 + 1/3) % 1) * 255);
+        const newG = Math.round(hue2rgb(p, q, (newH / 360) % 1) * 255);
+        const newB = Math.round(hue2rgb(p, q, (newH / 360 - 1/3) % 1) * 255);
+        
+        bgColor = `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+      }
+      break;
+      
+    case 3: // Zufällige Akzentfarbe, die gut zum Schwert passt
+    default:
+      {
+        // Filtere Akzentfarben, die gut zur Schwertfarbe passen
+        const swordColorHex = swordColor.slice(1); // Entferne #
+        const swordR = parseInt(swordColorHex.slice(0, 2), 16);
+        const swordG = parseInt(swordColorHex.slice(2, 4), 16);
+        const swordB = parseInt(swordColorHex.slice(4, 6), 16);
+        
+        // Wähle Farben, die einen gewissen Kontrast haben
+        const compatibleColors = accentColors.filter(color => {
+          const colorHex = color.slice(1); // Entferne #
+          const r = parseInt(colorHex.slice(0, 2), 16);
+          const g = parseInt(colorHex.slice(2, 4), 16);
+          const b = parseInt(colorHex.slice(4, 6), 16);
+          
+          // Berechne Farbdifferenz (vereinfacht)
+          const diff = Math.abs(r - swordR) + Math.abs(g - swordG) + Math.abs(b - swordB);
+          return diff > 150; // Mindestens eine gewisse Differenz
+        });
+        
+        if (compatibleColors.length > 0) {
+          bgColor = compatibleColors[Math.floor(Math.random() * compatibleColors.length)];
+        } else {
+          // Fallback auf Komplementärfarbe
+          bgColor = getComplementaryColor(swordColor);
+        }
+      }
+      break;
   }
   
-  // Pulsation basierend auf Zeit
-  const pulseFrequency = effectiveConfig.pulseSpeed * 0.1;
-  const pulseFactor = Math.sin(Date.now() * pulseFrequency * 0.001) * 0.2 + 0.8;
-  
-  // Kombiniere alle Faktoren
-  intensity = Math.min(1.5, intensity * pulseFactor); // Cap bei 1.5 (150%)
-  
-  // Berechne neue RGB-Werte
-  let newR = Math.min(255, Math.floor(r * intensity));
-  let newG = Math.min(255, Math.floor(g * intensity));
-  let newB = Math.min(255, Math.floor(b * intensity));
-  
-  // Farbverschiebung bei höherer Energie, wenn aktiviert
-  if (effectiveConfig.colorShift && energy > 0.6) {
-    // Verschiebe Farben basierend auf Energie und Beat
-    const hueShift = effectiveConfig.hueShift * energy * (beatDetected ? 2 : 1);
-    
-    // RGB zu HSL konvertieren, Hue verschieben, zurück zu RGB
-    const [h, s, l] = rgbToHsl(newR, newG, newB);
-    const newHue = (h + hueShift) % 1.0;
-    const [shiftedR, shiftedG, shiftedB] = hslToRgb(newHue, s, l);
-    
-    newR = shiftedR;
-    newG = shiftedG;
-    newB = shiftedB;
-  }
-  
-  // Konvertiere zurück zu Hex
-  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+  return { swordColor, bgColor };
 }
 
 /**
- * Wählt eine Farbe aus der Farbpalette basierend auf Energie und Beat
- * @param energy Aktuelle Audio-Energie (0-1)
- * @param beatDetected Ob ein Beat erkannt wurde
- * @param palette Farbpalette (baseColors oder accentColors)
- * @returns Ausgewählte Farbe
- */
-export function selectDynamicColor(
-  energy: number,
-  beatDetected: boolean,
-  palette: string[] = accentColors
-): string {
-  // Bei höherer Energie: hellere/intensivere Farben wählen
-  const energyFactor = Math.pow(energy, 1.5); // Exponentiell für natürlichere Skalierung
-  
-  // Sortiere Farben nach Helligkeit/Sättigung
-  const sortedColors = [...palette].sort((a, b) => {
-    const [, sa, la] = hexToHsl(a);
-    const [, sb, lb] = hexToHsl(b);
-    
-    // Hellere und gesättigtere Farben bevorzugen
-    const scoreA = sa * 0.7 + la * 0.3;
-    const scoreB = sb * 0.7 + lb * 0.3;
-    
-    return scoreB - scoreA; // Absteigend sortieren
-  });
-  
-  // Wähle Farbe basierend auf Energie
-  const index = Math.min(
-    sortedColors.length - 1,
-    Math.floor(energyFactor * sortedColors.length)
-  );
-  
-  // Bei Beat: Bevorzuge hellere Farben
-  if (beatDetected) {
-    return sortedColors[Math.max(0, Math.min(index - 2, sortedColors.length - 1))];
-  }
-  
-  return sortedColors[index];
-}
-
-/**
- * Generiert einen dynamischen Farbverlauf basierend auf Energie und Beat
- * @param numColors Anzahl der Farben im Verlauf
- * @param energy Aktuelle Audio-Energie (0-1)
- * @param beatDetected Ob ein Beat erkannt wurde
- * @returns Array mit Farben für den Verlauf
- */
-export function generateDynamicGradient(
-  numColors: number,
-  energy: number,
-  beatDetected: boolean
-): string[] {
-  // Wähle Basis-Farben für den Verlauf
-  const startColor = selectDynamicColor(energy, beatDetected, baseColors);
-  let endColor = selectDynamicColor(energy, beatDetected, accentColors);
-  
-  // Bei Beat: kontrastreichere Farben
-  if (beatDetected) {
-    // Wähle eine komplementäre Farbe für mehr Kontrast
-    const [h, s, l] = hexToHsl(startColor);
-    const complementaryHue = (h + 0.5) % 1.0;
-    endColor = hslToHex(complementaryHue, Math.min(1, s * 1.2), Math.min(1, l * 1.2));
-  }
-  
-  // Generiere Farbverlauf zwischen Start- und Endfarbe
-  return interpolateColors(startColor, endColor, numColors);
-}
-
-/**
- * Berechnet dynamische Farbwerte für das Schwert basierend auf Musik-Intensität
+ * Generiert farbige Kacheln für das Schwert basierend auf der Energie und dem Beat
  * @param positions Array von Schwertpositionen
+ * @param glitchLevel Aktuelles Glitch-Level (0-3)
+ * @param colorEffectIntensity Intensität der Farbeffekte
+ * @returns Array von farbigen Kacheln
+ */
+export function generateColoredTiles(
+  positions: Array<{x: number, y: number}>,
+  glitchLevel: number,
+  colorEffectIntensity: {[key: number]: number}
+): Array<{x: number, y: number, color: string}> {
+  const coloredTiles: Array<{x: number, y: number, color: string}> = [];
+  
+  // Anzahl der Cluster basierend auf glitchLevel und Intensität
+  // Bei niedriger Intensität (ruhige Musik) sehr wenige Cluster
+  const baseClusterCount = Math.max(1, Math.floor(Math.random() * 3)); // 1-3 Basis-Cluster
+  const intensityFactor = colorEffectIntensity[glitchLevel] || 1;
+  const numClusters = baseClusterCount + Math.floor(intensityFactor * 1.5);
+  
+  for (let i = 0; i < numClusters; i++) {
+    // Wähle eine zufällige Position und Clustergröße
+    if (positions.length === 0) continue;
+    
+    const randomPosIndex = Math.floor(Math.random() * positions.length);
+    const basePos = positions[randomPosIndex];
+    
+    // Clustergröße: Bei niedriger Intensität kleinere Cluster, bei höherer Intensität größere
+    // 1-2 Tiles bei niedriger Intensität, bis zu 5-6 bei hoher Intensität
+    const clusterSizeBase = intensityFactor < 2 ? 1 : 2;
+    const clusterSizeRange = Math.min(4, Math.floor(intensityFactor * 1.5));
+    const clusterSize = clusterSizeBase + Math.floor(Math.random() * clusterSizeRange);
+    
+    // Generiere Cluster
+    const cluster = generateCluster(
+      basePos.x, 
+      basePos.y, 
+      clusterSize,
+      20, // maxWidth
+      30  // maxHeight
+    );
+    
+    // Wähle eine zufällige Akzentfarbe für dieses Cluster
+    const accentColor = accentColors[Math.floor(Math.random() * accentColors.length)];
+    
+    // Füge alle Positionen im Cluster hinzu
+    cluster.forEach(pos => {
+      coloredTiles.push({
+        x: pos.x,
+        y: pos.y,
+        color: accentColor
+      });
+    });
+  }
+  
+  return coloredTiles;
+}
+
+/**
+ * Generiert einen Farbverlauf für das Schwert basierend auf der Energie
  * @param energy Aktuelle Audio-Energie (0-1)
  * @param beatDetected Ob ein Beat erkannt wurde
- * @param config Optionale Konfiguration für Farbeffekte
- * @returns Objekt mit Basis- und Akzentfarben
+ * @param glitchLevel Aktuelles Glitch-Level (0-3)
+ * @returns Farbe im Hex-Format
  */
-export function calculateDynamicColors(
-  positions: Array<SwordPosition>,
-  energy: number,
+export function generateSwordColor(
+  energy: number, 
   beatDetected: boolean,
-  config: Partial<ColorEffectConfig> = {}
-): {baseColor: string, accentColor: string, edgeColor: string} {
-  // Kombiniere Standard-Konfiguration mit übergebenen Werten
-  const effectiveConfig: ColorEffectConfig = {
-    ...defaultColorConfig,
-    ...config
-  };
+  glitchLevel: number
+): string {
+  // Basis-Farbwerte
+  let r = 62; // 3E in Hex
+  let g = 230; // E6 in Hex
+  let b = 255; // FF in Hex
   
-  // Wähle Basis-Farbe
-  const baseColorIndex = Math.floor(energy * baseColors.length * 0.8);
-  const baseColor = baseColors[Math.min(baseColorIndex, baseColors.length - 1)];
+  // Pulsieren basierend auf Energie - verstärkte Reaktion für bessere Sichtbarkeit
+  const pulseAmount = energy * 25; // Erhöht von 15 für stärkere Farbänderung
+  r = Math.min(255, r + Math.floor(pulseAmount * 1.5)); // Erhöht von 1.2 für stärkere Rotkomponente
+  g = Math.max(180, g - Math.floor(pulseAmount * 0.8)); // Erhöht von 0.5 für stärkere Grünreduktion
   
-  // Wähle Akzent-Farbe
-  const accentColorIndex = Math.floor((energy * 0.8 + 0.2) * accentColors.length);
-  const accentColor = accentColors[Math.min(accentColorIndex, accentColors.length - 1)];
-  
-  // Berechne pulsierende Farbe für Kanten
-  const edgeColor = calculatePulsingColor(
-    beatDetected ? accentColor : baseColor,
-    energy,
-    beatDetected,
-    config
-  );
-  
-  return {
-    baseColor,
-    accentColor,
-    edgeColor
-  };
-}
-
-// ===== HILFSFUNKTIONEN FÜR FARBBERECHNUNGEN =====
-
-/**
- * Konvertiert RGB zu HSL
- * @param r Rot (0-255)
- * @param g Grün (0-255)
- * @param b Blau (0-255)
- * @returns [h, s, l] Array mit HSL-Werten (0-1)
- */
-function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
-  r /= 255;
-  g /= 255;
-  b /= 255;
-  
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
-  
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    
-    h /= 6;
+  // Zusätzliche Farbänderung bei Beat-Erkennung - verstärkte Reaktion für bessere Sichtbarkeit
+  if (beatDetected) {
+    r = Math.min(255, r + 25); // Erhöht von 15 für stärkeren Beat-Effekt
+    g = Math.min(255, g + 15); // Erhöht von 10 für stärkeren Beat-Effekt
+    b = Math.max(200, b - 15); // Erhöht von 10 für stärkeren Beat-Effekt
   }
   
-  return [h, s, l];
-}
-
-/**
- * Konvertiert HSL zu RGB
- * @param h Farbton (0-1)
- * @param s Sättigung (0-1)
- * @param l Helligkeit (0-1)
- * @returns [r, g, b] Array mit RGB-Werten (0-255)
- */
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-  let r, g, b;
-  
-  if (s === 0) {
-    r = g = b = l; // Graustufe
-  } else {
-    const hue2rgb = (p: number, q: number, t: number) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-      return p;
-    };
-    
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    
-    r = hue2rgb(p, q, h + 1/3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1/3);
+  // Farbverschiebung bei höherem Glitch-Level - verstärkte Reaktion für bessere Sichtbarkeit
+  if (glitchLevel > 0) {
+    const glitchMultiplier = glitchLevel * 0.4; // Erhöht von 0.25 für stärkeren Glitch-Effekt
+    r = Math.min(255, Math.floor(r * (1 + glitchMultiplier * 0.5)));
+    g = Math.max(100, Math.floor(g * (1 - glitchMultiplier * 0.3)));
+    b = Math.min(255, Math.floor(b * (1 + glitchMultiplier * 0.2)));
   }
   
-  return [
-    Math.round(r * 255),
-    Math.round(g * 255),
-    Math.round(b * 255)
-  ];
+  // Konvertiere zu Hex-Farbe
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
 /**
- * Konvertiert Hex-Farbe zu HSL
- * @param hex Hex-Farbcode
- * @returns [h, s, l] Array mit HSL-Werten (0-1)
+ * Generiert eine dunklere Hintergrundfarbe basierend auf der Schwertfarbe
+ * @param baseColor Die Basisfarbe des Schwerts im Hex-Format
+ * @returns Dunklere Farbe im Hex-Format
  */
-function hexToHsl(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
+export function getDarkerColor(baseColor: string): string {
+  // Extrahiere RGB-Komponenten
+  const r = parseInt(baseColor.substring(1, 3), 16);
+  const g = parseInt(baseColor.substring(3, 5), 16);
+  const b = parseInt(baseColor.substring(5, 7), 16);
   
-  return rgbToHsl(r * 255, g * 255, b * 255);
+  // Berechne dunklere Farbe - stärkerer Kontrast für bessere Sichtbarkeit
+  const darkerR = Math.floor(r * 0.08); // Reduziert von 0.1 für dunkleren Hintergrund
+  const darkerG = Math.floor(g * 0.08); // Reduziert von 0.1 für dunkleren Hintergrund
+  const darkerB = Math.floor(b * 0.12); // Reduziert von 0.15 für dunkleren Hintergrund
+  
+  // Konvertiere zu Hex-Farbe
+  return `#${darkerR.toString(16).padStart(2, '0')}${darkerG.toString(16).padStart(2, '0')}${darkerB.toString(16).padStart(2, '0')}`;
 }
 
 /**
- * Konvertiert HSL zu Hex-Farbe
- * @param h Farbton (0-1)
- * @param s Sättigung (0-1)
- * @param l Helligkeit (0-1)
- * @returns Hex-Farbcode
+ * Generiert eine hellere Farbe für den Höhlenhintergrund
+ * @param baseColor Die Basisfarbe des Schwerts im Hex-Format
+ * @returns Hellere Farbe im Hex-Format
  */
-function hslToHex(h: number, s: number, l: number): string {
-  const [r, g, b] = hslToRgb(h, s, l);
+export function getLighterColor(baseColor: string): string {
+  // Extrahiere RGB-Komponenten
+  const r = parseInt(baseColor.substring(1, 3), 16);
+  const g = parseInt(baseColor.substring(3, 5), 16);
+  const b = parseInt(baseColor.substring(5, 7), 16);
   
-  const toHex = (c: number) => {
-    const hex = c.toString(16);
-    return hex.length === 1 ? '0' + hex : hex;
-  };
+  // Berechne hellere Farbe - verstärkter Kontrast für bessere Sichtbarkeit
+  const lighterR = Math.min(255, Math.floor(r * 0.35)); // Erhöht von 0.25 für besseren Kontrast
+  const lighterG = Math.min(255, Math.floor(g * 0.35)); // Erhöht von 0.25 für besseren Kontrast
+  const lighterB = Math.min(255, Math.floor(b * 0.5)); // Erhöht von 0.4 für besseren Kontrast
   
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-/**
- * Interpoliert zwischen zwei Farben
- * @param color1 Erste Farbe als Hex-String
- * @param color2 Zweite Farbe als Hex-String
- * @param steps Anzahl der Zwischenschritte
- * @returns Array mit interpolierten Farben
- */
-function interpolateColors(color1: string, color2: string, steps: number): string[] {
-  const [h1, s1, l1] = hexToHsl(color1);
-  const [h2, s2, l2] = hexToHsl(color2);
-  
-  const result: string[] = [];
-  
-  // Kürzester Weg für Hue finden (über 0 oder 1)
-  let hDiff = h2 - h1;
-  if (Math.abs(hDiff) > 0.5) {
-    if (hDiff > 0) {
-      hDiff = hDiff - 1;
-    } else {
-      hDiff = hDiff + 1;
-    }
-  }
-  
-  for (let i = 0; i < steps; i++) {
-    const factor = i / (steps - 1);
-    
-    // Interpoliere HSL-Werte
-    let h = h1 + hDiff * factor;
-    if (h < 0) h += 1;
-    if (h > 1) h -= 1;
-    
-    const s = s1 + (s2 - s1) * factor;
-    const l = l1 + (l2 - l1) * factor;
-    
-    // Konvertiere zurück zu Hex
-    result.push(hslToHex(h, s, l));
-  }
-  
-  return result;
+  // Konvertiere zu Hex-Farbe
+  return `#${lighterR.toString(16).padStart(2, '0')}${lighterG.toString(16).padStart(2, '0')}${lighterB.toString(16).padStart(2, '0')}`;
 } 
