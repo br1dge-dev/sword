@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAudioReactionStore } from '@/store/audioReactionStore';
 
 interface AudioVisualizerProps {
@@ -18,15 +18,24 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
   // Zugriff auf den Fallback-Status
   const isFallbackActive = useAudioReactionStore(state => state.isFallbackActive());
   
-  // Optimierte Aktualisierung des Energy-Werts
+  // OPTIMIERT: Reduzierte Update-Frequenz für bessere Performance
   useEffect(() => {
-    // Empfindlicher auf Energieänderungen reagieren
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
+    
+    // OPTIMIERT: Throttling auf 30fps für bessere Performance
+    if (timeSinceLastUpdate < 33) { // 33ms = ~30fps
+      return;
+    }
+    
+    // OPTIMIERT: Nur bei signifikanten Änderungen aktualisieren
     if (Math.abs(energy - lastEnergyRef.current) > 0.02) {
       lastEnergyRef.current = energy;
+      lastUpdateTimeRef.current = now;
     }
   }, [energy]);
   
-  // Effekt für Beat-Animation
+  // OPTIMIERT: Effizientere Beat-Animation
   useEffect(() => {
     if (beatDetected) {
       setVisualBeatActive(true);
@@ -38,15 +47,27 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
     }
   }, [beatDetected]);
   
-  // Berechne die Anzahl der aktiven Balken basierend auf der Energie
-  const calculateActiveBars = () => {
+  // OPTIMIERT: Memoisierte Berechnung für bessere Performance
+  const activeBars = useMemo(() => {
     const maxBars = 16;
     // Verstärke den Energiewert, um die Visualisierung empfindlicher zu machen
     const amplifiedEnergy = Math.min(1, lastEnergyRef.current * 1.8);
     return Math.max(1, Math.floor(amplifiedEnergy * maxBars));
-  };
+  }, [lastEnergyRef.current]);
   
-  const activeBars = calculateActiveBars();
+  // OPTIMIERT: Memoisierte Styles für bessere Performance
+  const containerStyle = useMemo(() => ({
+    transform: visualBeatActive ? 'scale(1.1)' : 'scale(1)',
+    transition: 'transform 0.15s ease-out'
+  }), [visualBeatActive]);
+  
+  const barStyle = useMemo(() => ({
+    transition: 'all 0.1s ease-out',
+    backgroundColor: visualBeatActive ? 'var(--color-neon-pink)' : 'var(--color-neon-green)',
+    boxShadow: visualBeatActive 
+      ? '0 0 10px var(--color-neon-pink), 0 0 20px var(--color-neon-pink)' 
+      : '0 0 5px var(--color-neon-green)'
+  }), [visualBeatActive]);
   
   return (
     <div className={`flex flex-col ${className}`}>

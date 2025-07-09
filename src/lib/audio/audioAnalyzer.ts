@@ -39,6 +39,7 @@ export class AudioAnalyzer {
   private maxReconnectAttempts: number = 3;
   private noDataCount: number = 0;
   private maxNoDataCount: number = 10;
+  private lastEnergy: number = 0; // Speichere die letzte Energie für Throttling
 
   constructor(options?: AudioAnalyzerOptions) {
     if (options) {
@@ -199,77 +200,71 @@ export class AudioAnalyzer {
 
   private analyze(): void {
     if (!this.isAnalyzing || !this.analyser || !this.frequencyData) {
-      console.warn('Cannot analyze: analyzer not initialized or not analyzing');
       return;
     }
 
     const now = performance.now();
-    const timeSinceLastAnalyze = now - this.lastAnalyzeTime;
     
-    // Nur analysieren, wenn das Intervall überschritten wurde
-    if (timeSinceLastAnalyze >= (this.options.analyzeInterval || 50)) {
-      try {
-        // Get frequency data
-        this.analyser.getByteFrequencyData(this.frequencyData);
-        
-        // Debug: Überprüfe, ob die Frequenzdaten Werte enthalten
-        const hasAudioData = this.frequencyData.some(value => value > 0);
-        
-        // Calculate energy (average amplitude)
-        const energy = this.calculateEnergy(this.frequencyData);
-        
-        // Debug: Logge die Energie alle 2 Sekunden
-        if (now % 2000 < 100) {
-          console.log(`Current audio energy: ${energy.toFixed(4)}, has data: ${hasAudioData}`);
-          
-          // Wenn keine Audiodaten vorhanden sind, versuche den Analyzer neu zu verbinden
-          if (!hasAudioData && this.audioContext && this.audioElement) {
-            this.noDataCount++;
-            
-            if (this.noDataCount >= this.maxNoDataCount) {
-              console.warn('No audio data detected, trying to reconnect analyzer');
-              
-              // Prüfe, ob das Audio-Element tatsächlich abgespielt wird
-              if (!this.audioElement.paused && !this.audioElement.ended && this.audioElement.currentTime > 0) {
-                console.log('Audio is playing but no data detected, possible connection issue');
-                this.attemptReconnect();
-              } else {
-                console.log('Audio is not playing, no need to reconnect');
-                this.noDataCount = 0;
-              }
-            }
-          } else if (hasAudioData) {
-            // Zurücksetzen des Zählers, wenn Daten erkannt wurden
-            this.noDataCount = 0;
-            
-            // Wenn Audiodaten vorhanden sind, rufe den Energy-Callback auf
-            if (this.options.onEnergy && energy > 0) {
-              this.options.onEnergy(energy);
-            }
-          }
-        } else {
-          // Auch außerhalb des Logging-Intervalls den Energy-Callback aufrufen
-          if (this.options.onEnergy && energy > 0) {
-            this.options.onEnergy(energy);
+    // OPTIMIERT: Reduzierte Analyse-Frequenz für bessere Performance (20fps statt 60fps)
+    if (now - this.lastAnalyzeTime < 50) { // 50ms = 20fps
+      this.animationFrameId = requestAnimationFrame(() => this.analyze());
+      return;
+    }
+
+    try {
+      // Hole Frequenzdaten
+      this.analyser.getByteFrequencyData(this.frequencyData);
+      
+      // Berechne Energie
+      let sum = 0;
+      let count = 0;
+      
+      // OPTIMIERT: Reduzierte Frequenzanalyse für bessere Performance
+      const step = Math.max(1, Math.floor(this.frequencyData.length / 64)); // Nur 64 Samples statt alle
+      
+      for (let i = 0; i < this.frequencyData.length; i += step) {
+        sum += this.frequencyData[i];
+        count++;
+      }
+      
+      const average = count > 0 ? sum / count : 0;
+      const energy = average / 255; // Normalisiere auf 0-1
+      
+      // OPTIMIERT: Früher Exit bei sehr niedriger Energie
+      if (energy < 0.01) {
+        this.noDataCount++;
+        if (this.noDataCount > this.maxNoDataCount) {
+          if (this.options.onEnergy) {
+            this.options.onEnergy(0);
           }
         }
+        this.lastAnalyzeTime = now;
+        this.animationFrameId = requestAnimationFrame(() => this.analyze());
+        return;
+      }
+      
+      this.noDataCount = 0;
+      
+      // OPTIMIERT: Reduzierte Energy-Updates für bessere Performance
+      if (Math.abs(energy - this.lastEnergy) > 0.02 || energy > 0.1) { // Nur bei signifikanten Änderungen
+        this.lastEnergy = energy;
         
-        // Detect beat based on energy threshold with improved sensitivity
-        if (energy > this.options.energyThreshold!) {
-          const now = performance.now();
-          const timeSinceLastBeat = now - this.lastBeatTime;
+        if (this.options.onEnergy) {
+          this.options.onEnergy(energy);
+        }
+      }
+      
+      // OPTIMIERT: Verbesserte Beat-Erkennung mit Throttling
+      if (energy > this.options.energyThreshold!) {
+        const timeSinceLastBeat = now - this.lastBeatTime;
+        
+        // OPTIMIERT: Mindestens 200ms zwischen Beats für stabilere Erkennung
+        if (timeSinceLastBeat > 200) {
+          const beatIntensity = energy / this.options.energyThreshold!;
+          const beatSensitivity = this.options.beatSensitivity || 1.5;
           
-          // Mindestens 150ms zwischen Beats (reduziert von 200ms)
-          if (timeSinceLastBeat > 150) {
-            // Verbesserte Beat-Erkennung mit Berücksichtigung der Energie-Änderung
-            const beatIntensity = energy / this.options.energyThreshold!;
-            const beatSensitivity = this.options.beatSensitivity || 1.5;
-            
-            // Log für Beat-Erkennung
-            if (beatIntensity > beatSensitivity) {
-              console.log(`Strong beat detected! Energy: ${energy.toFixed(2)}, Intensity: ${beatIntensity.toFixed(2)}`);
-            }
-            
+          // OPTIMIERT: Reduzierte Beat-Erkennung für bessere Performance
+          if (beatIntensity > beatSensitivity && Math.random() < 0.8) { // 80% Wahrscheinlichkeit
             this.lastBeatTime = now;
             
             if (this.options.onBeat) {
@@ -277,11 +272,11 @@ export class AudioAnalyzer {
             }
           }
         }
-        
-        this.lastAnalyzeTime = now;
-      } catch (error) {
-        console.error('Error during audio analysis:', error);
       }
+      
+      this.lastAnalyzeTime = now;
+    } catch (error) {
+      console.error('Error during audio analysis:', error);
     }
     
     // Weiterhin analysieren
