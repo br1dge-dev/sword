@@ -48,15 +48,23 @@ import {
 
 // Importiere Effekt-Generatoren
 import { generateCaveBackground, generateColoredVeins } from './effects/backgroundEffects';
-import { generateHarmonicColorPair } from './effects/colorEffects';
 import {
-  generateEdgeGlitches,
+  calculateDynamicColors,
+  calculatePulsingColor,
+  selectDynamicColor,
+  generateDynamicGradient,
+  ColorEffectConfig
+} from './effects/colorEffects';
+import {
+  generateGlitchChars,
   generateUnicodeGlitches,
-  generateBlurredChars,
-  generateSkewedChars,
-  generateFadedChars
+  calculateGlitchDuration,
+  GlitchEffectConfig
 } from './effects/glitchEffects';
-import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects';
+import { 
+  generateColoredTiles,
+  TileEffectConfig
+} from './effects/tileEffects';
 
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
@@ -244,12 +252,27 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     // Bei Beat oder hoher Energie Farbwechsel auslösen
     // Erhöhte Reaktivität für Schwert und äußeren Ring
     if ((energy > 0.30 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) {
-      // Erzeuge eine harmonische Farbkombination
-      const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
+      // Konfiguration für Farbeffekte
+      const colorConfig: Partial<ColorEffectConfig> = {
+        baseIntensity: 0.6 + (energy * 0.4),
+        energyMultiplier: 2.0,
+        beatBoost: beatDetected ? 1.5 : 1.0,
+        pulseSpeed: 3 + (energy * 5),
+        colorShift: energy > 0.5,
+        hueShift: 0.3
+      };
+      
+      // Berechne dynamische Farben basierend auf Musik-Intensität
+      const { baseColor: newBaseColor, accentColor, edgeColor } = calculateDynamicColors(
+        getSwordPositions(),
+        energy,
+        beatDetected,
+        colorConfig
+      );
       
       // Setze die neuen Farben
-      setBaseColor(swordColor);
-      setBgColor(newBgColor);
+      setBaseColor(newBaseColor);
+      setBgColor(accentColor);
       
       // Aktualisiere den Zeitstempel für den letzten Farbwechsel
       setLastColorChangeTime(Date.now());
@@ -262,7 +285,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       
       setColorStability(newStability);
       
-      console.log(`[${new Date().toLocaleTimeString()}] [COLOR_CHANGE] New color: ${swordColor}, BG: ${newBgColor}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}, Stability: ${newStability}ms`);
+      console.log(`[${new Date().toLocaleTimeString()}] [COLOR_CHANGE] New color: ${newBaseColor}, BG: ${accentColor}, Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}, Stability: ${newStability}ms`);
     }
   }, [beatDetected, energy, lastColorChangeTime, colorStability]);
   
@@ -270,115 +293,91 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     // Niedrigerer Schwellenwert für bessere Reaktivität
     if (beatDetected || energy > 0.15) {
-      // Temporär erhöhte Farbeffekte - stärkere Reaktion auf Beats
-      const tempIntensity = { ...colorEffectIntensity };
-      for (const level in tempIntensity) {
-        if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
-          const numLevel = Number(level) as keyof typeof colorEffectIntensity;
-          // Stärkere Intensitätssteigerung bei Beats
-          tempIntensity[numLevel] = Math.min(3, tempIntensity[numLevel] + Math.floor(energy * (beatDetected ? 3 : 2)));
-        }
-      }
+      // Konfiguration für Tile-Effekte
+      const tileConfig: Partial<TileEffectConfig> = {
+        minCount: Math.max(2, Math.floor(energy * 5)),
+        maxPercent: Math.min(0.5, 0.1 + energy * 0.4),
+        beatBoost: beatDetected ? 1.5 : 1.0,
+        energyCurve: 2.0,
+        waveForm: energy > 0.4 // Wellenform nur bei höherer Energie aktivieren
+      };
       
-      setColoredTiles(generateColoredTiles(getSwordPositions(), glitchLevel, tempIntensity));
+      // Generiere farbige Tiles basierend auf Musik-Intensität
+      setColoredTiles(generateColoredTiles(
+        getSwordPositions(),
+        energy,
+        beatDetected,
+        glitchLevel,
+        tileConfig
+      ));
       
       // Längere Dauer für flüssigeren Übergang
       const timeout = setTimeout(() => {
-        setColoredTiles(generateColoredTiles(getSwordPositions(), glitchLevel, colorEffectIntensity));
-      }, beatDetected ? 1000 : 800); // Längere Dauer bei Beat-Erkennung
+        setColoredTiles([]);
+      }, calculateGlitchDuration(energy, beatDetected));
       
       return () => clearTimeout(timeout);
     }
   }, [beatDetected, energy, glitchLevel]);
-  
-  // Audio-reaktive Edge-Effekte - Erhöhte Reaktivität für Schwert
+
+  // Audio-reaktive Glitch-Effekte - Erhöhte Reaktivität für Schwert
   useEffect(() => {
     // Niedrigerer Schwellenwert für bessere Reaktivität
     if (beatDetected || energy > 0.15) {
-      // Wenn keine Kanten vorhanden sind, nichts tun
-      const edgePositions = getEdgePositions();
-      if (edgePositions.length === 0) return;
+      // Konfiguration für Glitch-Effekte
+      const glitchConfig: Partial<GlitchEffectConfig> = {
+        minCount: Math.max(1, Math.floor(energy * 3)),
+        maxPercent: Math.min(0.2, 0.05 + energy * 0.15),
+        beatBoost: beatDetected ? 2.0 : 1.0,
+        energyCurve: 1.5,
+        glitchIntensity: 1.0 + (glitchLevel * 0.3)
+      };
       
-      // Neue Edge-Effekte basierend auf chargeLevel
-      const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}> = [];
-      
-      // Intensität basierend auf chargeLevel
-      const vibrationChance = vibrationIntensity[chargeLevel as keyof typeof vibrationIntensity] || 0.2;
-      const glitchChance = glitchFrequency[chargeLevel as keyof typeof glitchFrequency] || 0.1;
-      const colorChance = colorEffectFrequency[chargeLevel as keyof typeof colorEffectFrequency] || 0.15;
-      
-      // Multiplier für Level 2 (erhöht die Chance um 50%)
-      const glitchMultiplier = chargeLevel === 2 ? 1.5 : 1;
-      
-      // Erhöhe die Chancen basierend auf der Energie - stärkere Reaktion
-      const energyMultiplier = 1 + (energy * 2.0); // Erhöht von 1.5 auf 2.0
-      const effectiveVibrationChance = Math.min(0.95, vibrationChance * energyMultiplier);
-      const effectiveGlitchChance = Math.min(0.95, glitchChance * glitchMultiplier * energyMultiplier);
-      const effectiveColorChance = Math.min(0.95, colorChance * energyMultiplier);
-      
-      // Durchlaufe alle Kantenpositionen
-      edgePositions.forEach(pos => {
-        // Vibrations-Effekt (Verschiebung)
-        if (Math.random() < effectiveVibrationChance) {
-          const offsetX = Math.random() < 0.5 ? -1 : 1;
-          const offsetY = Math.random() < 0.5 ? -1 : 1;
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            offset: { x: offsetX, y: offsetY }
-          });
-        }
-        
-        // Glitch-Effekt (Zeichenersetzung)
-        if (Math.random() < effectiveGlitchChance) {
-          // Korrekte Typbehandlung für edgeGlitchChars
-          const glitchCharSet = Math.floor(Math.random() * edgeGlitchChars[1].length);
-          const glitchChar = edgeGlitchChars[1][glitchCharSet];
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            char: glitchChar
-          });
-        }
-        
-        // Farb-Effekt
-        if (Math.random() < effectiveColorChance) {
-          const colorIndex = Math.floor(Math.random() * accentColors.length);
-          const edgeColor = accentColors[colorIndex];
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            color: edgeColor
-          });
-        }
-      });
-      
-      // Setze die neuen Edge-Effekte
-      setEdgeEffects(newEdgeEffects);
+      // Generiere Glitch-Effekte basierend auf Musik-Intensität
+      setGlitchChars(generateGlitchChars(
+        getSwordPositions(),
+        energy,
+        beatDetected,
+        glitchLevel,
+        glitchConfig
+      ));
       
       // Längere Dauer bei höherer Energie für flüssigeren Effekt
-      const duration = beatDetected ? 150 : Math.max(100, Math.min(200, Math.floor(energy * 200)));
+      const duration = calculateGlitchDuration(energy, beatDetected);
       
       // Zurücksetzen nach berechneter Zeit
-      setTimeout(() => {
-        setEdgeEffects([]);
+      const timeout = setTimeout(() => {
+        setGlitchChars([]);
       }, duration);
+      
+      return () => clearTimeout(timeout);
     }
-  }, [beatDetected, energy, chargeLevel]);
-  
+  }, [beatDetected, energy, glitchLevel]);
+
   // Audio-reaktive Unicode-Glitch-Effekte - Erhöhte Reaktivität für Schwert
   useEffect(() => {
     // Niedrigerer Schwellenwert für bessere Reaktivität
     if (beatDetected || energy > 0.20) {
-      // Erhöhe temporär den Glitch-Level
-      const tempGlitchLevel = Math.min(3, Math.floor(glitchLevel + (energy * 2)));
-      setUnicodeGlitches(generateUnicodeGlitches(getSwordPositions(), tempGlitchLevel));
+      // Konfiguration für Unicode-Glitch-Effekte
+      const glitchConfig: Partial<GlitchEffectConfig> = {
+        minCount: Math.max(1, Math.floor(energy * 2)),
+        maxPercent: Math.min(0.1, 0.02 + energy * 0.08),
+        beatBoost: beatDetected ? 2.0 : 1.0,
+        energyCurve: 1.5,
+        glitchIntensity: 1.0 + (glitchLevel * 0.3)
+      };
+      
+      // Generiere Unicode-Glitch-Effekte basierend auf Musik-Intensität
+      setUnicodeGlitches(generateUnicodeGlitches(
+        getSwordPositions(),
+        energy,
+        beatDetected,
+        glitchLevel,
+        glitchConfig
+      ));
       
       // Längere Dauer bei höherer Energie für flüssigeren Effekt
-      const duration = beatDetected ? 200 : Math.max(160, Math.min(300, Math.floor(energy * 250)));
+      const duration = calculateGlitchDuration(energy, beatDetected);
       
       // Zurücksetzen nach berechneter Zeit
       const timeout = setTimeout(() => {

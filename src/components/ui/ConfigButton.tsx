@@ -1,0 +1,88 @@
+"use client";
+
+/**
+ * ConfigButton.tsx
+ * 
+ * Button zum Öffnen des Effekt-Konfigurationsmodals
+ */
+import { useState } from 'react';
+import EffectsConfigModal from './EffectsConfigModal';
+import { useEffectsStore } from '@/store/effectsReducer';
+
+export default function ConfigButton() {
+  // Zustand für das Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Effekt-Konfigurationen aus dem Store
+  const { 
+    tileConfig, 
+    glitchConfig, 
+    colorConfig, 
+    updateAllConfigs 
+  } = useEffectsStore();
+  
+  // Modal öffnen
+  const openModal = () => {
+    setIsModalOpen(true);
+  };
+  
+  // Modal schließen
+  const closeModal = () => {
+    setIsModalOpen(false);
+  };
+  
+  // Konfigurationen speichern
+  const saveConfigs = (configs: {
+    tile: typeof tileConfig;
+    glitch: typeof glitchConfig;
+    color: typeof colorConfig;
+  }) => {
+    updateAllConfigs({
+      tile: configs.tile,
+      glitch: configs.glitch,
+      color: configs.color
+    });
+  };
+  
+  return (
+    <>
+      <button
+        onClick={openModal}
+        className="fixed bottom-4 right-4 z-50 p-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-full shadow-lg"
+        title="Effekte konfigurieren"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+          />
+        </svg>
+      </button>
+      
+      <EffectsConfigModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        onSave={saveConfigs}
+        initialConfig={{
+          tile: tileConfig,
+          glitch: glitchConfig,
+          color: colorConfig
+        }}
+      />
+    </>
+  );
+} 
