@@ -9,7 +9,9 @@
  */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
-import { useAudioReactionStore, useBeatReset, useFallbackAnimation } from '@/store/audioReactionStore';
+import { useAudioReactionStore, useBeatReset } from '@/store/audioReactionStore';
+import { getPerformanceMonitor } from '@/lib/performance/performanceMonitor';
+// import { getPerformanceOptimizer } from '@/lib/performance/performanceOptimizer';
 
 // Importiere Typen
 import {
@@ -64,7 +66,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const { currentLevel, chargeLevel, glitchLevel } = usePowerUpStore();
   
   // Audio-Reaktionsdaten abrufen
-  const { energy: storeEnergy, beatDetected: storeBeat } = useAudioReactionStore();
+  const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying } = useAudioReactionStore();
   
   // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
   const energy = directEnergy !== undefined ? directEnergy : storeEnergy;
@@ -73,16 +75,79 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // Automatisches Beat-Reset aktivieren
   useBeatReset(100);
   
-  // Fallback-Animation aktivieren, wenn keine Audio-Reaktivität vorhanden ist
-  useFallbackAnimation();
+  // Fallback-Animation läuft jetzt im Layout, nicht mehr hier
+  
+  // Performance Monitor
+  const performanceMonitor = getPerformanceMonitor();
+  
+  // OPTIMIERT: Performance Optimizer vorübergehend deaktiviert
+  // const performanceOptimizer = getPerformanceOptimizer();
+  
+  // OPTIMIERT: Performance-Optimierung basierend auf Optimizer-Status
+  // useEffect(() => {
+  //   const { effectReductionLevel, updateThrottleLevel, emergencyMode } = performanceOptimizer.getOptimizationStatus();
+  //   
+  //   // Reduziere Effekte basierend auf Performance-Level
+  //   if (effectReductionLevel > 0) {
+  //     // Reduziere Vein-Generierung durch Anpassung der maxVeinsRef
+  //     const veinReduction = Math.max(0.1, 1 - (effectReductionLevel * 0.3));
+  //     maxVeinsRef.current = Math.floor(300 * veinReduction);
+  //   }
+  //   
+  //   // Reduziere Update-Frequenz basierend auf Throttle-Level
+  //   if (updateThrottleLevel > 0) {
+  //     // Erhöhe Intervall-Zeiten durch längere Delays
+  //     const throttleMultiplier = 1 + (updateThrottleLevel * 0.5);
+  //     // Die Intervalle werden in den bestehenden useEffect-Hooks angepasst
+  //   }
+  //   
+  //   // Notfall-Modus: Deaktiviere alle nicht-essentiellen Effekte
+  //   if (emergencyMode) {
+  //     setGlowIntensity(0);
+  //     setColoredTiles([]);
+  //     setUnicodeGlitches([]);
+  //     // Stoppe alle Intervalle
+  //     clearAllIntervals();
+  //   }
+  // }, [performanceOptimizer]);
+  
+  // OPTIMIERT: Setup Performance Optimizer Callbacks
+  // useEffect(() => {
+  //   performanceOptimizer.setCallbacks({
+  //     onEmergencyMode: (enabled) => {
+  //       if (enabled) {
+  //         console.log('🚨 Notfall-Modus aktiviert - Alle Effekte deaktiviert');
+  //         setGlowIntensity(0);
+  //         setColoredTiles([]);
+  //         setUnicodeGlitches([]);
+  //         // clearAllIntervals wird später definiert
+  //       } else {
+  //         console.log('✅ Notfall-Modus deaktiviert - Effekte wieder aktiviert');
+  //       }
+  //     },
+  //     onEffectReduction: (level) => {
+  //       console.log(`🔧 Effekt-Reduktion Level ${level} aktiviert`);
+  //       // Implementiere Effekt-Reduktion basierend auf Level
+  //     },
+  //     onUpdateThrottle: (level) => {
+  //       console.log(`🔧 Update-Throttling Level ${level} aktiviert`);
+  //       // Implementiere Update-Throttling basierend auf Level
+  //     }
+  //   });
+  // }, [performanceOptimizer]);
   
   // OPTIMIERT: Intelligentes Vein-Management-System
   const lastUpdateTimeRef = useRef<number>(Date.now());
   const cleanupTimeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
   const lastVeinSeedRef = useRef<number>(0); // Pseudo-random Seed für Vein-Generierung
   const veinLifetimeRef = useRef<Map<string, number>>(new Map()); // Vein-Lebensdauer-Tracking
-  const maxVeinsRef = useRef<number>(300); // Erhöht auf 300 für mehr rhythmische Dynamik
-  
+  const maxVeinsRef = useRef<number>(100); // Reduziert von 200 auf 100 für bessere Performance
+  const veinCleanupIntervalRef = useRef<number>(20000); // Erhöht von 15000ms auf 20000ms für bessere Performance
+  const veinGenerationIntervalRef = useRef<number>(12000); // Erhöht von 8000ms auf 12000ms für bessere Performance
+
+  // Vein-Handling als Map
+  const veinsMapRef = useRef(new Map<string, {vein: {x: number, y: number, color: string}, birth: number}>());
+
   // OPTIMIERT: Memoisierte Berechnungen für bessere Performance
   const getBackgroundDimensions = useCallback(() => {
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
@@ -106,6 +171,51 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       height: Math.floor(baseHeight * heightFactor)
     };
   }, []);
+
+  // Vein-Handling: coloredVeins wird regelmäßig aus der Map gebaut, damit Veins "einbrennen"
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      // Entferne alte Veins
+      Array.from(veinsMapRef.current.entries()).forEach(([key, value]) => {
+        if (now - value.birth > 5000) {
+          veinsMapRef.current.delete(key);
+        }
+      });
+      // Setze das Rendering-Array
+      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Vein-Generierung: Füge neue Veins nur hinzu, wenn sie noch nicht existieren
+  useEffect(() => {
+    if ((beatDetected && Math.random() < 0.1) || energy > 0.25) {
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
+      const currentTime = Date.now();
+      const baseVeins = Math.floor(8 + energy * 20);
+      const targetVeins = Math.min(maxVeinsRef.current, baseVeins);
+      const timeSeed = Math.floor(currentTime / 3000);
+      const energySeed = Math.floor(energy * 25);
+      const beatSeed = beatDetected ? 1 : 0;
+      const pseudoRandomSeed = timeSeed + energySeed + beatSeed;
+      if (beatDetected || Math.abs(pseudoRandomSeed - lastVeinSeedRef.current) > 5 || veinsMapRef.current.size < targetVeins * 0.2) {
+        lastVeinSeedRef.current = pseudoRandomSeed;
+        const newVeinsCount = beatDetected 
+          ? Math.floor(targetVeins * 0.2)
+          : Math.floor(targetVeins * 0.1);
+        const newVeins = generateColoredVeins(bgWidth, bgHeight, newVeinsCount, viewportWidth, viewportHeight);
+        newVeins.forEach(vein => {
+          const key = `${vein.x}-${vein.y}`;
+          if (!veinsMapRef.current.has(key)) {
+            veinsMapRef.current.set(key, { vein, birth: currentTime });
+          }
+        });
+      }
+    }
+  }, [beatDetected, energy, glitchLevel, getBackgroundDimensions]);
   
   // OPTIMIERT: Memoisierte Schwert-Positionen (nur bei Level-Änderung neu berechnen)
   const swordPositions = useMemo(() => {
@@ -177,7 +287,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const [baseColor, setBaseColor] = useState('#00FCA6');
   const [bgColor, setBgColor] = useState<string>(getComplementaryColor('#00FCA6'));
   const [lastColorChangeTime, setLastColorChangeTime] = useState<number>(Date.now());
-  const [colorStability, setColorStability] = useState<number>(2000);
+  const [colorStability, setColorStability] = useState<number>(3000); // Erhöht von 2000 auf 3000 für sanftere Farbübergänge
   const [coloredTiles, setColoredTiles] = useState<Array<{x: number, y: number, color: string}>>([]);
   const [glitchChars, setGlitchChars] = useState<Array<{x: number, y: number, char: string}>>([]);
   const [caveBackground, setCaveBackground] = useState<string[][]>([]);
@@ -210,9 +320,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     
     setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
     
-    // OPTIMIERT: Rhythmische initiale Vein-Generierung mit Lebensdauer-Tracking
-    const baseVeins = Math.floor(40 + (glitchLevel * 20)); // Erhöht für bessere rhythmische Dynamik
-    const maxVeins = Math.min(150, baseVeins); // Erhöht für mehr initiale Veins
+    // OPTIMIERT: Sanftere initiale Vein-Generierung mit weniger Veins
+    const baseVeins = Math.floor(10 + (glitchLevel * 5)); // Reduziert von 20+10 auf 10+5 für bessere Performance
+    const maxVeins = Math.min(50, baseVeins); // Reduziert von 80 auf 50 für weniger initiale Veins
     const initialVeins = generateColoredVeins(bgWidth, bgHeight, maxVeins, viewportWidth, viewportHeight);
     
     // Initialisiere Lebensdauer-Tracking für alle initialen Veins
@@ -268,170 +378,167 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     };
   }, [glitchLevel, getBackgroundDimensions]);
   
-  // OPTIMIERT: Direkte Audio-reaktive Effekte - Sofortige Reaktion
+  // OPTIMIERT: Reaktive Audio-Effekte für visuellen Impact
   useEffect(() => {
-    // OPTIMIERT: Minimales Throttling für unmittelbarere Reaktionen
+    // OPTIMIERT: Niedrige Latenz für visuellen Impact
     const now = Date.now();
     const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
     
-    if (timeSinceLastUpdate < 8) { // 8ms Throttling = 120fps für maximale Reaktivität
+    if (timeSinceLastUpdate < 100) { // Reduziert von 200ms auf 100ms für bessere Reaktivität
+      return;
+    }
+    
+    // OPTIMIERT: Empfindlichere Reaktion für visuellen Impact
+    if (energy < 0.01 && !beatDetected) { // Noch empfindlicher: ab 0.01
       return;
     }
     
     lastUpdateTimeRef.current = now;
     
-    // OPTIMIERT: Direkte State-Updates ohne Batch-System
+    // OPTIMIERT: Reaktive Effekt-Aktivität für visuellen Impact
+    let effectsTriggered = 0;
+    const MAX_EFFECTS_PER_UPDATE = 1; // Zurück zu 1 Effekt pro Update für besseren visuellen Impact
     
-    // Glow-Effekte (höchste Priorität) - Sehr niedrige Schwellenwerte
-    if (beatDetected || energy > 0.02) { // Reduziert auf 0.02 für maximale Reaktivität
-      const randomIntensity = Math.random() * 0.8 + 0.2;
+    // Glow-Effekte - Reaktiver für visuellen Impact
+    if ((beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || energy > 0.03) { // Noch empfindlicher: ab 0.03
+      const randomIntensity = Math.random() * 0.15 + 0.05; // Zurück zu 0.15 für besseren visuellen Impact
       setGlowIntensity(randomIntensity);
+      performanceMonitor.trackEffect();
+      effectsTriggered++;
     }
     
-    // Tile-Effekte - Sehr niedrige Schwellenwerte
-    if (beatDetected || energy > 0.01) { // Reduziert auf 0.01
+    // Tile-Effekte - Nur bei sehr deutlichen Beats oder höherer Energy
+    if ((beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || energy > 0.03) {
       const tempIntensity = { ...colorEffectIntensity };
       for (const level in tempIntensity) {
         if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
           const numLevel = Number(level) as keyof typeof colorEffectIntensity;
-          tempIntensity[numLevel] = Math.min(4, tempIntensity[numLevel] + Math.floor(energy * (beatDetected ? 4 : 3)));
+          tempIntensity[numLevel] = Math.min(2, tempIntensity[numLevel] + Math.floor(energy * (beatDetected ? 1 : 0.5)));
         }
       }
-      
       setColoredTiles(generateColoredTiles(swordPositions, glitchLevel, tempIntensity));
-      
-      // Cleanup für Tile-Effekte
-      const duration = beatDetected ? 600 : 500;
+      performanceMonitor.trackEffect();
+      effectsTriggered++;
+      // OPTIMIERT: Längere Cleanup-Dauer für sanftere Übergänge
+      const duration = beatDetected ? 1200 : 1000;
       const timeout = setTimeout(() => {
-        setColoredTiles(generateColoredTiles(swordPositions, glitchLevel, colorEffectIntensity));
+        setColoredTiles([]); // Nach Ablauf werden die Tiles entfernt
       }, duration);
       cleanupTimeoutsRef.current.add(timeout);
+    } else {
+      setColoredTiles([]); // Wenn keine Bedingungen erfüllt, Tiles sofort entfernen
     }
     
-    // Unicode-Glitch-Effekte - Sehr niedrige Schwellenwerte
-    if (beatDetected || energy > 0.03) { // Reduziert auf 0.03
-      const tempGlitchLevel = Math.min(3, Math.floor(glitchLevel + (energy * 2.5)));
+    // OPTIMIERT: Reduzierte Unicode-Glitch-Effekte für bessere Performance
+    if (beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) {
+      const tempGlitchLevel = Math.min(1, Math.floor(glitchLevel + (energy * 1.0))); // Reduziert von 2/1.5 auf 1/1.0
       
       setUnicodeGlitches(generateUnicodeGlitches(swordPositions, tempGlitchLevel));
+      performanceMonitor.trackGlitch();
       
-      // Cleanup für Unicode-Glitch-Effekte
-      const duration = beatDetected ? 150 : Math.max(120, Math.min(250, Math.floor(energy * 200)));
+      // OPTIMIERT: Längere Cleanup-Dauer
+      const duration = beatDetected ? 300 : Math.max(250, Math.min(400, Math.floor(energy * 200))); // Erhöht Dauer
       const timeout = setTimeout(() => {
         setUnicodeGlitches([]);
       }, duration);
       cleanupTimeoutsRef.current.add(timeout);
     }
     
-    // Hintergrund-Effekte - Erhöhte Chance auf 2% für mehr Stimmungswechsel
-    if ((beatDetected && Math.random() < 0.02) || energy > 0.85) { // Erhöht auf 2% Chance bei Beat, 0.85 Energy-Schwelle
+    // OPTIMIERT: Reduzierte Hintergrund-Effekte für bessere Performance
+    if ((beatDetected && Math.random() < 0.001) || energy > 0.95) { // Reduziert von 0.005/0.9 auf 0.001/0.95
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
       
       setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+      performanceMonitor.trackBackgroundUpdate();
     }
     
-    // OPTIMIERT: Rhythmische Vein-Dynamik - viele Veins, lange Lebensdauer, Beat-getrieben
-    if ((beatDetected && Math.random() < 0.6) || energy > 0.05) { // Erhöht auf 0.6 Chance bei Beat, 0.05 Energy-Schwelle
+    // OPTIMIERT: Drastisch reduzierte Vein-Dynamik für bessere Performance
+    if ((beatDetected && Math.random() < 0.1) || energy > 0.25) { // Reduziert von 0.2/0.15 auf 0.1/0.25
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
       
-      // OPTIMIERT: Rhythmische Vein-Generierung mit Beat-Synchronisation
+      // OPTIMIERT: Drastisch reduzierte Vein-Generierung
       const currentTime = Date.now();
-      const baseVeins = Math.floor(30 + energy * 80); // Erhöht auf 30 Basis-Veins + 80 pro Energy
+      const baseVeins = Math.floor(8 + energy * 20); // Reduziert von 15+40 auf 8+20
       const targetVeins = Math.min(maxVeinsRef.current, baseVeins);
       
       // Verwende einen deterministischen Seed basierend auf Energy und Beat für rhythmische Dynamik
-      const timeSeed = Math.floor(currentTime / 1000); // 1-Sekunden-basiert für Beat-Synchronisation
-      const energySeed = Math.floor(energy * 100);
+      const timeSeed = Math.floor(currentTime / 3000); // Erhöht von 2000ms auf 3000ms für sanftere Änderungen
+      const energySeed = Math.floor(energy * 25); // Reduziert von 50 auf 25
       const beatSeed = beatDetected ? 1 : 0;
       const pseudoRandomSeed = timeSeed + energySeed + beatSeed;
       
       // Generiere neue Veins bei Beat oder wenn zu wenige vorhanden sind
-      if (beatDetected || Math.abs(pseudoRandomSeed - lastVeinSeedRef.current) > 2 || coloredVeins.length < targetVeins * 0.4) {
+      if (beatDetected || Math.abs(pseudoRandomSeed - lastVeinSeedRef.current) > 5 || veinsMapRef.current.size < targetVeins * 0.2) { // Erhöht von 3/0.3 auf 5/0.2
         lastVeinSeedRef.current = pseudoRandomSeed;
         
-        // OPTIMIERT: Beat-getriebene Vein-Generierung
+        // OPTIMIERT: Drastisch reduzierte Vein-Generierung
         const newVeinsCount = beatDetected 
-          ? Math.floor(targetVeins * 0.6) // Mehr Veins bei Beat
-          : Math.floor(targetVeins * 0.3); // Weniger Veins bei normaler Energy
+          ? Math.floor(targetVeins * 0.2) // Reduziert von 0.4 auf 0.2
+          : Math.floor(targetVeins * 0.1); // Reduziert von 0.2 auf 0.1
         
         const newVeins = generateColoredVeins(bgWidth, bgHeight, newVeinsCount, viewportWidth, viewportHeight);
         
-        // Füge neue Veins zu bestehenden hinzu
-        const combinedVeins = [...coloredVeins, ...newVeins];
+        // Füge neue Veins nur hinzu, wenn sie noch nicht existieren
+        newVeins.forEach(vein => {
+          const key = `${vein.x}-${vein.y}`;
+          if (!veinsMapRef.current.has(key)) {
+            veinsMapRef.current.set(key, { vein, birth: currentTime });
+          }
+        });
+        // Entferne Veins, die älter als 5000ms sind
+        Array.from(veinsMapRef.current.entries()).forEach(([key, value]) => {
+          if (currentTime - value.birth > 5000) {
+            veinsMapRef.current.delete(key);
+          }
+        });
+        // Setze das State-Array für das Rendering
+        setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
         
-        // OPTIMIERT: Sanfte Vein-Bereinigung - nur bei Überlast und nur die ältesten 10%
-        if (combinedVeins.length > maxVeinsRef.current) {
-          // Sortiere nach Lebensdauer und entferne nur die ältesten 10%
-          const veinsToRemove = Math.floor(combinedVeins.length * 0.1); // Reduziert von 20% auf 10%
-          const sortedVeins = combinedVeins.sort((a, b) => {
-            const aKey = `${a.x}-${a.y}`;
-            const bKey = `${b.x}-${b.y}`;
-            const aLifetime = veinLifetimeRef.current.get(aKey) || 0;
-            const bLifetime = veinLifetimeRef.current.get(bKey) || 0;
-            return aLifetime - bLifetime;
-          });
-          
-          // Entferne nur die ältesten Veins
-          const filteredVeins = sortedVeins.slice(veinsToRemove);
-          
-          // Aktualisiere Lebensdauer-Tracking
-          veinLifetimeRef.current.clear();
-          filteredVeins.forEach(vein => {
-            const key = `${vein.x}-${vein.y}`;
-            veinLifetimeRef.current.set(key, currentTime);
-          });
-          
-          setColoredVeins(filteredVeins);
-        } else {
-          // Füge neue Veins hinzu und aktualisiere Lebensdauer
-          newVeins.forEach(vein => {
-            const key = `${vein.x}-${vein.y}`;
-            veinLifetimeRef.current.set(key, currentTime);
-          });
-          
-          setColoredVeins(combinedVeins);
-        }
+        performanceMonitor.trackVein();
       }
     }
     
   }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions]);
   
-  // OPTIMIERT: Audio-reaktive Farb-Effekte - Reduzierte Empfindlichkeit um 50%
+  // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
   useEffect(() => {
-    if ((energy > 0.1 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) { // Erhöht auf 0.1 (50% weniger empfindlich)
+    if ((energy > 0.05 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) { // Noch empfindlicher: ab 0.05
       const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
       
-      const newStability = energy > 0.6 // Erhöht auf 0.6 (50% weniger empfindlich)
-        ? Math.max(200, Math.floor(800 - (energy * 600)))
-        : Math.floor(800 + Math.random() * 1200);
+      const newStability = energy > 0.8 // Erhöht von 0.7 auf 0.8 für längere Stabilität
+        ? Math.max(800, Math.floor(1500 - (energy * 300))) // Erhöht von 500/1200 auf 800/1500
+        : Math.floor(2000 + Math.random() * 2500); // Erhöht von 1500+2000 auf 2000+2500
       
       setBaseColor(swordColor);
       setBgColor(newBgColor);
       setLastColorChangeTime(Date.now());
       setColorStability(newStability);
+      
+      performanceMonitor.trackColorChange();
     }
-  }, [beatDetected, energy, lastColorChangeTime, colorStability]);
+  }, [beatDetected, energy, lastColorChangeTime, colorStability, performanceMonitor]);
   
-  // OPTIMIERT: Audio-reaktive Edge-Effekte - Sofortige Reaktion
+  // OPTIMIERT: Drastisch reduzierte Audio-reaktive Edge-Effekte für bessere Performance
   useEffect(() => {
-    if (beatDetected || energy > 0.02) { // Reduziert auf 0.02
+    if (beatDetected || energy > 0.03) { // Noch empfindlicher: ab 0.03
       if (edgePositions.length === 0) return;
       
       const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}> = [];
       
-      const vibrationChance = vibrationIntensity[chargeLevel as keyof typeof vibrationIntensity] || 0.2;
-      const glitchChance = glitchFrequency[chargeLevel as keyof typeof glitchFrequency] || 0.1;
-      const colorChance = colorEffectFrequency[chargeLevel as keyof typeof colorEffectFrequency] || 0.15;
+      const vibrationChance = (vibrationIntensity[chargeLevel as keyof typeof vibrationIntensity] || 0.2) * 0.3; // Reduziert um 70%
+      const glitchChance = (glitchFrequency[chargeLevel as keyof typeof glitchFrequency] || 0.1) * 0.2; // Reduziert um 80%
+      const colorChance = (colorEffectFrequency[chargeLevel as keyof typeof colorEffectFrequency] || 0.15) * 0.3; // Reduziert um 70%
       
-      const glitchMultiplier = chargeLevel === 2 ? 1.5 : 1;
-      const energyMultiplier = 1 + (energy * 2.5);
+      const glitchMultiplier = chargeLevel === 2 ? 1.1 : 1; // Reduziert von 1.2 auf 1.1
+      const energyMultiplier = 1 + (energy * 1.0); // Reduziert von 1.5 auf 1.0
       
-      const effectiveVibrationChance = Math.min(0.98, vibrationChance * energyMultiplier);
-      const effectiveGlitchChance = Math.min(0.98, glitchChance * glitchMultiplier * energyMultiplier);
-      const effectiveColorChance = Math.min(0.98, colorChance * energyMultiplier);
+      const effectiveVibrationChance = Math.min(0.6, vibrationChance * energyMultiplier); // Reduziert von 0.8 auf 0.6
+      const effectiveGlitchChance = Math.min(0.6, glitchChance * glitchMultiplier * energyMultiplier); // Reduziert von 0.8 auf 0.6
+      const effectiveColorChance = Math.min(0.6, colorChance * energyMultiplier); // Reduziert von 0.8 auf 0.6
       
       edgePositions.forEach(pos => {
         if (Math.random() < effectiveVibrationChance) {
@@ -469,15 +576,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       });
       
       setEdgeEffects(newEdgeEffects);
+      performanceMonitor.trackEffect();
       
-      // Cleanup für Edge-Effekte
-      const duration = beatDetected ? 120 : Math.max(80, Math.min(150, Math.floor(energy * 150)));
+      // Cleanup für Edge-Effekte - Längere Dauer für sanftere Übergänge
+      const duration = beatDetected ? 150 : Math.max(120, Math.min(200, Math.floor(energy * 120))); // Erhöht Dauer
       const timeout = setTimeout(() => {
         setEdgeEffects([]);
       }, duration);
       cleanupTimeoutsRef.current.add(timeout);
     }
-  }, [beatDetected, energy, chargeLevel, edgePositions]);
+  }, [beatDetected, energy, chargeLevel, edgePositions, performanceMonitor]);
   
   // OPTIMIERT: Memoisierte Berechnungen für Rendering
   const shadowSize = useMemo(() => Math.floor(glowIntensity * 20), [glowIntensity]);
@@ -521,7 +629,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            transform: 'scale(1.5)',
+            transform: 'scale(1.65)',
             position: 'absolute',
             top: 0,
             left: 0,
