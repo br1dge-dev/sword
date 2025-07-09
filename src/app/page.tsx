@@ -2,10 +2,11 @@
  * HomePage - Hauptseite der SWORD-App
  * 
  * Diese Komponente enthält das ASCII-Schwert und alle UI-Elemente.
+ * OPTIMIERT: Reduzierte Logs, bessere Performance
  */
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAudioReactionStore, useFallbackAnimation } from '@/store/audioReactionStore';
 import AsciiSword from '@/components/ascii/AsciiSword';
 import MusicPlayer from '@/components/ui/MusicPlayer';
@@ -20,7 +21,11 @@ export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
   const { energy, beatDetected, setMusicPlaying } = useAudioReactionStore();
   
-  // Beat-Effekt für Debugging
+  // OPTIMIERT: Reduzierte Logs für bessere Performance
+  const lastLogTimeRef = useRef(0);
+  const lastEnergyRef = useRef(energy);
+  
+  // OPTIMIERT: Beat-Effekt für Debugging (nur bei wichtigen Events)
   useEffect(() => {
     if (beatDetected) {
       console.log('Beat detected in main component!');
@@ -41,9 +46,17 @@ export default function HomePage() {
     };
   }, [setMusicPlaying]);
   
-  // Energie- und Beat-Änderungen loggen
+  // OPTIMIERT: Reduzierte Energie- und Beat-Logs
   useEffect(() => {
-    console.log(`Energy changed: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
+    const now = Date.now();
+    const timeSinceLastLog = now - lastLogTimeRef.current;
+    
+    // OPTIMIERT: Log nur alle 5 Sekunden oder bei signifikanten Änderungen
+    if (timeSinceLastLog > 5000 || Math.abs(energy - lastEnergyRef.current) > 0.3 || beatDetected) {
+      console.log(`Energy changed: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
+      lastLogTimeRef.current = now;
+      lastEnergyRef.current = energy;
+    }
   }, [energy, beatDetected]);
   
   // Handle beat detection

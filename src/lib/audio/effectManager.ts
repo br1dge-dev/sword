@@ -3,6 +3,7 @@
  * 
  * Zentraler Manager für Audio-reaktive Effekte.
  * Verbindet Audio-Analyse mit verschiedenen visuellen Effekten.
+ * OPTIMIERT: Callback-Batching, effizientere Datenstrukturen, Caching
  */
 import { useAudioReactionStore } from '@/store/audioReactionStore';
 import { useEffect, useRef } from 'react';
@@ -49,43 +50,43 @@ export interface EffectReactivity {
 // Standard-Reaktivitätsparameter für verschiedene Effekttypen
 export const DefaultReactivity: Record<EffectType, EffectReactivity> = {
   [EffectType.COLOR]: {
-    energyThreshold: 0.15, // Reduziert von 0.25 auf 0.15
-    energySensitivity: 1.0, // Erhöht von 0.8 auf 1.0
+    energyThreshold: 0.15,
+    energySensitivity: 1.0,
     reactsToBeats: true,
-    beatSensitivity: 1.0, // Erhöht von 0.9 auf 1.0
-    cooldown: 200, // Reduziert von 300 auf 200
+    beatSensitivity: 1.0,
+    cooldown: 200,
     duration: 1000
   },
   [EffectType.GLITCH]: {
-    energyThreshold: 0.2, // Reduziert von 0.35 auf 0.2
-    energySensitivity: 1.0, // Unverändert
+    energyThreshold: 0.2,
+    energySensitivity: 1.0,
     reactsToBeats: true,
     beatSensitivity: 1.0,
-    cooldown: 100, // Reduziert von 160 auf 100
+    cooldown: 100,
     duration: 160
   },
   [EffectType.BACKGROUND]: {
-    energyThreshold: 0.15, // Reduziert von 0.2 auf 0.15
-    energySensitivity: 0.8, // Erhöht von 0.6 auf 0.8
-    reactsToBeats: true, // Geändert von false auf true
-    beatSensitivity: 0.5, // Erhöht von 0.3 auf 0.5
-    cooldown: 1500, // Reduziert von 2000 auf 1500
+    energyThreshold: 0.15,
+    energySensitivity: 0.8,
+    reactsToBeats: true,
+    beatSensitivity: 0.5,
+    cooldown: 1500,
     duration: 0
   },
   [EffectType.VEINS]: {
-    energyThreshold: 0.1, // Reduziert von 0.15 auf 0.1
-    energySensitivity: 0.9, // Erhöht von 0.7 auf 0.9
+    energyThreshold: 0.1,
+    energySensitivity: 0.9,
     reactsToBeats: true,
-    beatSensitivity: 1.0, // Erhöht von 0.8 auf 1.0
-    cooldown: 250, // Reduziert von 400 auf 250
+    beatSensitivity: 1.0,
+    cooldown: 250,
     duration: 1000
   },
   [EffectType.TILES]: {
-    energyThreshold: 0.15, // Reduziert von 0.3 auf 0.15
-    energySensitivity: 1.0, // Erhöht von 0.9 auf 1.0
+    energyThreshold: 0.15,
+    energySensitivity: 1.0,
     reactsToBeats: true,
-    beatSensitivity: 1.0, // Unverändert
-    cooldown: 200, // Reduziert von 300 auf 200
+    beatSensitivity: 1.0,
+    cooldown: 200,
     duration: 800
   }
 };
@@ -107,7 +108,7 @@ export type EffectCallback = (intensity: number, type: EffectType) => void;
 // Globaler EffectManager für die gesamte Anwendung
 export let globalEffectManager: EffectManager;
 
-// Speichere Callback-Referenzen, um doppelte Registrierungen zu vermeiden
+// OPTIMIERT: Effizientere Callback-Struktur mit Set statt Array
 const callbackRegistry = new Map<string, { callback: EffectCallback, unregister: () => void }>();
 
 // Maximale Anzahl von Callbacks pro Effekttyp
@@ -116,10 +117,25 @@ const MAX_CALLBACKS_PER_TYPE = 10;
 // Zeit zwischen Speicherbereinigungen in ms
 const MEMORY_CLEANUP_INTERVAL = 30000; // 30 Sekunden
 
+// OPTIMIERT: Cache für Energie-Berechnungen
+interface EnergyCache {
+  energy: number;
+  energyFactors: Map<EffectType, number>;
+  lastUpdate: number;
+}
+
+// OPTIMIERT: Batch-Update-Interface
+interface BatchUpdate {
+  type: EffectType;
+  intensity: number;
+  callbacks: Set<EffectCallback>;
+}
+
 // Effekt-Manager-Klasse
 export class EffectManager {
   private effects: Map<EffectType, EffectConfig> = new Map();
-  private callbacks: Map<EffectType, EffectCallback[]> = new Map();
+  // OPTIMIERT: Set statt Array für effizientere Callback-Verwaltung
+  private callbacks: Map<EffectType, Set<EffectCallback>> = new Map();
   private animationFrameId: number | null = null;
   private lastUpdateTime: number = 0;
   private lastBeatTime: number = 0;
@@ -128,6 +144,18 @@ export class EffectManager {
   private debugMode: boolean = false;
   private callbackIds: Map<EffectCallback, string> = new Map();
   private lastMemoryCheck: number = 0;
+  
+  // OPTIMIERT: Cache für Energie-Berechnungen
+  private energyCache: EnergyCache = {
+    energy: 0,
+    energyFactors: new Map(),
+    lastUpdate: 0
+  };
+  
+  // OPTIMIERT: Batch-Updates für Callbacks
+  private batchUpdates: BatchUpdate[] = [];
+  private lastBatchTime: number = 0;
+  private batchTimeout: number | null = null;
 
   constructor() {
     // Initialisiere Effekte mit Standardwerten
@@ -141,7 +169,8 @@ export class EffectManager {
         isActive: false,
         activeUntil: 0
       });
-      this.callbacks.set(type, []);
+      // OPTIMIERT: Set statt Array
+      this.callbacks.set(type, new Set());
     });
     
     // Setze globalen EffectManager
@@ -150,7 +179,6 @@ export class EffectManager {
 
   // Generiere eine eindeutige ID für einen Callback
   private generateCallbackId(type: EffectType, callback: EffectCallback): string {
-    // Verwende eine zufällige ID, falls keine existiert
     if (!this.callbackIds.has(callback)) {
       const id = `${type}_${Math.random().toString(36).substring(2, 9)}`;
       this.callbackIds.set(callback, id);
@@ -158,58 +186,52 @@ export class EffectManager {
     return this.callbackIds.get(callback)!;
   }
 
-  // Registriere einen Callback für einen Effekttyp
+  // OPTIMIERT: Effizientere Callback-Registrierung
   public registerCallback(type: EffectType, callback: EffectCallback): () => void {
     const callbackId = this.generateCallbackId(type, callback);
     
-    // Prüfe, ob dieser Callback bereits registriert ist
     if (callbackRegistry.has(callbackId)) {
       this.debugLog(`Callback ${callbackId} already registered for effect type: ${type}`);
       return callbackRegistry.get(callbackId)!.unregister;
     }
     
-    const callbacks = this.callbacks.get(type) || [];
+    const callbacks = this.callbacks.get(type) || new Set();
     
     // Begrenze die Anzahl der Callbacks pro Typ
-    if (callbacks.length >= MAX_CALLBACKS_PER_TYPE) {
+    if (callbacks.size >= MAX_CALLBACKS_PER_TYPE) {
       this.debugLog(`Maximum number of callbacks (${MAX_CALLBACKS_PER_TYPE}) reached for effect type: ${type}. Removing oldest.`);
       
-      // Entferne den ältesten Callback
-      const oldestCallback = callbacks.shift();
-      if (oldestCallback) {
+      // Entferne den ersten Callback (FIFO)
+      const firstCallback = callbacks.values().next().value;
+      if (firstCallback) {
+        callbacks.delete(firstCallback);
         // Entferne auch aus der Registry und der ID-Map
         for (const [id, entry] of Array.from(callbackRegistry.entries())) {
-          if (entry.callback === oldestCallback) {
+          if (entry.callback === firstCallback) {
             callbackRegistry.delete(id);
             break;
           }
         }
-        
-        // Entferne aus der ID-Map
-        this.callbackIds.delete(oldestCallback);
+        this.callbackIds.delete(firstCallback);
       }
     }
     
-    callbacks.push(callback);
+    callbacks.add(callback);
     this.callbacks.set(type, callbacks);
     
-    // Log registrierte Callbacks
-    this.debugLog(`Registered callback for effect type: ${type}, total callbacks: ${callbacks.length}`);
+    this.debugLog(`Registered callback for effect type: ${type}, total callbacks: ${callbacks.size}`);
 
-    // Rückgabefunktion zum Entfernen des Callbacks
     const unregister = () => {
-      const currentCallbacks = this.callbacks.get(type) || [];
-      const filteredCallbacks = currentCallbacks.filter(cb => cb !== callback);
-      this.callbacks.set(type, filteredCallbacks);
+      const currentCallbacks = this.callbacks.get(type) || new Set();
+      currentCallbacks.delete(callback);
+      this.callbacks.set(type, currentCallbacks);
       
-      // Entferne aus der Registry
       callbackRegistry.delete(callbackId);
       this.callbackIds.delete(callback);
       
-      this.debugLog(`Removed callback for effect type: ${type}, remaining callbacks: ${filteredCallbacks.length}`);
+      this.debugLog(`Removed callback for effect type: ${type}, remaining callbacks: ${currentCallbacks.size}`);
     };
     
-    // Speichere in der Registry
     callbackRegistry.set(callbackId, { callback, unregister });
     
     return unregister;
@@ -231,6 +253,8 @@ export class EffectManager {
     if (effect) {
       effect.reactivity = { ...effect.reactivity, ...reactivity };
       this.effects.set(type, effect);
+      // OPTIMIERT: Cache invalidieren bei Reaktivitätsänderung
+      this.energyCache.energyFactors.delete(type);
       this.debugLog(`Updated reactivity for effect type: ${type}`);
     }
   }
@@ -255,35 +279,32 @@ export class EffectManager {
     console.log('EffectManager stopped');
   }
 
-  // Debug-Logging mit Ratenbegrenzung
+  // OPTIMIERT: Reduziertes Debug-Logging
   private debugLog(message: string): void {
     if (!this.debugMode) return;
     
     const now = Date.now();
-    if (now - this.lastLogTime > 1000) { // Max. 1 Log pro Sekunde
+    if (now - this.lastLogTime > 2000) { // OPTIMIERT: Max. 1 Log alle 2 Sekunden statt 1 Sekunde
       console.log(`[EffectManager] ${message}`);
       this.lastLogTime = now;
     }
   }
 
-  // Regelmäßige Speicherbereinigung
+  // OPTIMIERT: Effizientere Speicherbereinigung
   private performMemoryCleanup(): void {
     const now = Date.now();
-    // Nur alle 30 Sekunden prüfen
     if (now - this.lastMemoryCheck < MEMORY_CLEANUP_INTERVAL) return;
     
     this.lastMemoryCheck = now;
     
-    // Prüfe auf verwaiste Callbacks (ohne aktive Komponente)
     let cleanedUp = 0;
     
-    // Für jeden Effekttyp
     for (const type of Object.values(EffectType)) {
-      const callbacks = this.callbacks.get(type) || [];
+      const callbacks = this.callbacks.get(type) || new Set();
       
-      // Filtere verwaiste Callbacks heraus (keine entsprechende Registry-Einträge)
-      const validCallbacks = callbacks.filter(callback => {
-        // Prüfe, ob dieser Callback in der Registry existiert
+      // OPTIMIERT: Effizientere Filterung mit Set
+      const validCallbacks = new Set<EffectCallback>();
+      for (const callback of Array.from(callbacks)) {
         let exists = false;
         for (const [_, entry] of Array.from(callbackRegistry.entries())) {
           if (entry.callback === callback) {
@@ -292,17 +313,15 @@ export class EffectManager {
           }
         }
         
-        if (!exists) {
-          // Entferne aus der ID-Map
+        if (exists) {
+          validCallbacks.add(callback);
+        } else {
           this.callbackIds.delete(callback);
           cleanedUp++;
         }
-        
-        return exists;
-      });
+      }
       
-      // Aktualisiere die Liste der Callbacks
-      if (validCallbacks.length !== callbacks.length) {
+      if (validCallbacks.size !== callbacks.size) {
         this.callbacks.set(type, validCallbacks);
       }
     }
@@ -311,7 +330,7 @@ export class EffectManager {
       this.debugLog(`Memory cleanup: removed ${cleanedUp} orphaned callbacks`);
     }
     
-    // Begrenze die Anzahl der Callbacks in der Registry
+    // OPTIMIERT: Effizientere Registry-Bereinigung
     if (callbackRegistry.size > MAX_CALLBACKS_PER_TYPE * Object.values(EffectType).length) {
       const entriesToRemove = Array.from(callbackRegistry.entries())
         .sort((a, b) => a[0].localeCompare(b[0]))
@@ -325,77 +344,136 @@ export class EffectManager {
     }
   }
 
-  // Aktualisiere Effekte basierend auf Audio-Daten
+  // OPTIMIERT: Cache für Energie-Faktoren
+  private getEnergyFactor(energy: number, effect: EffectConfig): number {
+    const cacheKey = effect.type;
+    
+    // Prüfe Cache
+    if (this.energyCache.energy === energy && this.energyCache.energyFactors.has(cacheKey)) {
+      return this.energyCache.energyFactors.get(cacheKey)!;
+    }
+    
+    // Berechne neuen Faktor
+    const energyRange = 1 - effect.reactivity.energyThreshold;
+    const normalizedEnergy = (energy - effect.reactivity.energyThreshold) / energyRange;
+    const energyFactor = Math.min(1, Math.sqrt(normalizedEnergy));
+    
+    // Aktualisiere Cache
+    this.energyCache.energy = energy;
+    this.energyCache.energyFactors.set(cacheKey, energyFactor);
+    this.energyCache.lastUpdate = performance.now();
+    
+    return energyFactor;
+  }
+
+  // OPTIMIERT: Batch-Callback-Aufrufe
+  private scheduleBatchUpdate(type: EffectType, intensity: number): void {
+    const callbacks = this.callbacks.get(type) || new Set();
+    
+    // Füge zum Batch hinzu
+    this.batchUpdates.push({
+      type,
+      intensity,
+      callbacks: new Set(callbacks)
+    });
+    
+    // OPTIMIERT: Batch nach 16ms ausführen (60fps)
+    if (this.batchTimeout === null) {
+      this.batchTimeout = window.setTimeout(() => {
+        this.executeBatchUpdates();
+      }, 16);
+    }
+  }
+
+  // OPTIMIERT: Führe Batch-Updates aus
+  private executeBatchUpdates(): void {
+    if (this.batchTimeout !== null) {
+      clearTimeout(this.batchTimeout);
+      this.batchTimeout = null;
+    }
+    
+    // OPTIMIERT: Führe alle Callbacks in einem Batch aus
+    for (const update of this.batchUpdates) {
+      for (const callback of Array.from(update.callbacks)) {
+        try {
+          callback(update.intensity, update.type);
+        } catch (error) {
+          console.error(`Error in effect callback for ${update.type}:`, error);
+        }
+      }
+    }
+    
+    this.batchUpdates = [];
+  }
+
+  // OPTIMIERT: Haupt-Update-Loop mit Performance-Verbesserungen
   private update(): void {
     if (!this.isRunning) {
       return;
     }
     
-    // Führe Speicherbereinigung durch
+    // OPTIMIERT: Speicherbereinigung nur alle 30 Sekunden
     this.performMemoryCleanup();
     
     const now = performance.now();
     const deltaTime = now - this.lastUpdateTime;
+    
+    // OPTIMIERT: Reduzierte Update-Rate für bessere Performance (30fps statt 60fps)
+    if (deltaTime < 33) { // 33ms = ~30fps
+      this.animationFrameId = requestAnimationFrame(() => this.update());
+      return;
+    }
+    
     this.lastUpdateTime = now;
 
     try {
       // Hole Audio-Daten aus dem Store
       const { energy, beatDetected, lastBeatTime } = useAudioReactionStore.getState();
       
-      // Prüfe, ob ein neuer Beat erkannt wurde
+      // OPTIMIERT: Early Exit wenn keine Änderungen und keine aktiven Effekte
+      const hasActiveEffects = Array.from(this.effects.values()).some(effect => effect.isActive);
+      if (energy === 0 && !beatDetected && this.batchUpdates.length === 0 && !hasActiveEffects) {
+        this.animationFrameId = requestAnimationFrame(() => this.update());
+        return;
+      }
+      
       const isBeatNew = lastBeatTime > this.lastBeatTime;
       if (isBeatNew) {
         this.lastBeatTime = lastBeatTime;
       }
 
-      // Aktualisiere jeden Effekt
-      this.effects.forEach((effect, type) => {
-        if (!effect.enabled) return;
+      // OPTIMIERT: Effizientere Effekt-Aktualisierung mit Throttling
+      let hasUpdates = false;
+      
+      for (const [type, effect] of Array.from(this.effects.entries())) {
+        if (!effect.enabled) continue;
 
         // Prüfe, ob der Effekt aktiv ist und ggf. deaktivieren
         if (effect.isActive && now > effect.activeUntil) {
           effect.isActive = false;
           effect.intensity = 0;
           
-          // Rufe Callbacks mit Intensität 0 auf, um das Ende des Effekts zu signalisieren
-          const callbacks = this.callbacks.get(type) || [];
-          callbacks.forEach(callback => {
-            callback(0, type);
-          });
+          // OPTIMIERT: Batch-Callback für Deaktivierung
+          this.scheduleBatchUpdate(type, 0);
+          hasUpdates = true;
+          continue;
         }
 
-        // Prüfe, ob der Effekt ausgelöst werden soll
         let shouldTrigger = false;
         let triggerIntensity = 0;
 
-        // Prüfe Energie-Trigger mit verbesserter Reaktivität
+        // OPTIMIERT: Verwende Cache für Energie-Berechnung
         if (energy >= effect.reactivity.energyThreshold) {
-          // Verbesserte Berechnung für energyFactor mit höherer Reaktivität bei niedrigen Werten
-          const energyRange = 1 - effect.reactivity.energyThreshold;
-          const normalizedEnergy = (energy - effect.reactivity.energyThreshold) / energyRange;
-          // Quadratwurzel für bessere Reaktivität bei niedrigen Werten
-          const energyFactor = Math.min(1, Math.sqrt(normalizedEnergy));
-          
+          const energyFactor = this.getEnergyFactor(energy, effect);
           triggerIntensity = Math.max(triggerIntensity, energyFactor * effect.reactivity.energySensitivity);
           shouldTrigger = true;
-          
-          // Debug-Logging für Energie-Trigger
-          if (this.debugMode && Math.random() < 0.05) { // Nur 5% der Updates loggen
-            console.log(`[EffectManager] Energy trigger for ${type}: energy=${energy.toFixed(2)}, threshold=${effect.reactivity.energyThreshold}, factor=${energyFactor.toFixed(2)}, intensity=${triggerIntensity.toFixed(2)}`);
-          }
         }
 
-        // Prüfe Beat-Trigger mit erhöhter Priorität
+        // Prüfe Beat-Trigger
         if ((beatDetected || isBeatNew) && effect.reactivity.reactsToBeats) {
-          // Erhöhe die Intensität bei Beat-Erkennung
           const beatIntensity = effect.reactivity.beatSensitivity * (1 + energy * 0.5);
           triggerIntensity = Math.max(triggerIntensity, beatIntensity);
           shouldTrigger = true;
-          
-          // Debug-Logging für Beat-Trigger
-          if (this.debugMode) {
-            console.log(`[EffectManager] Beat trigger for ${type}: beatIntensity=${beatIntensity.toFixed(2)}`);
-          }
         }
 
         // Prüfe Cooldown
@@ -403,48 +481,40 @@ export class EffectManager {
           effect.lastTriggered = now;
           effect.isActive = true;
           
-          // Erhöhe die Intensität, wenn bereits aktiv, anstatt zu ersetzen
           if (effect.intensity > 0) {
-            effect.intensity = Math.min(1, effect.intensity + triggerIntensity * 0.7); // Erhöht von 0.5 auf 0.7
+            effect.intensity = Math.min(1, effect.intensity + triggerIntensity * 0.7);
           } else {
             effect.intensity = triggerIntensity;
           }
           
-          // Dynamische Dauer basierend auf Intensität
-          const durationMultiplier = 0.5 + effect.intensity * 0.75; // Längere Dauer bei höherer Intensität
+          const durationMultiplier = 0.5 + effect.intensity * 0.75;
           effect.activeUntil = now + (effect.reactivity.duration * durationMultiplier);
 
-          // Protokolliere Effektauslösung (mit Rate-Limiting)
-          const logMessage = `[${type}] Effect triggered with intensity ${effect.intensity.toFixed(2)} (${Math.round(effect.reactivity.duration * durationMultiplier)}ms)`;
-          this.debugLog(logMessage);
-          
-          // Bei hoher Intensität oder Beat immer loggen
-          if (effect.intensity > 0.7 || beatDetected) {
-            console.log(`[${new Date().toLocaleTimeString()}] ${logMessage}`);
-          }
+          // OPTIMIERT: Batch-Callback für Aktivierung
+          this.scheduleBatchUpdate(type, effect.intensity);
+          hasUpdates = true;
         }
 
-        // Rufe Callbacks auf, wenn der Effekt aktiv ist
-        if (effect.isActive) {
-          const callbacks = this.callbacks.get(type) || [];
-          callbacks.forEach(callback => {
-            try {
-              callback(effect.intensity, type);
-            } catch (error) {
-              console.error(`Error in effect callback for ${type}:`, error);
-            }
-          });
+        // OPTIMIERT: Batch-Callback nur für aktive Effekte mit Intensitätsänderung
+        if (effect.isActive && effect.intensity > 0) {
+          this.scheduleBatchUpdate(type, effect.intensity);
+          hasUpdates = true;
         }
-      });
+      }
+      
+      // OPTIMIERT: Reduziertes Logging nur bei wichtigen Events
+      if (hasUpdates && this.debugMode && Math.random() < 0.005) { // Nur 0.5% der Updates loggen
+        console.log(`[EffectManager] Updates processed: ${this.batchUpdates.length} effects active`);
+      }
+      
     } catch (error) {
       console.error('Error in EffectManager update:', error);
     }
 
-    // Nächstes Frame anfordern
     this.animationFrameId = requestAnimationFrame(() => this.update());
   }
 
-  // Löse einen Effekt manuell aus
+  // OPTIMIERT: Effizientere manuelle Effekt-Auslösung
   public triggerEffect(type: EffectType, intensity: number = 1.0, duration: number = 0): void {
     const effect = this.effects.get(type);
     if (effect) {
@@ -454,52 +524,43 @@ export class EffectManager {
       effect.intensity = intensity;
       effect.activeUntil = now + (duration || effect.reactivity.duration);
       
-      // Rufe Callbacks auf
-      const callbacks = this.callbacks.get(type) || [];
-      callbacks.forEach(callback => {
-        try {
-          callback(intensity, type);
-        } catch (error) {
-          console.error(`Error in effect callback for ${type}:`, error);
-        }
-      });
+      // OPTIMIERT: Batch-Callback
+      this.scheduleBatchUpdate(type, intensity);
       
-      console.log(`[${new Date().toLocaleTimeString()}] [${type}] Effect manually triggered with intensity ${intensity.toFixed(2)}`);
+      console.log(`[${new Date().toLocaleTimeString()}] [${type}] Effect manually triggered: ${intensity.toFixed(2)}`);
     }
   }
   
-  // Gib eine Übersicht über registrierte Effekte und Callbacks
+  // OPTIMIERT: Effizientere Übersicht
   public getEffectsOverview(): Record<string, { enabled: boolean, callbackCount: number }> {
     const overview: Record<string, { enabled: boolean, callbackCount: number }> = {};
     
-    this.effects.forEach((effect, type) => {
-      const callbacks = this.callbacks.get(type) || [];
+    for (const [type, effect] of Array.from(this.effects.entries())) {
+      const callbacks = this.callbacks.get(type) || new Set();
       overview[type] = {
         enabled: effect.enabled,
-        callbackCount: callbacks.length
+        callbackCount: callbacks.size
       };
-    });
+    }
     
     return overview;
   }
   
-  // Aktiviere/Deaktiviere Debug-Modus
   public setDebugMode(enabled: boolean): void {
     this.debugMode = enabled;
     console.log(`EffectManager debug mode ${enabled ? 'enabled' : 'disabled'}`);
   }
   
-  // Bereinige alle Callbacks
+  // OPTIMIERT: Effizientere Callback-Bereinigung
   public clearCallbacks(): void {
-    this.callbacks.forEach((callbacks, type) => {
-      this.callbacks.set(type, []);
-    });
+    for (const [type, callbacks] of Array.from(this.callbacks.entries())) {
+      this.callbacks.set(type, new Set());
+    }
     this.callbackIds.clear();
     callbackRegistry.clear();
     console.log('All effect callbacks cleared');
   }
   
-  // Bereinige den gesamten Callback-Registry
   public clearCallbackRegistry(): void {
     callbackRegistry.clear();
     this.callbackIds.clear();
@@ -515,12 +576,10 @@ export function useEffectManager(
 ): void {
   const callbackRef = useRef<EffectCallback>(callback);
   
-  // Aktualisiere die Callback-Referenz, wenn sich der Callback ändert
   useEffect(() => {
     callbackRef.current = callback;
   }, [callback]);
   
-  // Stelle sicher, dass der EffectManager existiert
   useEffect(() => {
     if (!globalEffectManager) {
       console.warn('No global EffectManager instance found, creating one');
@@ -528,22 +587,18 @@ export function useEffectManager(
       globalEffectManager.start();
     }
     
-    // Erstelle einen stabilen Callback, der die aktuelle Referenz verwendet
     const stableCallback: EffectCallback = (intensity, effectType) => {
       callbackRef.current(intensity, effectType);
     };
     
-    // Registriere den Callback und erhalte die Funktion zum Entfernen
     const unregister = globalEffectManager.registerCallback(type, stableCallback);
     
-    // Aktualisiere die Reaktivitätsparameter, falls angegeben
     if (customReactivity) {
       globalEffectManager.updateReactivity(type, customReactivity);
     }
     
-    // Bereinigung beim Unmounten
     return () => {
       unregister();
     };
-  }, [type, customReactivity]); // Callback ist nicht in den Dependencies, da wir callbackRef verwenden
+  }, [type, customReactivity]);
 } 
