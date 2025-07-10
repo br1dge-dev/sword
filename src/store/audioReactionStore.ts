@@ -23,7 +23,7 @@ let lastEnergyUpdate = 0;
 const ENERGY_UPDATE_THROTTLE = 200; // Reduziert auf 200ms für bessere Reaktivität
 
 interface UpdateEnergyOptions {
-  forceFallback?: boolean;
+  forceIdle?: boolean;
 }
 
 interface AudioReactionState {
@@ -31,7 +31,7 @@ interface AudioReactionState {
   beatDetected: boolean;
   lastBeatTime: number;
   isAudioActive: boolean;
-  fallbackEnabled: boolean;
+  idleEnabled: boolean;
   isMusicPlaying: boolean;
   
   // Aktionen
@@ -39,7 +39,7 @@ interface AudioReactionState {
   triggerBeat: () => void;
   resetBeat: () => void;
   setAudioActive: (active: boolean) => void;
-  setFallbackEnabled: (enabled: boolean) => void;
+  setIdleEnabled: (enabled: boolean) => void;
   setMusicPlaying: (playing: boolean) => void;
   startIdle: () => void;
   stopIdle: () => void;
@@ -51,7 +51,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   beatDetected: false,
   lastBeatTime: 0,
   isAudioActive: false,
-  fallbackEnabled: true,
+  idleEnabled: true,
   isMusicPlaying: false,
   
   updateEnergy: (energy, opts = {}) => {
@@ -76,19 +76,19 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   
   setAudioActive: (active) => set({ isAudioActive: active }),
   
-  setFallbackEnabled: (enabled) => set({ fallbackEnabled: enabled }),
+  setIdleEnabled: (enabled) => set({ idleEnabled: enabled }),
   
   // OPTIMIERT: Verbesserte Musik-Status-Verwaltung
   setMusicPlaying: (playing) => {
     set({ isMusicPlaying: playing });
     
     // Wenn Musik gestoppt wird und Idle aktiviert ist
-    if (!playing && get().fallbackEnabled) {
+    if (!playing && get().idleEnabled) {
       // OPTIMIERT: Längere Verzögerung für stabilere Animation und um Track-Wechsel zu berücksichtigen
       setTimeout(() => {
         // Prüfe nochmal, ob Musik wirklich gestoppt ist (nicht nur Track-Wechsel)
         const currentState = get();
-        if (!currentState.isMusicPlaying && currentState.fallbackEnabled) {
+        if (!currentState.isMusicPlaying && currentState.idleEnabled) {
           const { startIdle } = get();
           startIdle();
           console.log("Music paused, starting idle animation");
@@ -104,7 +104,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   // OPTIMIERT: Einfache Idle-Animation mit vordefinierten Sequenzen
   startIdle: () => {
     const store = get();
-    if (!store.fallbackEnabled) return;
+    if (!store.idleEnabled) return;
     
     // Wenn die Idle-Animation bereits aktiv ist, nichts tun
     if (idleActive) {
@@ -129,7 +129,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     idleStep = 0;
     
     // Setze konstante, niedrige Energy für subtile Animation
-    store.updateEnergy(IDLE_ENERGY, { forceFallback: true });
+    store.updateEnergy(IDLE_ENERGY, { forceIdle: true });
     
     // OPTIMIERT: Einfache Schritt-für-Schritt Animation
     idleInterval = setInterval(() => {
@@ -192,24 +192,24 @@ export function useBeatReset(delay: number = 500) {
 
 // OPTIMIERT: Hook für Idle-Animation
 export function useIdleAnimation() {
-  const { isMusicPlaying, fallbackEnabled, startIdle } = useAudioReactionStore();
+  const { isMusicPlaying, idleEnabled, startIdle } = useAudioReactionStore();
   
   // Initialisiere Idle bei Komponentenladung und wenn Musik stoppt
   useEffect(() => {
-    if (!isMusicPlaying && fallbackEnabled) {
+    if (!isMusicPlaying && idleEnabled) {
       console.log("No music playing, activating idle animation");
       // OPTIMIERT: Längere Verzögerung für stabilere Animation und um Track-Wechsel zu berücksichtigen
       const timer = setTimeout(() => {
         // Prüfe nochmal, ob Musik wirklich gestoppt ist (nicht nur Track-Wechsel)
         const currentState = useAudioReactionStore.getState();
-        if (!currentState.isMusicPlaying && currentState.fallbackEnabled) {
+        if (!currentState.isMusicPlaying && currentState.idleEnabled) {
           startIdle();
         }
       }, 5000); // Erhöht auf 5000ms um Track-Wechsel zu berücksichtigen
       
       return () => clearTimeout(timer);
     }
-  }, [isMusicPlaying, fallbackEnabled, startIdle]);
+  }, [isMusicPlaying, idleEnabled, startIdle]);
   
   return idleActive;
 }

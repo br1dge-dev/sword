@@ -36,14 +36,14 @@ export default function HomePage() {
   useEffect(() => {
     setIsClient(true);
     
-    // Musik als nicht spielend markieren, damit Fallback aktiviert wird
+    // Musik als nicht spielend markieren, damit Idle aktiviert wird
     setMusicPlaying(false);
     
     console.log('HomePage mounted');
     
     return () => {
       console.log('HomePage unmounted');
-      // KEIN Cleanup beim Unmount, da der Fallback im Layout läuft
+      // KEIN Cleanup beim Unmount, da die Idle-Animation im Layout läuft
     };
   }, [setMusicPlaying]);
   

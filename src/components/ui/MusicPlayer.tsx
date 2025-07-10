@@ -198,7 +198,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         audioRef.current.pause();
         setIsPlaying(false);
         
-        // Setze Musik als nicht spielend und aktiviere Fallback
+        // Setze Musik als nicht spielend und aktiviere Idle
         setMusicPlaying(false);
         
         // Stoppe die Audio-Analyse
@@ -210,45 +210,29 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         // Erhöhe die Lautstärke, um sicherzustellen, dass Audio hörbar ist
         audioRef.current.volume = Math.max(0.5, audioRef.current.volume);
         
-        // Stelle sicher, dass der Analyzer initialisiert ist
-        if (!analyzerInitialized) {
-          await initializeAudioAnalyzer();
-        }
+        // Spiele den Track ab
+        await audioRef.current.play();
+        setIsPlaying(true);
         
-        try {
-          // Versuche zu spielen und fange Fehler ab
-          await audioRef.current.play();
-          setError(null);
-          setIsPlaying(true);
-          
-          // Setze Musik als spielend und deaktiviere Fallback
-          setMusicPlaying(true);
-          setAudioActive(true);
-          
-          console.log("Music playback started, fallback should deactivate");
-          
-          // Starte die Analyse, wenn sie nicht bereits läuft
-          if (isInitialized && !isAnalyzing) {
-            start();
-          }
-        } catch (playError) {
-          console.error('Error playing audio:', playError);
-          setError('Audio konnte nicht abgespielt werden.');
-          
-          // Bei Fehler Fallback aktivieren
-          setMusicPlaying(false);
+        // Setze Musik als spielend und deaktiviere Idle
+        setMusicPlaying(true);
+        
+        // Starte die Audio-Analyse
+        if (!isAnalyzing) {
+          start();
+          console.log("Music playback started, idle should deactivate");
         }
       }
-    } catch (err) {
-      console.error("Fehler beim Abspielen:", err);
-      setError("Wiedergabe nicht möglich");
+    } catch (error) {
+      console.error('Error toggling playback:', error);
+      setError('Fehler beim Abspielen der Musik.');
       setIsPlaying(false);
       
-      // Bei Fehler Fallback aktivieren
+      // Bei Fehler Idle aktivieren
       setMusicPlaying(false);
     }
   };
-  
+
   // Zum nächsten Track wechseln
   const nextTrack = async () => {
     const wasPlaying = isPlaying;
@@ -257,7 +241,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     if (wasPlaying && audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
-      // OPTIMIERT: Nicht sofort setMusicPlaying(false) setzen, um Fallback-Konflikte zu vermeiden
+      // OPTIMIERT: Nicht sofort setMusicPlaying(false) setzen, um Idle-Konflikte zu vermeiden
       // setMusicPlaying(false);
     }
     

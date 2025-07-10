@@ -51,7 +51,7 @@ import {
 } from './utils/swordUtils';
 
 // Importiere Effekt-Generatoren
-import { generateCaveBackground, generateColoredVeins, generateIdleVeinSequence } from './effects/backgroundEffects';
+import { generateCaveBackground, generateColoredVeins, generateIdleVeinSequence, generateBeatVeins } from './effects/backgroundEffects';
 import { generateHarmonicColorPair } from './effects/colorEffects';
 import {
   generateEdgeGlitches,
@@ -599,55 +599,56 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // performanceMonitor.trackBackgroundUpdate(); // Entfernt
     }
     
-    // OPTIMIERT: Drastisch reduzierte Vein-Dynamik für bessere Performance
-    if ((beatDetected && Math.random() < 0.1) || energy > 0.25) { // Reduziert von 0.2/0.15 auf 0.1/0.25
+  }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions]);
+  
+  // OPTIMIERT: Dynamische Beat-Vein-Generierung für bessere Visualisierung
+  useEffect(() => {
+    // OPTIMIERT: Dynamische Beat-Vein-Generierung für bessere Visualisierung
+    if (beatDetected || energy > 0.05) { // Empfindlicher: ab 0.05 Energy
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
       
-      // OPTIMIERT: Drastisch reduzierte Vein-Generierung
+      // OPTIMIERT: Verwende neue Beat-Vein-Funktion für bessere Performance
       const currentTime = Date.now();
-      const baseVeins = Math.floor(8 + energy * 20); // Reduziert von 15+40 auf 8+20
-      const targetVeins = Math.min(maxVeinsRef.current, baseVeins);
       
-      // Verwende einen deterministischen Seed basierend auf Energy und Beat für rhythmische Dynamik
-      const timeSeed = Math.floor(currentTime / 3000); // Erhöht von 2000ms auf 3000ms für sanftere Änderungen
-      const energySeed = Math.floor(energy * 25); // Reduziert von 50 auf 25
-      const beatSeed = beatDetected ? 1 : 0;
-      const pseudoRandomSeed = timeSeed + energySeed + beatSeed;
+      // Generiere Beat-Veins basierend auf Energy und Beat
+      const beatVeins = generateBeatVeins(bgWidth, bgHeight, energy, beatDetected, viewportWidth, viewportHeight);
       
-      // Generiere neue Veins bei Beat oder wenn zu wenige vorhanden sind
-      if (beatDetected || Math.abs(pseudoRandomSeed - lastVeinSeedRef.current) > 5 || veinsMapRef.current.size < targetVeins * 0.2) { // Erhöht von 3/0.3 auf 5/0.2
-        lastVeinSeedRef.current = pseudoRandomSeed;
+      // Ersetze alle bestehenden Veins mit den neuen Beat-Veins
+      veinsMapRef.current.clear();
+      beatVeins.forEach(vein => {
+        const key = `${vein.x}-${vein.y}`;
+        veinsMapRef.current.set(key, { vein, birth: currentTime });
+      });
+      
+      // Setze das State-Array für das Rendering
+      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+      
+      // OPTIMIERT: Kürzere Lebensdauer für Beat-Veins (3-8 Sekunden)
+      const veinLifetime = beatDetected ? 3000 : Math.max(3000, Math.min(8000, Math.floor(energy * 10000)));
+      
+      // Cleanup nach der Lebensdauer
+      const timeout = setTimeout(() => {
+        const now = Date.now();
+        let changed = false;
         
-        // OPTIMIERT: Drastisch reduzierte Vein-Generierung
-        const newVeinsCount = beatDetected 
-          ? Math.floor(targetVeins * 0.2) // Reduziert von 0.4 auf 0.2
-          : Math.floor(targetVeins * 0.1); // Reduziert von 0.2 auf 0.1
-        
-        const newVeins = generateColoredVeins(bgWidth, bgHeight, newVeinsCount, viewportWidth, viewportHeight);
-        
-        // Füge neue Veins nur hinzu, wenn sie noch nicht existieren
-        newVeins.forEach(vein => {
-          const key = `${vein.x}-${vein.y}`;
-          if (!veinsMapRef.current.has(key)) {
-            veinsMapRef.current.set(key, { vein, birth: currentTime });
-          }
-        });
-        // Entferne Veins, die älter als 5000ms sind
         Array.from(veinsMapRef.current.entries()).forEach(([key, value]) => {
-          if (currentTime - value.birth > 10000) {
+          if (now - value.birth > veinLifetime) {
             veinsMapRef.current.delete(key);
+            changed = true;
           }
         });
-        // Setze das State-Array für das Rendering
-        // setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein)); // Entfernt
         
-        // performanceMonitor.trackVein(); // Entfernt
-      }
+        if (changed) {
+          setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+        }
+      }, veinLifetime);
+      
+      cleanupTimeoutsRef.current.add(timeout);
     }
     
-  }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions]);
+  }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions, setColoredVeins]);
   
   // OPTIMIERT: Separater useEffect für Idle-Animation
   useEffect(() => {
