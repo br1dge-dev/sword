@@ -12,6 +12,7 @@ let fallbackActive = false;
 let beatInterval: NodeJS.Timeout | null = null;
 let energyInterval: NodeJS.Timeout | null = null;
 let fallbackInitialized = false;
+let lastFallbackEnergyLog = 0;
 
 // OPTIMIERT: Stabilere Fallback-Animation um Einfrieren zu verhindern
 const MIN_ENERGY = 0.08; // Erhöht für stabilere Animation und bessere Sichtbarkeit
@@ -72,7 +73,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     lastEnergyUpdate = now;
     set((state) => ({ 
       energy,
-      isAudioActive: energy > 0.05 ? true : state.isAudioActive
+      isAudioActive: energy > 0.02 ? true : state.isAudioActive // Reduziert von 0.05 auf 0.02 für empfindlichere Reaktionen
     }));
   },
   
@@ -178,7 +179,11 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
       // Sanfterer Übergang zum Ziel
       currentEnergy = Math.max(MIN_ENERGY, Math.min(MAX_ENERGY, currentEnergy + energyStep));
       
-      console.log(`Fallback: Setting energy to ${currentEnergy.toFixed(3)}`);
+      const now = Date.now();
+      if (now - lastFallbackEnergyLog > 10000) {
+        console.log(`Fallback: Setting energy to ${currentEnergy.toFixed(3)}`);
+        lastFallbackEnergyLog = now;
+      }
       store.updateEnergy(currentEnergy, { forceFallback: true });
     }, ENERGY_INTERVAL / 20); // Reduziert auf 20 für häufigere Updates
   },

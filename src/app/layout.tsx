@@ -8,7 +8,7 @@
 
 import { useEffect } from 'react';
 import { Inter, Press_Start_2P } from 'next/font/google';
-import { useAudioReactionStore } from '@/store/audioReactionStore';
+import { useAudioReactionStore, useFallbackAnimation } from '@/store/audioReactionStore';
 import '../styles/globals.css';
 
 // Initialize the Inter font with Latin subset
@@ -27,7 +27,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Wir initialisieren den Fallback NICHT mehr im RootLayout, sondern überlassen das den Komponenten
+  // Fallback-Animation im Layout starten, damit sie nicht bei Page-Wechseln unterbrochen wird
+  useFallbackAnimation();
   
   useEffect(() => {
     // Setze nur den Titel und die Beschreibung

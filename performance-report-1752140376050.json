@@ -1,0 +1,42 @@
+{
+  "sessionId": "perf_1752140324448_wdxyq01jt",
+  "startTime": 1752140354280,
+  "endTime": 1752140376049,
+  "duration": 21769,
+  "metrics": [
+    {
+      "timestamp": 1752140368792,
+      "fps": 6,
+      "memoryUsage": 438.5049066543579,
+      "cpuUsage": 0,
+      "renderTime": -1752140309294,
+      "audioLatency": 0,
+      "effectCount": 342,
+      "veinCount": 0,
+      "glitchCount": 0,
+      "backgroundUpdateCount": 0,
+      "colorChangeCount": 10,
+      "beatCount": 0,
+      "energyUpdates": 221,
+      "domNodes": 24773,
+      "eventListeners": 2477,
+      "timeouts": 9,
+      "intervals": 2,
+      "animationFrames": 0
+    }
+  ],
+  "summary": {
+    "averageFps": 6,
+    "minFps": 6,
+    "maxFps": 6,
+    "averageMemory": 438.5049066543579,
+    "peakMemory": 438.5049066543579,
+    "totalBeats": 0,
+    "totalEffects": 342,
+    "performanceIssues": [
+      "Durchschnittliche FPS zu niedrig: 6.0",
+      "Speicherverbrauch zu hoch: 438.5MB",
+      "Zu viele DOM-Nodes erkannt"
+    ]
+  }
+}

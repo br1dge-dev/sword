@@ -39,6 +39,12 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
   const [analyzerInitialized, setAnalyzerInitialized] = useState(false);
   const initializationAttemptedRef = useRef<boolean>(false);
   
+  // Audio-Reaction-Store
+  const { setMusicPlaying, setAudioActive } = useAudioReactionStore(state => ({
+    setMusicPlaying: state.setMusicPlaying,
+    setAudioActive: state.setAudioActive
+  }));
+  
   // Audio-Analyzer Hook
   const {
     initialize,
@@ -51,8 +57,8 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     beatInfo,
     error: analyzerError
   } = useAudioAnalyzer({
-    energyThreshold: 0.4,
-    analyzeInterval: 200, // 200ms zwischen Analysen (5 FPS) für bessere Performance
+    energyThreshold: 0.03, // Reduziert von 0.4 auf 0.03 für empfindlichere Beat-Erkennung
+    analyzeInterval: 50, // Reduziert von 200ms auf 50ms für schnellere Reaktionen
     onBeat: () => {
       console.log('Beat callback triggered from analyzer');
       onBeat?.();
@@ -61,10 +67,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       onEnergyChange?.(e);
     }
   });
-  
-  // Audio-Reaction-Store
-  const setMusicPlaying = useAudioReactionStore(state => state.setMusicPlaying);
-  
+
   // Initialisiere Audio-Analyzer, wenn Audio-Element verfügbar ist
   const initializeAudioAnalyzer = useCallback(async () => {
     if (!audioRef.current || analyzerInitialized || initializationAttemptedRef.current) {
@@ -132,8 +135,9 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     };
     
     const handleEnded = () => {
-      console.log('Audio playback ended');
-      setIsPlaying(false);
+      console.log('Audio playback ended - starting next track');
+      // Automatisch zum nächsten Track wechseln (Endlosschleife)
+      nextTrack();
     };
     
     audio.addEventListener('timeupdate', updateProgress);
@@ -167,7 +171,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
           }
           
           // Setze Audio als aktiv im Store
-          const { setAudioActive } = useAudioReactionStore.getState();
           setAudioActive(true);
           
           return true;
@@ -196,19 +199,13 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         setIsPlaying(false);
         
         // Setze Musik als nicht spielend und aktiviere Fallback
-        const { setMusicPlaying } = useAudioReactionStore.getState();
-        
-        console.log("Music playback stopped, fallback should activate");
+        setMusicPlaying(false);
         
         // Stoppe die Audio-Analyse
         if (isAnalyzing) {
           stop();
           console.log("Stopping audio analysis because playback stopped");
         }
-        
-        // Setze Musik als nicht spielend NACH dem Stoppen der Analyse
-        // Dies ist wichtig, damit der Fallback korrekt aktiviert wird
-        setMusicPlaying(false);
       } else {
         // Erhöhe die Lautstärke, um sicherzustellen, dass Audio hörbar ist
         audioRef.current.volume = Math.max(0.5, audioRef.current.volume);
@@ -225,7 +222,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
           setIsPlaying(true);
           
           // Setze Musik als spielend und deaktiviere Fallback
-          const { setMusicPlaying, setAudioActive } = useAudioReactionStore.getState();
           setMusicPlaying(true);
           setAudioActive(true);
           
@@ -240,7 +236,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
           setError('Audio konnte nicht abgespielt werden.');
           
           // Bei Fehler Fallback aktivieren
-          const { setMusicPlaying } = useAudioReactionStore.getState();
           setMusicPlaying(false);
         }
       }
@@ -250,7 +245,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       setIsPlaying(false);
       
       // Bei Fehler Fallback aktivieren
-      const { setMusicPlaying } = useAudioReactionStore.getState();
       setMusicPlaying(false);
     }
   };

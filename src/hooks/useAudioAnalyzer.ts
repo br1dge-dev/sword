@@ -83,8 +83,8 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     // Standard-Analyseintervall für bessere Performance
     const defaultOptions = {
       analyzeInterval: 50, // Reduziert von 100ms auf 50ms für schnellere Reaktion
-      energyThreshold: 0.05, // Noch niedriger für bessere Beat-Erkennung
-      beatSensitivity: 1.0, // Noch empfindlicher
+      energyThreshold: 0.03, // Noch niedriger für bessere Beat-Erkennung
+      beatSensitivity: 0.8, // Noch empfindlicher
       ...options
     };
     
@@ -110,12 +110,12 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
           }
           
           // Wenn Energie über dem Schwellenwert liegt, könnte es ein Beat sein
-          if (e > (analyzerOptions.energyThreshold || 0.1)) {
+          if (e > (analyzerOptions.energyThreshold || 0.05)) { // Reduziert von 0.1 auf 0.05
             const now = Date.now();
             const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
             
-            // Mindestens 150ms zwischen Beats (reduziert von 200ms)
-            if (timeSinceLastBeat > 150) {
+            // Mindestens 100ms zwischen Beats (reduziert von 150ms)
+            if (timeSinceLastBeat > 100) {
               console.log(`Energy-based beat detected: ${e.toFixed(2)}`);
               setBeatDetected(true);
               triggerBeat();

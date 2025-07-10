@@ -10,7 +10,7 @@ import { generateCluster } from '../utils/swordUtils';
 // Maximale Dimensionen für Hintergründe
 export const MAX_BG_WIDTH = 200;
 export const MAX_BG_HEIGHT = 120;
-export const MAX_VEINS = 300;
+export const MAX_VEINS = 500;
 
 // OPTIMIERT: Cache für Hintergrund-Generierung
 interface BackgroundCache {
@@ -97,6 +97,12 @@ function cleanupCache<T>(cache: Map<string, T>): void {
   }
 }
 
+// Deterministische Pseudozufallsfunktion für (x, y, seed)
+function pseudoRandom(x: number, y: number, seed: number = 0): number {
+  // Einfache Hash-basierte Pseudozufallsfunktion
+  return Math.abs(Math.sin(x * 374761393 + y * 668265263 + seed * 982451653) % 1);
+}
+
 // OPTIMIERT: Lazy-Rendering für Hintergrund-Generierung
 function generateBackgroundRegion(
   background: string[][],
@@ -162,7 +168,8 @@ function generateBackgroundRegion(
       }
       emptyProbability = Math.max(emptyProbability, 0.10);
       
-      if (Math.random() < emptyProbability) {
+      // Ersetze Math.random() durch deterministische Variante
+      if (pseudoRandom(x, y, patternType) < emptyProbability) {
         background[y][x] = ' ';
         continue;
       }
@@ -182,30 +189,31 @@ function generateBackgroundRegion(
       
       if (isLargeViewport && distFromCenter > fadeStart) {
         const lightCharProbability = Math.min(0.85, (distFromCenter - fadeStart) / fadeWidth);
-        if (Math.random() < lightCharProbability) {
+        if (pseudoRandom(x + 1000, y + 1000, patternType) < lightCharProbability) {
           charSet = selectedCharSet.light;
         }
       }
       
       // OPTIMIERT: Reduzierte rhythmische Variationen für bessere Performance
-      if ((x + y) % 7 === 0 || Math.random() < 0.1) {
-        background[y][x] = charSet[Math.floor(Math.random() * charSet.length)];
-      } else if (Math.random() < 0.7) {
+      // Ersetze Math.random() durch deterministische Variante für Zeichenwahl
+      if ((x + y) % 7 === 0 || pseudoRandom(x + 2000, y + 2000, patternType) < 0.1) {
+        background[y][x] = charSet[Math.floor(pseudoRandom(x, y, patternType) * charSet.length)];
+      } else if (pseudoRandom(x + 3000, y + 3000, patternType) < 0.7) {
         const patternY = y % caveBgPatterns.length;
         const patternX = x % caveBgPatterns[patternY].length;
         const baseChar = caveBgPatterns[patternY][patternX];
         
         if (baseChar === '█' || baseChar === '▓') {
-          background[y][x] = selectedCharSet.dense[Math.floor(Math.random() * selectedCharSet.dense.length)];
+          background[y][x] = selectedCharSet.dense[Math.floor(pseudoRandom(x, y, patternType) * selectedCharSet.dense.length)];
         } else if (baseChar === '▒') {
-          background[y][x] = selectedCharSet.medium[Math.floor(Math.random() * selectedCharSet.medium.length)];
+          background[y][x] = selectedCharSet.medium[Math.floor(pseudoRandom(x, y, patternType) * selectedCharSet.medium.length)];
         } else if (baseChar === '░') {
-          background[y][x] = selectedCharSet.light[Math.floor(Math.random() * selectedCharSet.light.length)];
+          background[y][x] = selectedCharSet.light[Math.floor(pseudoRandom(x, y, patternType) * selectedCharSet.light.length)];
         } else {
           background[y][x] = baseChar;
         }
       } else {
-        background[y][x] = charSet[Math.floor(Math.random() * charSet.length)];
+        background[y][x] = charSet[Math.floor(pseudoRandom(x + 4000, y + 4000, patternType) * charSet.length)];
       }
     }
   }

@@ -18,18 +18,18 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
   // Zugriff auf den Fallback-Status
   const isFallbackActive = useAudioReactionStore(state => state.isFallbackActive());
   
-  // OPTIMIERT: Reduzierte Update-Frequenz für bessere Performance
+  // OPTIMIERT: Reaktive Update-Frequenz für visuellen Impact
   useEffect(() => {
     const now = Date.now();
     const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
     
-    // OPTIMIERT: Throttling auf 30fps für bessere Performance
-    if (timeSinceLastUpdate < 33) { // 33ms = ~30fps
+    // OPTIMIERT: Throttling auf 30fps für besseren visuellen Impact
+    if (timeSinceLastUpdate < 33) { // 33ms = ~30fps (zurück von 67ms für bessere Reaktivität)
       return;
     }
     
-    // OPTIMIERT: Nur bei signifikanten Änderungen aktualisieren
-    if (Math.abs(energy - lastEnergyRef.current) > 0.02) {
+    // OPTIMIERT: Empfindlichere Updates für visuellen Impact
+    if (Math.abs(energy - lastEnergyRef.current) > 0.02) { // Zurück zu 0.02 für empfindlichere Updates
       lastEnergyRef.current = energy;
       lastUpdateTimeRef.current = now;
     }

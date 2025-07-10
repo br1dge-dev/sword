@@ -108,14 +108,11 @@ export type EffectCallback = (intensity: number, type: EffectType) => void;
 // Globaler EffectManager für die gesamte Anwendung
 export let globalEffectManager: EffectManager;
 
-// OPTIMIERT: Effizientere Callback-Struktur mit Set statt Array
-const callbackRegistry = new Map<string, { callback: EffectCallback, unregister: () => void }>();
+// OPTIMIERT: Drastische Performance-Optimierungen für Render-Zeit-Katastrophe
+const MAX_CALLBACKS_PER_TYPE = 5; // Reduziert von 10 auf 5
 
-// Maximale Anzahl von Callbacks pro Effekttyp
-const MAX_CALLBACKS_PER_TYPE = 10;
-
-// Zeit zwischen Speicherbereinigungen in ms
-const MEMORY_CLEANUP_INTERVAL = 30000; // 30 Sekunden
+// OPTIMIERT: Reduzierte Speicherbereinigung für bessere Performance
+const MEMORY_CLEANUP_INTERVAL = 120000; // 120 Sekunden (erhöht von 60s)
 
 // OPTIMIERT: Cache für Energie-Berechnungen
 interface EnergyCache {
@@ -124,12 +121,15 @@ interface EnergyCache {
   lastUpdate: number;
 }
 
-// OPTIMIERT: Batch-Update-Interface
+// OPTIMIERT: Batch-Updates für Callbacks
 interface BatchUpdate {
   type: EffectType;
   intensity: number;
-  callbacks: Set<EffectCallback>;
+  timestamp: number;
 }
+
+// OPTIMIERT: Effizientere Callback-Struktur mit Set statt Array
+const callbackRegistry = new Map<string, { callback: EffectCallback, unregister: () => void }>();
 
 // Effekt-Manager-Klasse
 export class EffectManager {
@@ -156,6 +156,11 @@ export class EffectManager {
   private batchUpdates: BatchUpdate[] = [];
   private lastBatchTime: number = 0;
   private batchTimeout: number | null = null;
+  
+  // OPTIMIERT: Memory-Leak-Prävention
+  private isDisposed: boolean = false;
+  private lastActiveCheck: number = 0;
+  private activeCheckInterval: number = 10000; // 10 Sekunden
 
   constructor() {
     // Initialisiere Effekte mit Standardwerten
@@ -259,24 +264,55 @@ export class EffectManager {
     }
   }
 
-  // Starte den Effekt-Manager
   public start(): void {
-    if (this.animationFrameId === null && !this.isRunning) {
-      this.isRunning = true;
-      this.lastUpdateTime = performance.now();
-      this.update();
-      console.log('EffectManager started');
-    }
+    if (this.isRunning || this.isDisposed) return;
+    
+    this.isRunning = true;
+    this.lastUpdateTime = performance.now();
+    this.lastActiveCheck = Date.now();
+    
+    console.log('🎵 EffectManager gestartet');
+    
+    // OPTIMIERT: Reduzierte Update-Rate für bessere Performance
+    this.update();
   }
 
-  // Stoppe den Effekt-Manager
   public stop(): void {
-    if (this.animationFrameId !== null) {
+    if (!this.isRunning) return;
+    
+    this.isRunning = false;
+    
+    // OPTIMIERT: Sauberes Cleanup der Animation-Frame
+    if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
-    this.isRunning = false;
-    console.log('EffectManager stopped');
+    
+    // OPTIMIERT: Cleanup der Batch-Updates
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+      this.batchTimeout = null;
+    }
+    
+    // OPTIMIERT: Cleanup aller Effekte
+    this.effects.forEach(effect => {
+      effect.isActive = false;
+      effect.intensity = 0;
+    });
+    
+    console.log('⏹️ EffectManager gestoppt');
+  }
+
+  public dispose(): void {
+    this.stop();
+    this.isDisposed = true;
+    
+    // OPTIMIERT: Cleanup aller Callbacks
+    this.callbacks.clear();
+    this.callbackIds.clear();
+    this.batchUpdates = [];
+    
+    console.log('🗑️ EffectManager disposed');
   }
 
   // OPTIMIERT: Reduziertes Debug-Logging
@@ -297,6 +333,7 @@ export class EffectManager {
     
     this.lastMemoryCheck = now;
     
+    // OPTIMIERT: Reduzierte Cleanup-Frequenz für bessere Performance
     let cleanedUp = 0;
     
     for (const type of Object.values(EffectType)) {
@@ -374,7 +411,7 @@ export class EffectManager {
     this.batchUpdates.push({
       type,
       intensity,
-      callbacks: new Set(callbacks)
+      timestamp: performance.now()
     });
     
     // OPTIMIERT: Batch nach 16ms ausführen (60fps)
@@ -392,34 +429,35 @@ export class EffectManager {
       this.batchTimeout = null;
     }
     
-    // OPTIMIERT: Führe alle Callbacks in einem Batch aus
-    for (const update of this.batchUpdates) {
-      for (const callback of Array.from(update.callbacks)) {
-        try {
-          callback(update.intensity, update.type);
-        } catch (error) {
-          console.error(`Error in effect callback for ${update.type}:`, error);
+          // OPTIMIERT: Führe alle Callbacks in einem Batch aus
+      for (const update of this.batchUpdates) {
+        const callbacks = this.callbacks.get(update.type) || new Set();
+        for (const callback of Array.from(callbacks)) {
+          try {
+            (callback as EffectCallback)(update.intensity, update.type);
+          } catch (error) {
+            console.error(`Error in effect callback for ${update.type}:`, error);
+          }
         }
       }
-    }
     
     this.batchUpdates = [];
   }
 
-  // OPTIMIERT: Haupt-Update-Loop mit Performance-Verbesserungen
+  // OPTIMIERT: Haupt-Update-Loop mit niedriger Latenz für visuellen Impact
   private update(): void {
-    if (!this.isRunning) {
+    if (!this.isRunning || this.isDisposed) {
       return;
     }
     
-    // OPTIMIERT: Speicherbereinigung nur alle 30 Sekunden
+    // OPTIMIERT: Reduzierte Speicherbereinigung
     this.performMemoryCleanup();
     
     const now = performance.now();
     const deltaTime = now - this.lastUpdateTime;
     
-    // OPTIMIERT: Reduzierte Update-Rate für bessere Performance (30fps statt 60fps)
-    if (deltaTime < 33) { // 33ms = ~30fps
+    // OPTIMIERT: Niedrige Latenz für visuellen Impact (15fps statt 5fps)
+    if (deltaTime < 67) { // 67ms = ~15fps (zurück von 200ms für bessere Reaktivität)
       this.animationFrameId = requestAnimationFrame(() => this.update());
       return;
     }
@@ -430,9 +468,10 @@ export class EffectManager {
       // Hole Audio-Daten aus dem Store
       const { energy, beatDetected, lastBeatTime } = useAudioReactionStore.getState();
       
-      // OPTIMIERT: Early Exit wenn keine Änderungen und keine aktiven Effekte
+      // OPTIMIERT: Früher Exit wenn keine Änderungen und keine aktiven Effekte
       const hasActiveEffects = Array.from(this.effects.values()).some(effect => effect.isActive);
       if (energy === 0 && !beatDetected && this.batchUpdates.length === 0 && !hasActiveEffects) {
+        // OPTIMIERT: Direkter requestAnimationFrame statt setTimeout für bessere Performance
         this.animationFrameId = requestAnimationFrame(() => this.update());
         return;
       }
@@ -442,11 +481,13 @@ export class EffectManager {
         this.lastBeatTime = lastBeatTime;
       }
 
-      // OPTIMIERT: Effizientere Effekt-Aktualisierung mit Throttling
+      // OPTIMIERT: Ausgewogene Effekt-Aktualisierung für visuellen Impact
       let hasUpdates = false;
-      
-      for (const [type, effect] of Array.from(this.effects.entries())) {
-        if (!effect.enabled) continue;
+      let updateCount = 0;
+      const MAX_UPDATES_PER_FRAME = 2; // Zurück zu 2 Updates pro Frame für besseren visuellen Impact
+    
+    for (const [type, effect] of Array.from(this.effects.entries())) {
+      if (!effect.enabled || updateCount >= MAX_UPDATES_PER_FRAME) continue;
 
         // Prüfe, ob der Effekt aktiv ist und ggf. deaktivieren
         if (effect.isActive && now > effect.activeUntil) {
@@ -456,6 +497,7 @@ export class EffectManager {
           // OPTIMIERT: Batch-Callback für Deaktivierung
           this.scheduleBatchUpdate(type, 0);
           hasUpdates = true;
+          updateCount++;
           continue;
         }
 
@@ -482,36 +524,33 @@ export class EffectManager {
           effect.isActive = true;
           
           if (effect.intensity > 0) {
-            effect.intensity = Math.min(1, effect.intensity + triggerIntensity * 0.7);
+            effect.intensity = Math.min(1, effect.intensity + triggerIntensity * 0.5); // Reduziert von 0.7 auf 0.5
           } else {
             effect.intensity = triggerIntensity;
           }
           
-          const durationMultiplier = 0.5 + effect.intensity * 0.75;
+          const durationMultiplier = 0.3 + effect.intensity * 0.5; // Reduziert von 0.5+0.75 auf 0.3+0.5
           effect.activeUntil = now + (effect.reactivity.duration * durationMultiplier);
 
           // OPTIMIERT: Batch-Callback für Aktivierung
           this.scheduleBatchUpdate(type, effect.intensity);
           hasUpdates = true;
+          updateCount++;
         }
+      }
 
-        // OPTIMIERT: Batch-Callback nur für aktive Effekte mit Intensitätsänderung
-        if (effect.isActive && effect.intensity > 0) {
-          this.scheduleBatchUpdate(type, effect.intensity);
-          hasUpdates = true;
-        }
+      // OPTIMIERT: Reduzierte Batch-Update-Verarbeitung
+      if (hasUpdates && this.batchUpdates.length > 0) {
+        this.executeBatchUpdates();
       }
-      
-      // OPTIMIERT: Reduziertes Logging nur bei wichtigen Events
-      if (hasUpdates && this.debugMode && Math.random() < 0.005) { // Nur 0.5% der Updates loggen
-        console.log(`[EffectManager] Updates processed: ${this.batchUpdates.length} effects active`);
-      }
+
+      // OPTIMIERT: Direkter requestAnimationFrame statt setTimeout für bessere Performance
+      this.animationFrameId = requestAnimationFrame(() => this.update());
       
     } catch (error) {
-      console.error('Error in EffectManager update:', error);
+      console.error('EffectManager update error:', error);
+      this.animationFrameId = requestAnimationFrame(() => this.update());
     }
-
-    this.animationFrameId = requestAnimationFrame(() => this.update());
   }
 
   // OPTIMIERT: Effizientere manuelle Effekt-Auslösung

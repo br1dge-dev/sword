@@ -7,7 +7,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { useAudioReactionStore, useFallbackAnimation } from '@/store/audioReactionStore';
+import { useAudioReactionStore } from '@/store/audioReactionStore';
 import AsciiSword from '@/components/ascii/AsciiSword';
 import MusicPlayer from '@/components/ui/MusicPlayer';
 import AudioVisualizer from '@/components/ui/AudioVisualizer';
@@ -32,17 +32,18 @@ export default function HomePage() {
     }
   }, [beatDetected]);
   
-  // Client-Side Rendering aktivieren und Fallback starten
+  // Client-Side Rendering aktivieren
   useEffect(() => {
     setIsClient(true);
     
     // Musik als nicht spielend markieren, damit Fallback aktiviert wird
     setMusicPlaying(false);
     
-    console.log('HomePage mounted, fallback should start');
+    console.log('HomePage mounted');
     
     return () => {
       console.log('HomePage unmounted');
+      // KEIN Cleanup beim Unmount, da der Fallback im Layout läuft
     };
   }, [setMusicPlaying]);
   
@@ -51,8 +52,8 @@ export default function HomePage() {
     const now = Date.now();
     const timeSinceLastLog = now - lastLogTimeRef.current;
     
-    // OPTIMIERT: Log nur alle 5 Sekunden oder bei signifikanten Änderungen
-    if (timeSinceLastLog > 5000 || Math.abs(energy - lastEnergyRef.current) > 0.3 || beatDetected) {
+    // OPTIMIERT: Log nur alle 10 Sekunden oder bei signifikanten Änderungen (erhöht von 5s auf 10s)
+    if (timeSinceLastLog > 10000 || Math.abs(energy - lastEnergyRef.current) > 0.5 || beatDetected) { // Erhöht von 0.3 auf 0.5
       console.log(`Energy changed: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
       lastLogTimeRef.current = now;
       lastEnergyRef.current = energy;
@@ -89,7 +90,7 @@ export default function HomePage() {
         </div>
         
         {/* UI-Elemente auf der linken Seite, untereinander angeordnet */}
-        <div className="absolute left-[10%] top-1/2 transform -translate-y-1/2 z-10 flex flex-col gap-8">
+        <div className="hidden sm:flex absolute left-[10%] top-1/2 transform -translate-y-1/2 z-10 flex-col gap-8">
           {/* AudioVisualizer oben */}
           <AudioVisualizer 
             energy={energy} 
@@ -116,6 +117,7 @@ export default function HomePage() {
             onEnergyChange={handleEnergyChange}
           />
         </div>
+        
       </div>
     </main>
   );

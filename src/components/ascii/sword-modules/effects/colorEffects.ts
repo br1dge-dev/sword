@@ -142,46 +142,49 @@ export function generateColoredTiles(
   beatDetected: boolean,
   glitchLevel: number
 ): Array<{x: number, y: number, color: string}> {
+  // Maximal 1-3 Tiles aktiv, langsam rotierend
   const coloredTiles: Array<{x: number, y: number, color: string}> = [];
-  
-  // Berechne die Anzahl der farbigen Kacheln basierend auf Energie und Beat
-  // Erhöhte Basisanzahl und stärkere Reaktion auf Energie für bessere Sichtbarkeit
-  let numTiles = Math.floor(positions.length * 0.05); // Basiswert: 5% der Schwertpositionen (erhöht von 0.03)
-  
-  // Erhöhe die Anzahl basierend auf Energie und Beat
-  numTiles += Math.floor(positions.length * energy * 0.15); // Erhöht von 0.1 für bessere Sichtbarkeit
-  
-  // Zusätzliche Kacheln bei Beat-Erkennung
-  if (beatDetected) {
-    numTiles += Math.floor(positions.length * 0.08); // Erhöht von 0.05 für bessere Sichtbarkeit
-  }
-  
-  // Zusätzliche Kacheln bei höherem Glitch-Level
-  numTiles += Math.floor(glitchLevel * positions.length * 0.04); // Erhöht von 0.02 für bessere Sichtbarkeit
-  
-  // Begrenze die maximale Anzahl
-  const maxTiles = Math.floor(positions.length * 0.4); // Erhöht von 0.3 für bessere Sichtbarkeit
-  numTiles = Math.min(numTiles, maxTiles);
-  
-  // Wähle zufällige Positionen aus
-  const selectedPositions = [...positions]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, numTiles);
-  
-  // Erstelle farbige Kacheln für die ausgewählten Positionen
+
+  // Bestimme die Anzahl der Tiles (1 bei wenig Energie, max. 3 bei Beat oder hoher Energie)
+  let numTiles = 1;
+  if (energy > 0.08 || beatDetected) numTiles = 2;
+  if (energy > 0.15 || (beatDetected && glitchLevel > 0)) numTiles = 3;
+
+  // Wähle zufällige, aber stabile Positionen (z.B. per Seed aus Energie/Beat)
+  const seed = Math.floor((energy * 1000) + (beatDetected ? 100 : 0) + (glitchLevel * 10));
+  const stablePositions = [...positions].sort((a, b) => {
+    // Einfache Pseudozufallsfunktion
+    const aVal = ((a.x + 1) * (a.y + 1) * seed) % 1000;
+    const bVal = ((b.x + 1) * (b.y + 1) * seed) % 1000;
+    return aVal - bVal;
+  });
+  const selectedPositions = stablePositions.slice(0, numTiles);
+
+  // Dezente Farben: Wähle aus accentColors, aber mische mit Basisfarbe für weniger Sättigung
   for (const pos of selectedPositions) {
-    // Wähle eine zufällige Farbe aus den Akzentfarben
-    const color = accentColors[Math.floor(Math.random() * accentColors.length)];
-    
-    // Füge die farbige Kachel hinzu
-    coloredTiles.push({
-      x: pos.x,
-      y: pos.y,
-      color
-    });
+    const accent = accentColors[Math.floor(Math.random() * accentColors.length)];
+    // Mische mit Basisfarbe (z.B. 60% Basis, 40% Akzent)
+    const base = baseColors[Math.floor(Math.random() * baseColors.length)];
+    const color = mixColors(base, accent, 0.4); // 0.4 = 40% Akzent, 60% Basis
+    coloredTiles.push({ x: pos.x, y: pos.y, color });
   }
-  
+
   return coloredTiles;
+}
+
+// Hilfsfunktion zum Mischen zweier Hex-Farben
+function mixColors(hex1: string, hex2: string, ratio: number): string {
+  // ratio: Anteil von hex2
+  const r1 = parseInt(hex1.slice(1, 3), 16);
+  const g1 = parseInt(hex1.slice(3, 5), 16);
+  const b1 = parseInt(hex1.slice(5, 7), 16);
+  const r2 = parseInt(hex2.slice(1, 3), 16);
+  const g2 = parseInt(hex2.slice(3, 5), 16);
+  const b2 = parseInt(hex2.slice(5, 7), 16);
+  const r = Math.round(r1 * (1 - ratio) + r2 * ratio);
+  const g = Math.round(g1 * (1 - ratio) + g2 * ratio);
+  const b = Math.round(b1 * (1 - ratio) + b2 * ratio);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
 /**

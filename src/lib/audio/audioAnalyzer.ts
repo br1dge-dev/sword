@@ -30,8 +30,8 @@ export class AudioAnalyzer {
   private lastAnalyzeTime: number = 0;
   private lastBeatTime: number = 0; // Zeit des letzten erkannten Beats
   private options: AudioAnalyzerOptions = {
-    beatSensitivity: 1.5, // Erhöht für aktivere Beat-Erkennung
-    energyThreshold: 0.1, // Reduziert von 0.4 auf 0.1 für empfindlichere Reaktionen
+    beatSensitivity: 1.0,
+    energyThreshold: 0.04, // Fester Wert, nicht mehr dynamisch
     analyzeInterval: 50
   };
   private initializationPromise: Promise<void> | null = null;
@@ -198,6 +198,16 @@ export class AudioAnalyzer {
     }
   }
 
+  public setBeatSensitivity(sensitivity: number): void {
+    this.options.beatSensitivity = Math.max(0.1, Math.min(5.0, sensitivity));
+    console.log('Beat sensitivity set to:', this.options.beatSensitivity);
+  }
+
+  public setEnergyThreshold(threshold: number): void {
+    this.options.energyThreshold = Math.max(0.01, Math.min(1.0, threshold));
+    console.log('Energy threshold set to:', this.options.energyThreshold);
+  }
+
   private analyze(): void {
     if (!this.isAnalyzing || !this.analyser || !this.frequencyData) {
       return;
@@ -231,7 +241,7 @@ export class AudioAnalyzer {
       const energy = average / 255; // Normalisiere auf 0-1
       
       // OPTIMIERT: Empfindlichere Reaktion für visuellen Impact
-      if (energy < 0.01) { // Zurück zu 0.01 für empfindlichere Reaktionen
+      if (energy < 0.005) { // Reduziert von 0.01 auf 0.005 für empfindlichere Reaktionen
         this.noDataCount++;
         if (this.noDataCount > this.maxNoDataCount) {
           if (this.options.onEnergy) {
@@ -246,7 +256,7 @@ export class AudioAnalyzer {
       this.noDataCount = 0;
       
       // OPTIMIERT: Reaktive Energy-Updates für visuellen Impact
-      if (Math.abs(energy - this.lastEnergy) > 0.02 || energy > 0.1) { // Zurück zu 0.02/0.1 für bessere Reaktivität
+      if (Math.abs(energy - this.lastEnergy) > 0.01 || energy > 0.05) { // Reduziert von 0.02/0.1 auf 0.01/0.05 für empfindlichere Reaktionen
         this.lastEnergy = energy;
         
         if (this.options.onEnergy) {
@@ -254,27 +264,26 @@ export class AudioAnalyzer {
         }
       }
 
-      // OPTIMIERT: Verbesserte Beat-Erkennung mit Throttling
+      // Nur noch die neue Schwellen-Logik:
       if (energy > this.options.energyThreshold!) {
         const timeSinceLastBeat = now - this.lastBeatTime;
-        
-        // OPTIMIERT: Mindestens 100ms zwischen Beats für aktivere Erkennung (reduziert von 200ms)
-        if (timeSinceLastBeat > 100) {
+        if (timeSinceLastBeat > 180) {
           const beatIntensity = energy / this.options.energyThreshold!;
-          const beatSensitivity = this.options.beatSensitivity || 1.5;
-          
-          // OPTIMIERT: Aktivere Beat-Erkennung für bessere Animation
-          if (beatIntensity > beatSensitivity && Math.random() < 0.95) { // 95% Wahrscheinlichkeit (erhöht von 80%)
+          const beatSensitivity = this.options.beatSensitivity || 1.0;
+          const minSensitivity = 0.5;
+          const maxSensitivity = 3.0;
+          const effectiveThreshold = 5 + (maxSensitivity - beatSensitivity) * 5;
+          console.log(`[AudioAnalyzer] BeatIntensity: ${beatIntensity.toFixed(2)}, EffectiveThreshold: ${effectiveThreshold.toFixed(2)}, Regler: ${beatSensitivity}`);
+          if (beatIntensity > effectiveThreshold && Math.random() < 0.75) {
             this.lastBeatTime = now;
-            
-            console.log(`[AudioAnalyzer] Beat! Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}, Threshold: ${this.options.energyThreshold}, Sensitivity: ${beatSensitivity}`);
-            
+            console.log(`[AudioAnalyzer] Beat! Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}, Sensitivity-Regler: ${beatSensitivity}, EffectiveThreshold: ${effectiveThreshold}`);
             if (this.options.onBeat) {
               this.options.onBeat(now);
             }
           }
         }
       }
+      // Die High-Energy-Beat-Detection ist entfernt!
 
       this.lastAnalyzeTime = now;
       this.animationFrameId = requestAnimationFrame(() => this.analyze());

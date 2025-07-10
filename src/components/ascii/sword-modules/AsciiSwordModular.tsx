@@ -10,7 +10,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
 import { useAudioReactionStore, useBeatReset } from '@/store/audioReactionStore';
-import { getPerformanceMonitor } from '@/lib/performance/performanceMonitor';
+import { useAudioAnalyzer } from '@/hooks/useAudioAnalyzer';
+// import { getPerformanceMonitor } from '@/lib/performance/performanceMonitor';
 // import { getPerformanceOptimizer } from '@/lib/performance/performanceOptimizer';
 
 // Importiere Typen
@@ -79,7 +80,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // Fallback-Animation läuft jetzt im Layout, nicht mehr hier
   
   // Performance Monitor
-  const performanceMonitor = getPerformanceMonitor();
+  // Entferne die Zeile mit getPerformanceMonitor und alle auskommentierten Performance-Optimizer-Zeilen
   
   // OPTIMIERT: Performance Optimizer vorübergehend deaktiviert
   // const performanceOptimizer = getPerformanceOptimizer();
@@ -145,6 +146,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const maxVeinsRef = useRef<number>(500); // Erhöht auf 500 für mehr Veins
   const veinCleanupIntervalRef = useRef<number>(20000); // Erhöht von 15000ms auf 20000ms für bessere Performance
   const veinGenerationIntervalRef = useRef<number>(12000); // Erhöht von 8000ms auf 12000ms für bessere Performance
+  const lastVeinLogTimeRef = useRef<number>(0);
 
   // Vein-Handling als Map
   const veinsMapRef = useRef(new Map<string, {vein: {x: number, y: number, color: string}, birth: number}>());
@@ -307,7 +309,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       }
       // Debug-Log
       if (newVeins > 0) {
-        console.log(`[Veins] Aktiv: ${veinsMapRef.current.size}, Neu: ${newVeins}, Energie: ${energy}, Beat: ${beatDetected}`);
+        const now = Date.now();
+        if (now - lastVeinLogTimeRef.current > 10000) {
+          console.log(`[Veins] Aktiv: ${veinsMapRef.current.size}, Neu: ${newVeins}, Energie: ${energy}, Beat: ${beatDetected}`);
+          lastVeinLogTimeRef.current = now;
+        }
       }
     }, 100);
     return () => clearInterval(interval);
@@ -385,7 +391,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const [glitchChars, setGlitchChars] = useState<Array<{x: number, y: number, char: string}>>([]);
   const [caveBackground, setCaveBackground] = useState<string[][]>([]);
   const [coloredVeins, setColoredVeins] = useState<Array<{x: number, y: number, color: string}>>([]);
-  const [edgeEffects, setEdgeEffects] = useState<Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}>>([]);
+  const [edgeEffects, setEdgeEffects] = useState<Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}, rotation?: number, fontSize?: number}>>([]);
   const [unicodeGlitches, setUnicodeGlitches] = useState<Array<{x: number, y: number, char: string}>>([]);
   const [blurredChars, setBlurredChars] = useState<Array<{x: number, y: number}>>([]);
   const [skewedChars, setSkewedChars] = useState<Array<{x: number, y: number, angle: number}>>([]);
@@ -525,12 +531,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     if ((beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || energy > 0.03) { // Noch empfindlicher: ab 0.03
       const randomIntensity = Math.random() * 0.15 + 0.05; // Zurück zu 0.15 für besseren visuellen Impact
       setGlowIntensity(randomIntensity);
-      performanceMonitor.trackEffect();
+      // performanceMonitor.trackEffect(); // Entfernt
       effectsTriggered++;
     }
     
     // Tile-Effekte - Nur bei sehr deutlichen Beats oder höherer Energy
     if ((beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || energy > 0.03) {
+      console.log(`[Tiles] Bedingung erfüllt: beatDetected=${beatDetected}, energy=${energy.toFixed(3)}, effectsTriggered=${effectsTriggered}`);
+      
       const tempIntensity = { ...colorEffectIntensity };
       for (const level in tempIntensity) {
         if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
@@ -538,16 +546,30 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           tempIntensity[numLevel] = Math.min(2, tempIntensity[numLevel] + Math.floor(energy * (beatDetected ? 1 : 0.5)));
         }
       }
-      setColoredTiles(generateColoredTiles(swordPositions, glitchLevel, tempIntensity));
-      performanceMonitor.trackEffect();
+      
+      const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity);
+      console.log(`[Tiles] Generiert: ${generatedTiles.length} Tiles`);
+      
+      setColoredTiles(generatedTiles);
+      // performanceMonitor.trackEffect(); // Entfernt
       effectsTriggered++;
-      // OPTIMIERT: Längere Cleanup-Dauer für sanftere Übergänge
-      const duration = beatDetected ? 2000 : 1500; // Erhöht von 1200/1000 auf 2000/1500 für weniger Flackern
+      
+      // VARIABLE DARSTELLUNGSDAUER: 1000ms Minimum, 3000ms Maximum
+      // Bei hoher Intensität (hohe Energie/Beat) kürzere Dauer, bei niedriger Intensität längere Dauer
+      const intensity = Math.min(1, (energy * 2) + (beatDetected ? 0.5 : 0));
+      const minDuration = 50; // Minimum 50ms (0,1 Sekunde) - erhöht von 20ms
+      const maxDuration = 3000; // Maximum 3000ms (3 Sekunden)
+      const duration = maxDuration - (intensity * (maxDuration - minDuration));
+      
+      console.log(`[Tiles] Dauer: ${duration}ms (Intensität: ${intensity.toFixed(3)})`);
+      
       const timeout = setTimeout(() => {
         setColoredTiles([]); // Nach Ablauf werden die Tiles entfernt
+        console.log(`[Tiles] Tiles entfernt nach ${duration}ms`);
       }, duration);
       cleanupTimeoutsRef.current.add(timeout);
     } else {
+      console.log(`[Tiles] Bedingung NICHT erfüllt: beatDetected=${beatDetected}, energy=${energy.toFixed(3)}, effectsTriggered=${effectsTriggered}`);
       setColoredTiles([]); // Wenn keine Bedingungen erfüllt, Tiles sofort entfernen
     }
     
@@ -556,7 +578,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const tempGlitchLevel = Math.min(1, Math.floor(glitchLevel + (energy * 1.0))); // Reduziert von 2/1.5 auf 1/1.0
       
       setUnicodeGlitches(generateUnicodeGlitches(swordPositions, tempGlitchLevel));
-      performanceMonitor.trackGlitch();
+      // performanceMonitor.trackGlitch(); // Entfernt
       
       // OPTIMIERT: Längere Cleanup-Dauer
       const duration = beatDetected ? 500 : Math.max(400, Math.min(600, Math.floor(energy * 300))); // Erhöht von 300/250-400 auf 500/400-600 für weniger Flackern
@@ -573,7 +595,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
       
       setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-      performanceMonitor.trackBackgroundUpdate();
+      // performanceMonitor.trackBackgroundUpdate(); // Entfernt
     }
     
     // OPTIMIERT: Drastisch reduzierte Vein-Dynamik für bessere Performance
@@ -620,7 +642,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         // Setze das State-Array für das Rendering
         // setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein)); // Entfernt
         
-        performanceMonitor.trackVein();
+        // performanceMonitor.trackVein(); // Entfernt
       }
     }
     
@@ -640,32 +662,73 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setLastColorChangeTime(Date.now());
       setColorStability(newStability);
       
-      performanceMonitor.trackColorChange();
+      // performanceMonitor.trackColorChange(); // Entfernt
     }
-  }, [beatDetected, energy, lastColorChangeTime, colorStability, performanceMonitor]);
+  }, [beatDetected, energy, lastColorChangeTime, colorStability]);
   
-  // OPTIMIERT: Drastisch reduzierte Audio-reaktive Edge-Effekte für bessere Performance
+  // OPTIMIERT: Verbesserte Audio-reaktive Edge-Effekte basierend auf Charge-Level
   useEffect(() => {
     if (beatDetected || energy > 0.03) { // Noch empfindlicher: ab 0.03
       if (edgePositions.length === 0) return;
       
-      const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}}> = [];
+      const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}, rotation?: number}> = [];
       
-      const vibrationChance = (vibrationIntensity[chargeLevel as keyof typeof vibrationIntensity] || 0.2) * 0.3; // Reduziert um 70%
-      const glitchChance = (glitchFrequency[chargeLevel as keyof typeof glitchFrequency] || 0.1) * 0.2; // Reduziert um 80%
-      const colorChance = (colorEffectFrequency[chargeLevel as keyof typeof colorEffectFrequency] || 0.15) * 0.3; // Reduziert um 70%
+      // CHARGE-LEVEL BASIERTE EFFEKTE
+      let vibrationChance, glitchChance, colorChance, rotationChance, patternSwapChance;
       
-      const glitchMultiplier = chargeLevel === 2 ? 1.1 : 1; // Reduziert von 1.2 auf 1.1
-      const energyMultiplier = 1 + (energy * 1.0); // Reduziert von 1.5 auf 1.0
+      switch (chargeLevel) {
+        case 1:
+          // CHARGE LVL1: Dünne Außenlinien, minimal vibrieren, selten Pattern-Tausch
+          vibrationChance = 0.1 + (energy * 0.2); // Minimal, reaktiv auf Musik-Intensität
+          glitchChance = 0.05; // Sehr selten
+          colorChance = 0.08; // Selten
+          rotationChance = 0.15; // Dünne Linien können sich drehen
+          patternSwapChance = 0.02; // Sehr selten mit Hintergrund-Pattern tauschen
+          break;
+          
+        case 2:
+          // CHARGE LVL2: Stärkere Vibrationen, stärkerer Glow
+          vibrationChance = 0.3 + (energy * 0.4); // Sichtbarer und stärker
+          glitchChance = 0.15; // Häufiger
+          colorChance = 0.25; // Häufiger
+          rotationChance = 0.25; // Häufigere Rotation
+          patternSwapChance = 0.08; // Häufigerer Pattern-Tausch
+          break;
+          
+        case 3:
+          // CHARGE LVL3: Von allem noch mehr
+          vibrationChance = 0.5 + (energy * 0.6); // Sehr stark
+          glitchChance = 0.3; // Sehr häufig
+          colorChance = 0.4; // Sehr häufig
+          rotationChance = 0.4; // Sehr häufige Rotation
+          patternSwapChance = 0.15; // Häufiger Pattern-Tausch
+          break;
+          
+        default:
+          // Fallback für Level 0 oder undefined
+          vibrationChance = 0.05;
+          glitchChance = 0.02;
+          colorChance = 0.05;
+          rotationChance = 0.05;
+          patternSwapChance = 0.01;
+      }
       
-      const effectiveVibrationChance = Math.min(0.6, vibrationChance * energyMultiplier); // Reduziert von 0.8 auf 0.6
-      const effectiveGlitchChance = Math.min(0.6, glitchChance * glitchMultiplier * energyMultiplier); // Reduziert von 0.8 auf 0.6
-      const effectiveColorChance = Math.min(0.6, colorChance * energyMultiplier); // Reduziert von 0.8 auf 0.6
+      // Energie-Multiplikator für reaktive Intensität
+      const energyMultiplier = 1 + (energy * 1.5);
+      
+      // Effektive Chancen mit Energie-Multiplikator
+      const effectiveVibrationChance = Math.min(0.8, vibrationChance * energyMultiplier);
+      const effectiveGlitchChance = Math.min(0.7, glitchChance * energyMultiplier);
+      const effectiveColorChance = Math.min(0.7, colorChance * energyMultiplier);
+      const effectiveRotationChance = Math.min(0.6, rotationChance * energyMultiplier);
+      const effectivePatternSwapChance = Math.min(0.3, patternSwapChance * energyMultiplier);
       
       edgePositions.forEach(pos => {
+        // VIBRATION (reaktiv auf Musik-Intensität)
         if (Math.random() < effectiveVibrationChance) {
-          const offsetX = Math.random() < 0.5 ? -1 : 1;
-          const offsetY = Math.random() < 0.5 ? -1 : 1;
+          const intensity = energy * (chargeLevel * 0.5 + 0.5); // Stärkere Vibration bei höherem Level
+          const offsetX = (Math.random() - 0.5) * intensity * 2;
+          const offsetY = (Math.random() - 0.5) * intensity * 2;
           
           newEdgeEffects.push({
             x: pos.x,
@@ -674,9 +737,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           });
         }
         
+        // ROTATION (dünne Linien drehen sich)
+        if (Math.random() < effectiveRotationChance) {
+          const rotationAngle = (Math.random() - 0.5) * 30; // ±15 Grad Rotation
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            rotation: rotationAngle
+          });
+        }
+        
+        // GLITCH-ZEICHEN
         if (Math.random() < effectiveGlitchChance) {
-          const glitchCharSet = Math.floor(Math.random() * edgeGlitchChars[1].length);
-          const glitchChar = edgeGlitchChars[1][glitchCharSet];
+          const glitchCharSet = Math.floor(Math.random() * edgeGlitchChars[chargeLevel as keyof typeof edgeGlitchChars]?.length || edgeGlitchChars[1].length);
+          const glitchChar = edgeGlitchChars[chargeLevel as keyof typeof edgeGlitchChars]?.[glitchCharSet] || edgeGlitchChars[1][glitchCharSet];
           
           newEdgeEffects.push({
             x: pos.x,
@@ -685,6 +759,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           });
         }
         
+        // FARB-EFFEKTE
         if (Math.random() < effectiveColorChance) {
           const colorIndex = Math.floor(Math.random() * accentColors.length);
           const edgeColor = accentColors[colorIndex];
@@ -695,25 +770,64 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             color: edgeColor
           });
         }
+        
+        // PATTERN-SWAP (mit Hintergrund-Elementen tauschen)
+        if (Math.random() < effectivePatternSwapChance) {
+          // Wähle ein zufälliges Hintergrund-Zeichen
+          const backgroundChars = ['░', '▒', '▓', '█', '▄', '▀', '▌', '▐'];
+          const randomBgChar = backgroundChars[Math.floor(Math.random() * backgroundChars.length)];
+          
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            char: randomBgChar
+          });
+        }
       });
       
       setEdgeEffects(newEdgeEffects);
-      performanceMonitor.trackEffect();
       
       // Cleanup für Edge-Effekte - Längere Dauer für sanftere Übergänge
-      const duration = beatDetected ? 250 : Math.max(200, Math.min(300, Math.floor(energy * 150))); // Erhöht von 150/120-200 auf 250/200-300 für weniger Flackern
+      const duration = beatDetected ? 250 : Math.max(200, Math.min(300, Math.floor(energy * 150)));
       const timeout = setTimeout(() => {
         setEdgeEffects([]);
       }, duration);
       cleanupTimeoutsRef.current.add(timeout);
     }
-  }, [beatDetected, energy, chargeLevel, edgePositions, performanceMonitor]);
+  }, [beatDetected, energy, chargeLevel, edgePositions]);
   
   // OPTIMIERT: Memoisierte Berechnungen für Rendering
   const shadowSize = useMemo(() => Math.floor(glowIntensity * 20), [glowIntensity]);
   const textShadow = useMemo(() => `0 0 ${shadowSize + (glitchLevel * 2)}px ${baseColor}`, [shadowSize, glitchLevel, baseColor]);
   const backgroundColor = useMemo(() => getDarkerColor(bgColor), [bgColor]);
   const lighterBgColor = useMemo(() => getLighterColor(bgColor), [bgColor]);
+
+  // Hilfsfunktion: Finde Parierstangen- und Klingenbereich
+  const getBladeAuraPositions = useCallback(() => {
+    const lines = centeredSwordLines;
+    const middleX = Math.floor(lines[0].length / 2);
+    // Parierstange finden (erste Zeile mit '__▓█▓__' o.ä.)
+    const hiltY = lines.findIndex(line => line.includes('__▓█▓__') || line.includes('_▓██▓_') || line.includes('_▓███▓_'));
+    if (hiltY === -1) return [];
+    // Klingenbereich: von hiltY-1 (direkt über Parierstange) bis 0 (Spitze)
+    const bladeStartY = 0;
+    const bladeEndY = hiltY - 1;
+    const bladeLen = bladeEndY - bladeStartY + 1;
+    let auraPositions: Array<{x: number, y: number, side: 'left'|'right'}> = [];
+    if (chargeLevel >= 2) {
+      // Lvl2 & Lvl3: nur untere Hälfte (von Parierstange bis Mitte)
+      const halfLen = Math.floor(bladeLen / 2);
+      for (let y = bladeEndY; y >= bladeEndY - halfLen + 1; y--) {
+        auraPositions.push({ x: middleX - 1, y, side: 'left' });
+        auraPositions.push({ x: middleX + 1, y, side: 'right' });
+      }
+    }
+    return auraPositions;
+  }, [centeredSwordLines, chargeLevel]);
+
+  // Entferne Beat-Detector-States, -UI und -useEffects
+  // Entferne performanceMonitor und getPerformanceMonitor
+  // Entferne alle Importe, die nur für Beat-Detector oder Performance Monitor benötigt wurden
 
   return (
     <div 
@@ -841,8 +955,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                 style.color = coloredTile.color;
                 style.textShadow = `0 0 ${shadowSize}px ${coloredTile.color}`;
               }
+              
+              // ROTATION-EFFEKT (Charge Level 1+)
+              if (edgeEffect?.rotation !== undefined) {
+                style.transform = `${style.transform || ''} rotate(${edgeEffect.rotation}deg)`.trim();
+              }
+              
               if (edgeEffect?.offset) {
-                style.transform = `translate(${edgeEffect.offset.x}px, ${edgeEffect.offset.y}px)`;
+                style.transform = `${style.transform || ''} translate(${edgeEffect.offset.x}px, ${edgeEffect.offset.y}px)`.trim();
               }
               const isBlurred = blurredChars.some(c => c.x === x && c.y === y);
               if (isBlurred) {
@@ -860,6 +980,22 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                                  glitch ? glitch.char : 
                                  edgeEffect?.char ? edgeEffect.char : 
                                  char;
+              // Charge-Aura prüfen
+              const auraPos = getBladeAuraPositions().find(pos => pos.x === x && pos.y === y);
+              if (auraPos) {
+                if (chargeLevel === 3) {
+                  style.color = '#FFD700'; // Kräftiges Gelb für Lvl3
+                  style.textShadow = '0 0 16px #FFD700, 0 0 32px #FFD700';
+                } else {
+                  style.color = '#FFDF6B'; // Gelb für Lvl2
+                  style.textShadow = '0 0 8px #FFDF6B, 0 0 16px #FFDF6B';
+                }
+                return (
+                  <span key={`aura-${x}-${y}`} style={style}>
+                    |
+                  </span>
+                );
+              }
               return (
                 <span 
                   key={`sword-${x}-${y}`}
