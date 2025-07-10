@@ -1,7 +1,6 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { AudioAnalyzer, AudioAnalyzerOptions } from '../lib/audio/audioAnalyzer';
-import { BeatDetectionResult } from '../lib/audio/audioAnalyzer';
-import { useAudioReactionStore } from '../store/audioReactionStore';
+import { useEffect, useRef, useState } from 'react';
+import { AudioAnalyzer, AudioAnalyzerOptions, BeatDetectionResult } from '../lib/audio/audioAnalyzer';
+import { useAudioReactionStore } from '@/store/audioReactionStore';
 
 interface UseAudioAnalyzerOptions extends AudioAnalyzerOptions {
   autoStart?: boolean;
@@ -23,8 +22,10 @@ interface UseAudioAnalyzerReturn {
   error: Error | null;
 }
 
-// Globale Variablen für den Audio-Analyzer
-let globalAnalyzer: AudioAnalyzer | null = null;
+// Globaler Analyzer für die gesamte Anwendung
+export let globalAnalyzer: AudioAnalyzer | null = null;
+
+// Flag, um zu verfolgen, ob eine Initialisierung im Gange ist
 let isGlobalInitializing = false;
 
 // Debounce-Funktion für Logging
@@ -79,14 +80,11 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   
   // Initialize analyzer with options
   useEffect(() => {
-    // Hole aktuelle Sensitivity-Werte aus dem Store
-    const { beatSensitivity, energyThreshold } = useAudioReactionStore.getState();
-    
     // Standard-Analyseintervall für bessere Performance
     const defaultOptions = {
       analyzeInterval: 50, // Reduziert von 100ms auf 50ms für schnellere Reaktion
-      energyThreshold: energyThreshold, // Verwende Store-Wert
-      beatSensitivity: beatSensitivity, // Verwende Store-Wert
+      energyThreshold: 0.03, // Noch niedriger für bessere Beat-Erkennung
+      beatSensitivity: 0.8, // Noch empfindlicher
       ...options
     };
     
@@ -106,13 +104,13 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
           setEnergy(e);
           updateEnergy(e); // Aktualisiere den globalen Store
           
-          // Wenn Energie über dem Store-Schwellenwert liegt, setzen wir Audio als aktiv
-          if (e > energyThreshold) {
+          // Wenn Energie über 0.03 liegt, setzen wir Audio als aktiv (reduziert von 0.05)
+          if (e > 0.03) {
             setAudioActive(true);
           }
           
           // Wenn Energie über dem Schwellenwert liegt, könnte es ein Beat sein
-          if (e > energyThreshold) {
+          if (e > (analyzerOptions.energyThreshold || 0.05)) { // Reduziert von 0.1 auf 0.05
             const now = Date.now();
             const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
             
@@ -135,10 +133,6 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       // Verwende den existierenden globalen Analyzer
       analyzerRef.current = globalAnalyzer;
       
-      // Aktualisiere die Sensitivity-Werte des bestehenden Analyzers
-      globalAnalyzer.setBeatSensitivity(beatSensitivity);
-      globalAnalyzer.setEnergyThreshold(energyThreshold);
-      
       // Debounce das Logging, um Konsolenflut zu vermeiden
       logDebouncer('usingExistingAnalyzer', () => {
         console.log('Using existing global audio analyzer');
@@ -156,19 +150,6 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       }
     };
   }, [updateEnergy, triggerBeat, setAudioActive, options]);
-  
-  // Effekt für Sensitivity-Updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const { beatSensitivity, energyThreshold } = useAudioReactionStore.getState();
-      if (globalAnalyzer) {
-        globalAnalyzer.setBeatSensitivity(beatSensitivity);
-        globalAnalyzer.setEnergyThreshold(energyThreshold);
-      }
-    }, 1000); // Prüfe alle Sekunde auf Updates
-    
-    return () => clearInterval(interval);
-  }, []);
   
   const initialize = async (audioElement: HTMLAudioElement) => {
     try {

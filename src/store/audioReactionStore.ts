@@ -26,7 +26,6 @@ interface UpdateEnergyOptions {
   forceIdle?: boolean;
 }
 
-// OPTIMIERT: Audio-Reaction Store für Beat- und Energy-basierte Animationen
 interface AudioReactionState {
   energy: number;
   beatDetected: boolean;
@@ -34,10 +33,6 @@ interface AudioReactionState {
   isAudioActive: boolean;
   idleEnabled: boolean;
   isMusicPlaying: boolean;
-  
-  // Sensitivity Control
-  beatSensitivity: number;
-  energyThreshold: number;
   
   // Aktionen
   updateEnergy: (energy: number, opts?: UpdateEnergyOptions) => void;
@@ -49,11 +44,6 @@ interface AudioReactionState {
   startIdle: () => void;
   stopIdle: () => void;
   isIdleActive: () => boolean;
-  
-  // Sensitivity Actions
-  increaseSensitivity: () => void;
-  decreaseSensitivity: () => void;
-  setSensitivity: (beatSensitivity: number, energyThreshold: number) => void;
 }
 
 export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
@@ -63,10 +53,6 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   isAudioActive: false,
   idleEnabled: true,
   isMusicPlaying: false,
-  
-  // Sensitivity Control - Initialwerte
-  beatSensitivity: 0.8,
-  energyThreshold: 0.03,
   
   updateEnergy: (energy, opts = {}) => {
     const now = Date.now();
@@ -186,38 +172,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     idleStep = 0;
   },
   
-  isIdleActive: () => idleActive,
-  
-  // Sensitivity Actions
-  increaseSensitivity: () => {
-    const current = get();
-    const newBeatSensitivity = Math.min(2.0, current.beatSensitivity * 1.1); // +10%, max 2.0
-    const newEnergyThreshold = Math.max(0.01, current.energyThreshold * 0.9); // -10%, min 0.01
-    set({ 
-      beatSensitivity: newBeatSensitivity,
-      energyThreshold: newEnergyThreshold
-    });
-    console.log(`Sensitivity increased: Beat=${newBeatSensitivity.toFixed(2)}, Energy=${newEnergyThreshold.toFixed(3)}`);
-  },
-  
-  decreaseSensitivity: () => {
-    const current = get();
-    const newBeatSensitivity = Math.max(0.1, current.beatSensitivity * 0.9); // -10%, min 0.1
-    const newEnergyThreshold = Math.min(0.5, current.energyThreshold * 1.1); // +10%, max 0.5
-    set({ 
-      beatSensitivity: newBeatSensitivity,
-      energyThreshold: newEnergyThreshold
-    });
-    console.log(`Sensitivity decreased: Beat=${newBeatSensitivity.toFixed(2)}, Energy=${newEnergyThreshold.toFixed(3)}`);
-  },
-  
-  setSensitivity: (beatSensitivity, energyThreshold) => {
-    set({ 
-      beatSensitivity: Math.max(0.1, Math.min(2.0, beatSensitivity)),
-      energyThreshold: Math.max(0.01, Math.min(0.5, energyThreshold))
-    });
-    console.log(`Sensitivity set: Beat=${beatSensitivity.toFixed(2)}, Energy=${energyThreshold.toFixed(3)}`);
-  }
+  isIdleActive: () => idleActive
 }));
 
 // OPTIMIERT: Hook für automatisches Beat-Reset

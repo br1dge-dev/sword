@@ -7,7 +7,7 @@
  * Integriert mit Audio-Analyse für Beat-Erkennung.
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useAudioAnalyzer } from '../../hooks/useAudioAnalyzer';
+import { useAudioAnalyzer, globalAnalyzer } from '../../hooks/useAudioAnalyzer';
 import { AudioAnalyzer } from '../../lib/audio/audioAnalyzer';
 import { useAudioReactionStore } from '../../store/audioReactionStore';
 
@@ -156,18 +156,34 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
   
   // Aktiviere den AudioContext bei Benutzerinteraktion
   const resumeAudioContext = useCallback(async () => {
-    if (isInitialized && !isAnalyzing && isPlaying) {
-      start();
-      console.log('Explicitly starting audio analysis after user interaction');
-      
-      // Setze Audio als aktiv im Store
-      setAudioActive(true);
-      
-      return true;
-    } else {
-      console.log('AudioContext is already running or not available');
-      return true;
+    if (globalAnalyzer && globalAnalyzer.getAudioContext) {
+      const audioContext = globalAnalyzer.getAudioContext();
+      if (audioContext && audioContext.state === 'suspended') {
+        console.log('Resuming AudioContext from user interaction');
+        try {
+          await audioContext.resume();
+          console.log('AudioContext resumed successfully:', audioContext.state);
+          
+          // Starte die Audio-Analyse explizit nach der Aktivierung des AudioContext
+          if (!isAnalyzing && isPlaying) {
+            start();
+            console.log('Explicitly starting audio analysis after user interaction');
+          }
+          
+          // Setze Audio als aktiv im Store
+          setAudioActive(true);
+          
+          return true;
+        } catch (err) {
+          console.error('Failed to resume AudioContext:', err);
+          return false;
+        }
+      } else {
+        console.log('AudioContext is already running or not available');
+        return true;
+      }
     }
+    return false;
   }, [isInitialized, isAnalyzing, isPlaying, start]);
   
   // Wiedergabe starten/pausieren
@@ -227,6 +243,12 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       setIsPlaying(false);
       // OPTIMIERT: Nicht sofort setMusicPlaying(false) setzen, um Idle-Konflikte zu vermeiden
       // setMusicPlaying(false);
+    }
+    
+    // NEU: Reset der Track-Analyse für adaptive Sensitivität
+    if (globalAnalyzer && globalAnalyzer.resetTrackAnalysis) {
+      globalAnalyzer.resetTrackAnalysis();
+      console.log('Track analysis reset for new track');
     }
     
     // Wechsle zum nächsten Track (oder zurück zum ersten)
@@ -370,49 +392,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
           {!isPlaying && !isAnalyzing && (
             <div className="text-[#FF3EC8] text-[8px] whitespace-nowrap">PRESS PLAY</div>
           )}
-        </div>
-        
-        {/* Sensitivity Control */}
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-[8px] text-[#3EE6FF] font-bold" 
-               style={{ 
-                 textShadow: '0 0 1px #3EE6FF',
-                 letterSpacing: '0.05em',
-                 fontFamily: 'var(--font-press-start-2p)'
-               }}
-          >
-            SENSITIVITY
-          </div>
-          <div className="flex space-x-1">
-            <button 
-              onClick={() => {
-                const { decreaseSensitivity } = useAudioReactionStore.getState();
-                decreaseSensitivity();
-              }}
-              className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-700 hover:bg-gray-800 focus:outline-none"
-              style={{ 
-                boxShadow: '0 0 3px rgba(0,0,0,0.3)',
-                fontSize: '10px'
-              }}
-              title="Sensitivity -10%"
-            >
-              <span className="text-[#FF3EC8]">-</span>
-            </button>
-            <button 
-              onClick={() => {
-                const { increaseSensitivity } = useAudioReactionStore.getState();
-                increaseSensitivity();
-              }}
-              className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-700 hover:bg-gray-800 focus:outline-none"
-              style={{ 
-                boxShadow: '0 0 3px rgba(0,0,0,0.3)',
-                fontSize: '10px'
-              }}
-              title="Sensitivity +10%"
-            >
-              <span className="text-[#3EE6FF]">+</span>
-            </button>
-          </div>
         </div>
         
         {/* Fortschrittsbalken */}

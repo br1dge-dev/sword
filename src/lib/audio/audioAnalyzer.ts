@@ -40,6 +40,15 @@ export class AudioAnalyzer {
   private noDataCount: number = 0;
   private maxNoDataCount: number = 10;
   private lastEnergy: number = 0; // Speichere die letzte Energie für Throttling
+  
+  // NEU: Dynamische Anpassung basierend auf Track-Eigenschaften
+  private energyHistory: number[] = []; // Speichere Energy-Werte für Durchschnittsberechnung
+  private maxEnergyHistoryLength: number = 100; // Anzahl der Samples für Durchschnitt
+  private adaptiveThreshold: number = 0.04; // Dynamischer Schwellenwert
+  private adaptiveSensitivity: number = 1.0; // Dynamische Sensitivität
+  private trackAnalysisComplete: boolean = false; // Track-Analyse abgeschlossen
+  private trackAnalysisStartTime: number = 0; // Startzeit der Track-Analyse
+  private trackAnalysisDuration: number = 5000; // 5 Sekunden für Track-Analyse
 
   constructor(options?: AudioAnalyzerOptions) {
     if (options) {
@@ -239,6 +248,9 @@ export class AudioAnalyzer {
       const average = count > 0 ? sum / count : 0;
       const energy = average / 255; // Normalisiere auf 0-1
       
+      // NEU: Dynamische Track-Analyse für adaptive Sensitivität
+      this.updateTrackAnalysis(energy, now);
+      
       // OPTIMIERT: Empfindlichere Reaktion für visuellen Impact
       if (energy < 0.005) { // Reduziert von 0.01 auf 0.005 für empfindlichere Reaktionen
         this.noDataCount++;
@@ -263,19 +275,29 @@ export class AudioAnalyzer {
         }
       }
 
+      // NEU: Verwende adaptive Schwellenwerte statt feste Werte
+      const currentThreshold = this.trackAnalysisComplete ? this.adaptiveThreshold : this.options.energyThreshold!;
+      const currentSensitivity = this.trackAnalysisComplete ? this.adaptiveSensitivity : this.options.beatSensitivity!;
+      
       // Nur noch die neue Schwellen-Logik:
-      if (energy > this.options.energyThreshold!) {
+      if (energy > currentThreshold) {
         const timeSinceLastBeat = now - this.lastBeatTime;
         if (timeSinceLastBeat > 180) {
-          const beatIntensity = energy / this.options.energyThreshold!;
-          const beatSensitivity = this.options.beatSensitivity || 1.0;
+          const beatIntensity = energy / currentThreshold;
           const minSensitivity = 0.5;
           const maxSensitivity = 3.0;
-          const effectiveThreshold = 5 + (maxSensitivity - beatSensitivity) * 5;
-          console.log(`[AudioAnalyzer] BeatIntensity: ${beatIntensity.toFixed(2)}, EffectiveThreshold: ${effectiveThreshold.toFixed(2)}, Regler: ${beatSensitivity}`);
+          const effectiveThreshold = 5 + (maxSensitivity - currentSensitivity) * 5;
+          
+          // NEU: Logging mit adaptiven Werten
+          if (this.trackAnalysisComplete) {
+            console.log(`[AudioAnalyzer] Adaptive: BeatIntensity: ${beatIntensity.toFixed(2)}, Threshold: ${currentThreshold.toFixed(3)}, Sensitivity: ${currentSensitivity.toFixed(2)}, EffectiveThreshold: ${effectiveThreshold.toFixed(2)}`);
+          } else {
+            console.log(`[AudioAnalyzer] BeatIntensity: ${beatIntensity.toFixed(2)}, EffectiveThreshold: ${effectiveThreshold.toFixed(2)}, Regler: ${currentSensitivity}`);
+          }
+          
           if (beatIntensity > effectiveThreshold && Math.random() < 0.75) {
             this.lastBeatTime = now;
-            console.log(`[AudioAnalyzer] Beat! Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}, Sensitivity-Regler: ${beatSensitivity}, EffectiveThreshold: ${effectiveThreshold}`);
+            console.log(`[AudioAnalyzer] Beat! Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}, Sensitivity: ${currentSensitivity.toFixed(2)}, Threshold: ${currentThreshold.toFixed(3)}`);
             if (this.options.onBeat) {
               this.options.onBeat(now);
             }
@@ -375,6 +397,102 @@ export class AudioAnalyzer {
     return weightedSum / (totalWeight * 255);
   }
 
+  // NEU: Dynamische Track-Analyse für adaptive Sensitivität
+  private updateTrackAnalysis(energy: number, currentTime: number): void {
+    // Starte Track-Analyse beim ersten Energy-Wert
+    if (this.trackAnalysisStartTime === 0) {
+      this.trackAnalysisStartTime = currentTime;
+      this.energyHistory = [];
+      this.trackAnalysisComplete = false;
+      console.log('[AudioAnalyzer] Starting track analysis for adaptive sensitivity...');
+    }
+    
+    // Sammle Energy-Werte während der Analyse-Phase
+    if (!this.trackAnalysisComplete && (currentTime - this.trackAnalysisStartTime) < this.trackAnalysisDuration) {
+      this.energyHistory.push(energy);
+      
+      // Begrenze die History-Größe
+      if (this.energyHistory.length > this.maxEnergyHistoryLength) {
+        this.energyHistory.shift();
+      }
+    }
+    
+    // Führe adaptive Anpassung durch, wenn Analyse abgeschlossen ist
+    if (!this.trackAnalysisComplete && (currentTime - this.trackAnalysisStartTime) >= this.trackAnalysisDuration) {
+      this.performAdaptiveAdjustment();
+    }
+  }
+  
+  // NEU: Führe adaptive Anpassung basierend auf Track-Eigenschaften durch
+  private performAdaptiveAdjustment(): void {
+    if (this.energyHistory.length === 0) {
+      console.warn('[AudioAnalyzer] No energy history available for adaptive adjustment');
+      return;
+    }
+    
+    // Berechne Durchschnitts-Energy und Standardabweichung
+    const avgEnergy = this.energyHistory.reduce((sum, e) => sum + e, 0) / this.energyHistory.length;
+    const variance = this.energyHistory.reduce((sum, e) => sum + Math.pow(e - avgEnergy, 2), 0) / this.energyHistory.length;
+    const stdDev = Math.sqrt(variance);
+    
+    // Berechne Peak-Energy (95. Perzentil)
+    const sortedEnergy = [...this.energyHistory].sort((a, b) => a - b);
+    const peakIndex = Math.floor(sortedEnergy.length * 0.95);
+    const peakEnergy = sortedEnergy[peakIndex];
+    
+    console.log(`[AudioAnalyzer] Track Analysis Complete:`);
+    console.log(`  - Average Energy: ${avgEnergy.toFixed(4)}`);
+    console.log(`  - Peak Energy (95%): ${peakEnergy.toFixed(4)}`);
+    console.log(`  - Standard Deviation: ${stdDev.toFixed(4)}`);
+    console.log(`  - Dynamic Range: ${(peakEnergy / avgEnergy).toFixed(2)}x`);
+    
+    // Adaptive Threshold-Anpassung
+    // Für leise Tracks: niedrigerer Threshold, für laute Tracks: höherer Threshold
+    const baseThreshold = 0.04;
+    const energyRatio = avgEnergy / baseThreshold;
+    
+    if (energyRatio < 0.5) {
+      // Sehr leise Tracks: sehr empfindlich
+      this.adaptiveThreshold = Math.max(0.01, avgEnergy * 0.8);
+      this.adaptiveSensitivity = Math.min(3.0, 1.0 + (0.5 - energyRatio) * 2);
+      console.log(`[AudioAnalyzer] Quiet track detected - Lowering threshold to ${this.adaptiveThreshold.toFixed(4)}, increasing sensitivity to ${this.adaptiveSensitivity.toFixed(2)}`);
+    } else if (energyRatio > 2.0) {
+      // Sehr laute Tracks: weniger empfindlich
+      this.adaptiveThreshold = Math.min(0.2, avgEnergy * 1.2);
+      this.adaptiveSensitivity = Math.max(0.5, 1.0 - (energyRatio - 2.0) * 0.3);
+      console.log(`[AudioAnalyzer] Loud track detected - Raising threshold to ${this.adaptiveThreshold.toFixed(4)}, decreasing sensitivity to ${this.adaptiveSensitivity.toFixed(2)}`);
+    } else {
+      // Normale Tracks: moderate Anpassung
+      this.adaptiveThreshold = Math.max(0.02, Math.min(0.1, avgEnergy * 1.0));
+      this.adaptiveSensitivity = Math.max(0.7, Math.min(1.5, 1.0 + (1.0 - energyRatio) * 0.5));
+      console.log(`[AudioAnalyzer] Normal track - Adjusted threshold to ${this.adaptiveThreshold.toFixed(4)}, sensitivity to ${this.adaptiveSensitivity.toFixed(2)}`);
+    }
+    
+    // Berücksichtige auch die Dynamik (Standardabweichung)
+    if (stdDev > avgEnergy * 0.5) {
+      // Hohe Dynamik: erhöhe Sensitivität für Beat-Erkennung
+      this.adaptiveSensitivity = Math.min(3.0, this.adaptiveSensitivity * 1.2);
+      console.log(`[AudioAnalyzer] High dynamics detected - Increasing sensitivity to ${this.adaptiveSensitivity.toFixed(2)}`);
+    } else if (stdDev < avgEnergy * 0.1) {
+      // Niedrige Dynamik: reduziere Sensitivität
+      this.adaptiveSensitivity = Math.max(0.5, this.adaptiveSensitivity * 0.8);
+      console.log(`[AudioAnalyzer] Low dynamics detected - Decreasing sensitivity to ${this.adaptiveSensitivity.toFixed(2)}`);
+    }
+    
+    this.trackAnalysisComplete = true;
+    console.log(`[AudioAnalyzer] Adaptive adjustment complete - Final threshold: ${this.adaptiveThreshold.toFixed(4)}, sensitivity: ${this.adaptiveSensitivity.toFixed(2)}`);
+  }
+  
+  // NEU: Reset der Track-Analyse für neue Tracks
+  public resetTrackAnalysis(): void {
+    this.energyHistory = [];
+    this.adaptiveThreshold = this.options.energyThreshold!;
+    this.adaptiveSensitivity = this.options.beatSensitivity!;
+    this.trackAnalysisComplete = false;
+    this.trackAnalysisStartTime = 0;
+    console.log('[AudioAnalyzer] Track analysis reset for new track');
+  }
+
   public async detectTempo(): Promise<number> {
     if (!this.audioContext || !this.audioElement) {
       console.error('Cannot detect tempo: audio context or element not initialized');
@@ -424,29 +542,38 @@ export class AudioAnalyzer {
   }
 
   public dispose(): void {
-    // Stoppe die Analyse
     this.stop();
     
-    // Trenne Verbindungen
     if (this.audioSource) {
       this.audioSource.disconnect();
+      this.audioSource = null;
     }
     
     if (this.analyser) {
       this.analyser.disconnect();
+      this.analyser = null;
     }
     
     if (this.gainNode) {
       this.gainNode.disconnect();
+      this.gainNode = null;
     }
     
-    // Entferne Referenzen
-    this.audioSource = null;
-    this.analyser = null;
-    this.gainNode = null;
-    this.frequencyData = null;
+    if (this.audioContext) {
+      this.audioContext.close().catch(err => {
+        console.error('Error closing audio context:', err);
+      });
+      this.audioContext = null;
+    }
     
-    console.log('Audio analyzer disposed');
+    this.audioElement = null;
+    this.frequencyData = null;
+    this.initializationPromise = null;
+    
+    // NEU: Reset der Track-Analyse beim Disposal
+    this.resetTrackAnalysis();
+    
+    console.log('AudioAnalyzer disposed');
   }
 
   public getAnalyzingState(): boolean {
