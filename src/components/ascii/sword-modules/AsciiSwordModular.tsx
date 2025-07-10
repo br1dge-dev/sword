@@ -802,29 +802,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const backgroundColor = useMemo(() => getDarkerColor(bgColor), [bgColor]);
   const lighterBgColor = useMemo(() => getLighterColor(bgColor), [bgColor]);
 
-  // Hilfsfunktion: Finde Parierstangen- und Klingenbereich
-  const getBladeAuraPositions = useCallback(() => {
-    const lines = centeredSwordLines;
-    const middleX = Math.floor(lines[0].length / 2);
-    // Parierstange finden (erste Zeile mit '__▓█▓__' o.ä.)
-    const hiltY = lines.findIndex(line => line.includes('__▓█▓__') || line.includes('_▓██▓_') || line.includes('_▓███▓_'));
-    if (hiltY === -1) return [];
-    // Klingenbereich: von hiltY-1 (direkt über Parierstange) bis 0 (Spitze)
-    const bladeStartY = 0;
-    const bladeEndY = hiltY - 1;
-    const bladeLen = bladeEndY - bladeStartY + 1;
-    let auraPositions: Array<{x: number, y: number, side: 'left'|'right'}> = [];
-    if (chargeLevel >= 2) {
-      // Lvl2 & Lvl3: nur untere Hälfte (von Parierstange bis Mitte)
-      const halfLen = Math.floor(bladeLen / 2);
-      for (let y = bladeEndY; y >= bladeEndY - halfLen + 1; y--) {
-        auraPositions.push({ x: middleX - 1, y, side: 'left' });
-        auraPositions.push({ x: middleX + 1, y, side: 'right' });
-      }
-    }
-    return auraPositions;
-  }, [centeredSwordLines, chargeLevel]);
-
   // Entferne Beat-Detector-States, -UI und -useEffects
   // Entferne performanceMonitor und getPerformanceMonitor
   // Entferne alle Importe, die nur für Beat-Detector oder Performance Monitor benötigt wurden
@@ -980,22 +957,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                                  glitch ? glitch.char : 
                                  edgeEffect?.char ? edgeEffect.char : 
                                  char;
-              // Charge-Aura prüfen
-              const auraPos = getBladeAuraPositions().find(pos => pos.x === x && pos.y === y);
-              if (auraPos) {
-                if (chargeLevel === 3) {
-                  style.color = '#FFD700'; // Kräftiges Gelb für Lvl3
-                  style.textShadow = '0 0 16px #FFD700, 0 0 32px #FFD700';
-                } else {
-                  style.color = '#FFDF6B'; // Gelb für Lvl2
-                  style.textShadow = '0 0 8px #FFDF6B, 0 0 16px #FFDF6B';
-                }
-                return (
-                  <span key={`aura-${x}-${y}`} style={style}>
-                    |
-                  </span>
-                );
-              }
               return (
                 <span 
                   key={`sword-${x}-${y}`}
