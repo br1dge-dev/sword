@@ -150,7 +150,13 @@ export const baseColors = [
   '#19FFBF', // Türkis
   '#B3FF00', // Lime
   '#FF00FF', // Magenta
-  '#00FFCC'  // Mint
+  '#00FFCC', // Mint
+  // NEU: 5 zusätzliche harmonische Fehlfarben
+  '#FF6B35', // Feuer-Orange (warm, energetisch)
+  '#8A2BE2', // Deep Purple (mystisch, intensiv)
+  '#00D4AA', // Aqua-Mint (frisch, beruhigend)
+  '#FF1493', // Deep Pink (leidenschaftlich, dynamisch)
+  '#32CD32'  // Lime Green (lebendig, natürlich)
 ];
 
 // Noch ungewöhnlichere Akzentfarben
@@ -171,7 +177,13 @@ export const accentColors = [
   '#08F7FE', // Elektrisches Blau
   '#09FBD3', // Türkis
   '#FE53BB', // Magenta
-  '#F5D300'  // Gelb
+  '#F5D300', // Gelb
+  // NEU: 5 zusätzliche kontrastierende Akzentfarben
+  '#FF4500', // Orange Red (feurig, kontrastreich)
+  '#9370DB', // Medium Purple (sanft, ausgewogen)
+  '#20B2AA', // Light Sea Green (tief, beruhigend)
+  '#FF69B4', // Hot Pink (lebendig, auffällig)
+  '#ADFF2F'  // Green Yellow (hell, energetisch)
 ];
 
 // Glitch-Symbole für DOS-Style Glitches
