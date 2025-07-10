@@ -83,8 +83,8 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     // Standard-Analyseintervall für bessere Performance
     const defaultOptions = {
       analyzeInterval: 50, // Reduziert von 100ms auf 50ms für schnellere Reaktion
-      energyThreshold: 0.1, // Reduziert von 0.15 auf 0.1 für bessere Beat-Erkennung
-      beatSensitivity: 1.2, // Neuer Parameter für Beat-Sensitivität
+      energyThreshold: 0.05, // Noch niedriger für bessere Beat-Erkennung
+      beatSensitivity: 1.0, // Noch empfindlicher
       ...options
     };
     

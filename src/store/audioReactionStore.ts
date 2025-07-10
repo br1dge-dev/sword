@@ -13,16 +13,20 @@ let beatInterval: NodeJS.Timeout | null = null;
 let energyInterval: NodeJS.Timeout | null = null;
 let fallbackInitialized = false;
 
-// OPTIMIERT: Konstanten für Fallback-Animation
-const MIN_ENERGY = 0.2;
-const MAX_ENERGY = 0.7;
-const ENERGY_INTERVAL = 2000; // OPTIMIERT: Erhöht von 1000ms auf 2000ms für bessere Performance
-const BEAT_INTERVAL = 4000; // OPTIMIERT: Erhöht von 3000ms auf 4000ms
-const BEAT_CHANCE = 0.05; // OPTIMIERT: Reduziert von 0.1 auf 0.05
+// OPTIMIERT: Stabilere Fallback-Animation um Einfrieren zu verhindern
+const MIN_ENERGY = 0.08; // Erhöht für stabilere Animation und bessere Sichtbarkeit
+const MAX_ENERGY = 0.35; // Erhöht für bessere Sichtbarkeit der Effekte
+const ENERGY_INTERVAL = 5000; // Reduziert auf 5s für häufigere Effekte
+const BEAT_INTERVAL = 8000; // Reduziert auf 8s für häufigere Beats
+const BEAT_CHANCE = 0.02; // Erhöht auf 2% für bessere Sichtbarkeit der Effekte
 
-// OPTIMIERT: Throttling für Energy-Updates
+// OPTIMIERT: Reduziertes Throttling für bessere Reaktivität
 let lastEnergyUpdate = 0;
-const ENERGY_UPDATE_THROTTLE = 100; // 100ms zwischen Energy-Updates
+const ENERGY_UPDATE_THROTTLE = 200; // Reduziert auf 200ms für bessere Reaktivität
+
+interface UpdateEnergyOptions {
+  forceFallback?: boolean;
+}
 
 interface AudioReactionState {
   energy: number;
@@ -33,7 +37,7 @@ interface AudioReactionState {
   isMusicPlaying: boolean;
   
   // Aktionen
-  updateEnergy: (energy: number) => void;
+  updateEnergy: (energy: number, opts?: UpdateEnergyOptions) => void;
   triggerBeat: () => void;
   resetBeat: () => void;
   setAudioActive: (active: boolean) => void;
@@ -54,13 +58,18 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   isMusicPlaying: false,
   
   // OPTIMIERT: Throttled Energy-Updates
-  updateEnergy: (energy) => {
+  updateEnergy: (energy, opts = {}) => {
+    // Blockiere externe Updates, wenn Fallback aktiv ist und das Update nicht explizit vom Fallback kommt
+    if (fallbackActive && !opts.forceFallback) {
+      // Debug-Log für Analyse
+      // console.log('updateEnergy blockiert: Fallback aktiv, Quelle nicht Fallback');
+      return;
+    }
     const now = Date.now();
     if (now - lastEnergyUpdate < ENERGY_UPDATE_THROTTLE) {
       return; // Skip update if too soon
     }
     lastEnergyUpdate = now;
-    
     set((state) => ({ 
       energy,
       isAudioActive: energy > 0.05 ? true : state.isAudioActive
@@ -85,12 +94,12 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     
     // Wenn Musik gestoppt wird und Fallback aktiviert ist
     if (!playing && get().fallbackEnabled) {
-      // OPTIMIERT: Längere Verzögerung für bessere Stabilität
+      // OPTIMIERT: Längere Verzögerung für stabilere Animation
       setTimeout(() => {
         const { startFallback } = get();
         startFallback();
         console.log("Music paused, forcing fallback activation");
-      }, 500); // OPTIMIERT: Erhöht von 100ms auf 500ms
+      }, 2000); // Erhöht auf 2000ms für stabilere Animation
     }
     // Wenn Musik gestartet wird und Fallback aktiv ist
     else if (playing && fallbackActive) {
@@ -98,7 +107,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     }
   },
   
-  // OPTIMIERT: Verbesserte Fallback-Verwaltung
+  // OPTIMIERT: Stabilere Fallback-Verwaltung
   startFallback: () => {
     const store = get();
     if (!store.fallbackEnabled) return;
@@ -109,7 +118,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
       return;
     }
     
-    // OPTIMIERT: Cleanup bestehender Intervalle
+    // OPTIMIERT: Sauberes Cleanup bestehender Intervalle
     if (beatInterval) {
       clearInterval(beatInterval);
       beatInterval = null;
@@ -129,11 +138,11 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     
     fallbackActive = true;
     
-    // Setze einen anfänglichen Energie-Wert, um Flackern zu vermeiden
-    const initialEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY);
-    store.updateEnergy(initialEnergy);
+    // OPTIMIERT: Sanftere Start-Animation für Stabilität
+    const initialEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY) * 0.3; // Reduziert auf 0.3 für stabilere Animation
+    store.updateEnergy(initialEnergy, { forceFallback: true });
     
-    // OPTIMIERT: Reduzierte Beat-Generierung
+    // OPTIMIERT: Sanftere Beat-Generierung für Stabilität
     beatInterval = setInterval(() => {
       if (!fallbackActive) return;
       
@@ -151,14 +160,27 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
       }
     }, BEAT_INTERVAL);
     
-    // OPTIMIERT: Reduzierte Energy-Generierung
+    // OPTIMIERT: Sanftere Energy-Generierung für Stabilität
+    let currentEnergy = initialEnergy;
+    let targetEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY);
+    let energyStep = 0;
+    
     energyInterval = setInterval(() => {
       if (!fallbackActive) return;
       
-      const randomEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY);
-      console.log(`Fallback: Setting energy to ${randomEnergy.toFixed(2)}`);
-      store.updateEnergy(randomEnergy);
-    }, ENERGY_INTERVAL);
+      // OPTIMIERT: Sanftere Energy-Änderungen für stabilere Animation
+      if (Math.abs(currentEnergy - targetEnergy) < 0.01) {
+        // Neues Ziel setzen
+        targetEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY);
+        energyStep = (targetEnergy - currentEnergy) / 20; // Erhöht auf 20 für sanftere Übergänge
+      }
+      
+      // Sanfterer Übergang zum Ziel
+      currentEnergy = Math.max(MIN_ENERGY, Math.min(MAX_ENERGY, currentEnergy + energyStep));
+      
+      console.log(`Fallback: Setting energy to ${currentEnergy.toFixed(3)}`);
+      store.updateEnergy(currentEnergy, { forceFallback: true });
+    }, ENERGY_INTERVAL / 20); // Reduziert auf 20 für häufigere Updates
   },
   
   // OPTIMIERT: Verbesserte Fallback-Beendigung
@@ -182,7 +204,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
 }));
 
 // OPTIMIERT: Hook für automatisches Beat-Reset
-export function useBeatReset(delay: number = 100) {
+export function useBeatReset(delay: number = 300) {
   const { beatDetected, resetBeat } = useAudioReactionStore();
   
   useEffect(() => {
@@ -204,14 +226,30 @@ export function useFallbackAnimation() {
   useEffect(() => {
     if (!isMusicPlaying && fallbackEnabled) {
       console.log("No music playing, activating fallback immediately");
-      // OPTIMIERT: Längere Verzögerung für bessere Stabilität
+      // OPTIMIERT: Längere Verzögerung für stabilere Animation
       const timer = setTimeout(() => {
         startFallback();
-      }, 1000); // OPTIMIERT: Erhöht von 300ms auf 1000ms
+      }, 2000); // Erhöht auf 2000ms für stabilere Animation
       
       return () => clearTimeout(timer);
     }
   }, [isMusicPlaying, fallbackEnabled, startFallback]);
   
   return fallbackActive;
+}
+
+// OPTIMIERT: Cleanup-Funktion für globale Intervalle
+export function cleanupAudioIntervals(): void {
+  if (beatInterval) {
+    clearInterval(beatInterval);
+    beatInterval = null;
+  }
+  
+  if (energyInterval) {
+    clearInterval(energyInterval);
+    energyInterval = null;
+  }
+  
+  fallbackActive = false;
+  console.log('🧹 Audio intervals cleaned up');
 } 

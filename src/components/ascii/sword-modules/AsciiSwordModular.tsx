@@ -60,6 +60,7 @@ import {
   generateFadedChars
 } from './effects/glitchEffects';
 import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects';
+import React from 'react'; // Added missing import for React
 
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
@@ -141,7 +142,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const cleanupTimeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
   const lastVeinSeedRef = useRef<number>(0); // Pseudo-random Seed für Vein-Generierung
   const veinLifetimeRef = useRef<Map<string, number>>(new Map()); // Vein-Lebensdauer-Tracking
-  const maxVeinsRef = useRef<number>(100); // Reduziert von 200 auf 100 für bessere Performance
+  const maxVeinsRef = useRef<number>(500); // Erhöht auf 500 für mehr Veins
   const veinCleanupIntervalRef = useRef<number>(20000); // Erhöht von 15000ms auf 20000ms für bessere Performance
   const veinGenerationIntervalRef = useRef<number>(12000); // Erhöht von 8000ms auf 12000ms für bessere Performance
 
@@ -172,50 +173,163 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     };
   }, []);
 
-  // Vein-Handling: coloredVeins wird regelmäßig aus der Map gebaut, damit Veins "einbrennen"
+  // Effizientere Cleanup-Funktionen
+  const clearAllIntervals = useCallback(() => {
+    Object.keys(intervalsRef.current).forEach(key => {
+      if (intervalsRef.current[key]) {
+        clearInterval(intervalsRef.current[key] as NodeJS.Timeout);
+        intervalsRef.current[key] = null;
+      }
+    });
+    
+    // OPTIMIERT: Cleanup aller Timeouts
+    cleanupTimeoutsRef.current.forEach(timeout => {
+      clearTimeout(timeout);
+    });
+    cleanupTimeoutsRef.current.clear();
+  }, []);
+
+  const clearBackgroundCache = useCallback(() => {
+    // setCaveBackground([]); // Entfernt
+    // setColoredVeins([]); // Entfernt
+  }, []);
+  
+  // Initialisierung/Background-Update: Veins ergänzen und State setzen
+  useEffect(() => {
+    const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
+    setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+    const currentTime = Date.now();
+    const baseVeins = Math.floor(10 + (glitchLevel * 5));
+    const maxVeins = Math.min(50, baseVeins);
+    const initialVeins = generateColoredVeins(bgWidth, bgHeight, maxVeins, viewportWidth, viewportHeight);
+    initialVeins.forEach(vein => {
+      const key = `${vein.x}-${vein.y}`;
+      // Wenn schon vorhanden, Zeitstempel aktualisieren
+      veinsMapRef.current.set(key, { vein, birth: currentTime });
+    });
+    setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+    return () => {
+      clearAllIntervals();
+      clearBackgroundCache();
+    };
+  }, [glitchLevel, getBackgroundDimensions, clearAllIntervals, clearBackgroundCache]);
+
+  // Resize-Handler: Veins ergänzen und State setzen
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let resizeTimeout: NodeJS.Timeout | null = null;
+    const handleResize = () => {
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+      const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
+      const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
+      const currentTime = Date.now();
+      const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins, viewportWidth, viewportHeight);
+      newVeins.forEach(vein => {
+        const key = `${vein.x}-${vein.y}`;
+        veinsMapRef.current.set(key, { vein, birth: currentTime });
+      });
+      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+    };
+    const debouncedResize = () => {
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+      resizeTimeout = setTimeout(handleResize, 250);
+    };
+    window.addEventListener('resize', debouncedResize);
+    return () => {
+      window.removeEventListener('resize', debouncedResize);
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+    };
+  }, [glitchLevel, getBackgroundDimensions]);
+
+  // Vein-Generierung: Mehr Aktivität, Debug-Log
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
-      // Entferne alte Veins
-      Array.from(veinsMapRef.current.entries()).forEach(([key, value]) => {
-        if (now - value.birth > 5000) {
+      // Hole aktuelle Background-Dimensionen
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      let changed = false;
+      // Entferne abgelaufene Veins
+      veinsMapRef.current.forEach((value, key) => {
+        if (now - value.birth > 10000) {
           veinsMapRef.current.delete(key);
+          changed = true;
         }
       });
-      // Setze das Rendering-Array
-      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+      // Dynamische Vein-Generierung
+      let newVeins = 0;
+      if (energy > 0.1 && veinsMapRef.current.size < maxVeinsRef.current) {
+        const count = Math.floor(Math.random() * 3) + 1; // 1–3 neue Veins
+        for (let i = 0; i < count; i++) {
+          let x, y, pos, tries = 0;
+          do {
+            x = Math.floor(Math.random() * bgWidth);
+            y = Math.floor(Math.random() * bgHeight);
+            pos = `${x}_${y}`;
+            tries++;
+          } while (veinsMapRef.current.has(pos) && tries < 10);
+          if (!veinsMapRef.current.has(pos)) {
+            const color = accentColors[Math.floor(Math.random() * accentColors.length)];
+            veinsMapRef.current.set(pos, { vein: { x, y, color }, birth: now });
+            newVeins++;
+            changed = true;
+          }
+        }
+      }
+      if (beatDetected && veinsMapRef.current.size < maxVeinsRef.current) {
+        const count = Math.floor(Math.random() * 3) + 3; // 3–5 neue Veins
+        for (let i = 0; i < count; i++) {
+          let x, y, pos, tries = 0;
+          do {
+            x = Math.floor(Math.random() * bgWidth);
+            y = Math.floor(Math.random() * bgHeight);
+            pos = `${x}_${y}`;
+            tries++;
+          } while (veinsMapRef.current.has(pos) && tries < 10);
+          if (!veinsMapRef.current.has(pos)) {
+            const color = accentColors[Math.floor(Math.random() * accentColors.length)];
+            veinsMapRef.current.set(pos, { vein: { x, y, color }, birth: now });
+            newVeins++;
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+      }
+      // Debug-Log
+      if (newVeins > 0) {
+        console.log(`[Veins] Aktiv: ${veinsMapRef.current.size}, Neu: ${newVeins}, Energie: ${energy}, Beat: ${beatDetected}`);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [energy, beatDetected, getBackgroundDimensions]);
+
+  // Intervall: Entferne abgelaufene Veins und aktualisiere das Overlay
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      let changed = false;
+      veinsMapRef.current.forEach((value, key) => {
+        if (now - value.birth > 10000) {
+          veinsMapRef.current.delete(key);
+          changed = true;
+        }
+      });
+      if (changed) {
+        setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+      }
     }, 100);
     return () => clearInterval(interval);
   }, []);
-
-  // Vein-Generierung: Füge neue Veins nur hinzu, wenn sie noch nicht existieren
-  useEffect(() => {
-    if ((beatDetected && Math.random() < 0.1) || energy > 0.25) {
-      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-      const currentTime = Date.now();
-      const baseVeins = Math.floor(8 + energy * 20);
-      const targetVeins = Math.min(maxVeinsRef.current, baseVeins);
-      const timeSeed = Math.floor(currentTime / 3000);
-      const energySeed = Math.floor(energy * 25);
-      const beatSeed = beatDetected ? 1 : 0;
-      const pseudoRandomSeed = timeSeed + energySeed + beatSeed;
-      if (beatDetected || Math.abs(pseudoRandomSeed - lastVeinSeedRef.current) > 5 || veinsMapRef.current.size < targetVeins * 0.2) {
-        lastVeinSeedRef.current = pseudoRandomSeed;
-        const newVeinsCount = beatDetected 
-          ? Math.floor(targetVeins * 0.2)
-          : Math.floor(targetVeins * 0.1);
-        const newVeins = generateColoredVeins(bgWidth, bgHeight, newVeinsCount, viewportWidth, viewportHeight);
-        newVeins.forEach(vein => {
-          const key = `${vein.x}-${vein.y}`;
-          if (!veinsMapRef.current.has(key)) {
-            veinsMapRef.current.set(key, { vein, birth: currentTime });
-          }
-        });
-      }
-    }
-  }, [beatDetected, energy, glitchLevel, getBackgroundDimensions]);
   
   // OPTIMIERT: Memoisierte Schwert-Positionen (nur bei Level-Änderung neu berechnen)
   const swordPositions = useMemo(() => {
@@ -261,27 +375,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     };
   }, [currentLevel, level]);
   
-  // OPTIMIERT: Effizientere Cleanup-Funktionen
-  const clearAllIntervals = useCallback(() => {
-    Object.keys(intervalsRef.current).forEach(key => {
-      if (intervalsRef.current[key]) {
-        clearInterval(intervalsRef.current[key] as NodeJS.Timeout);
-        intervalsRef.current[key] = null;
-      }
-    });
-    
-    // OPTIMIERT: Cleanup aller Timeouts
-    cleanupTimeoutsRef.current.forEach(timeout => {
-      clearTimeout(timeout);
-    });
-    cleanupTimeoutsRef.current.clear();
-  }, []);
-  
-  const clearBackgroundCache = useCallback(() => {
-    setCaveBackground([]);
-    setColoredVeins([]);
-  }, []);
-  
   // Zustände für visuelle Effekte
   const [glowIntensity, setGlowIntensity] = useState(0);
   const [baseColor, setBaseColor] = useState('#00FCA6');
@@ -320,20 +413,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     
     setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
     
-    // OPTIMIERT: Sanftere initiale Vein-Generierung mit weniger Veins
-    const baseVeins = Math.floor(10 + (glitchLevel * 5)); // Reduziert von 20+10 auf 10+5 für bessere Performance
-    const maxVeins = Math.min(50, baseVeins); // Reduziert von 80 auf 50 für weniger initiale Veins
-    const initialVeins = generateColoredVeins(bgWidth, bgHeight, maxVeins, viewportWidth, viewportHeight);
-    
     // Initialisiere Lebensdauer-Tracking für alle initialen Veins
     const currentTime = Date.now();
+    const baseVeins = Math.floor(10 + (glitchLevel * 5));
+    const maxVeins = Math.min(50, baseVeins);
+    const initialVeins = generateColoredVeins(bgWidth, bgHeight, maxVeins, viewportWidth, viewportHeight);
     initialVeins.forEach(vein => {
       const key = `${vein.x}-${vein.y}`;
-      veinLifetimeRef.current.set(key, currentTime);
+      if (!veinsMapRef.current.has(key)) {
+        veinsMapRef.current.set(key, { vein, birth: currentTime });
+      }
     });
-    
-    setColoredVeins(initialVeins);
-    
+    // KEIN setColoredVeins mehr hier!
+
     return () => {
       clearAllIntervals();
       clearBackgroundCache();
@@ -343,33 +435,40 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // OPTIMIERT: Resize-Handler mit besserer Performance
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     let resizeTimeout: NodeJS.Timeout | null = null;
-    
+
     const handleResize = () => {
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      
+
       // OPTIMIERT: Verwende aktuelle Viewport-Dimensionen für Lazy-Rendering
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      
+
       setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-      
+
       const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
       const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
-      
-      setColoredVeins(generateColoredVeins(bgWidth, bgHeight, numVeins, viewportWidth, viewportHeight));
+      const currentTime = Date.now();
+      const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins, viewportWidth, viewportHeight);
+      newVeins.forEach(vein => {
+        const key = `${vein.x}-${vein.y}`;
+        if (!veinsMapRef.current.has(key)) {
+          veinsMapRef.current.set(key, { vein, birth: currentTime });
+        }
+      });
+      // KEIN setColoredVeins mehr hier!
     };
-    
+
     const debouncedResize = () => {
       if (resizeTimeout) {
         clearTimeout(resizeTimeout);
       }
       resizeTimeout = setTimeout(handleResize, 250);
     };
-    
+
     window.addEventListener('resize', debouncedResize);
-    
+
     return () => {
       window.removeEventListener('resize', debouncedResize);
       if (resizeTimeout) {
@@ -378,6 +477,29 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     };
   }, [glitchLevel, getBackgroundDimensions]);
   
+  // Pattern-Wechsel: alle 10s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
+      setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+      console.log('[Pattern] Hintergrund-Pattern gewechselt');
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [getBackgroundDimensions]);
+
+  // Beim Setzen von caveBackground: Padding jeder Zeile auf gleiche Länge
+  function padBackgroundRows(bg: string[][]): string[][] {
+    const maxLen = Math.max(...bg.map(row => row.length));
+    return bg.map(row => {
+      if (row.length < maxLen) {
+        return [...row, ...Array(maxLen - row.length).fill(' ')];
+      }
+      return row;
+    });
+  }
+
   // OPTIMIERT: Reaktive Audio-Effekte für visuellen Impact
   useEffect(() => {
     // OPTIMIERT: Niedrige Latenz für visuellen Impact
@@ -491,12 +613,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         });
         // Entferne Veins, die älter als 5000ms sind
         Array.from(veinsMapRef.current.entries()).forEach(([key, value]) => {
-          if (currentTime - value.birth > 5000) {
+          if (currentTime - value.birth > 10000) {
             veinsMapRef.current.delete(key);
           }
         });
         // Setze das State-Array für das Rendering
-        setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+        // setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein)); // Entfernt
         
         performanceMonitor.trackVein();
       }
@@ -639,52 +761,47 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }}
         >
           <pre className="font-mono text-sm sm:text-base leading-[0.9] whitespace-pre select-none" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {caveBackground.map((row, y) => (
-              <div key={y} style={{ lineHeight: '0.9', width: '100%', textAlign: 'center' }}>
-                {row.map((char, x) => {
-                  const vein = coloredVeins.find(v => v.x === x && v.y === y);
-                  
-                  const style: React.CSSProperties = vein ? {
-                    color: vein.color,
-                    textShadow: `0 0 ${2 + glitchLevel}px ${vein.color}`,
-                    display: 'inline-block',
-                    filter: `contrast(${0.65 + (glitchLevel * 0.05)})`,
-                    transform: ''
-                  } : { 
-                    display: 'inline-block',
-                    transform: ''
-                  };
-                  
-                  const skewEffect = skewedChars.find(c => c.x === x && c.y === y);
-                  if (skewEffect) {
-                    style.transform = `${style.transform || ''} skewX(${skewEffect.angle}deg)`.trim();
-                  }
-                  
-                  const fadeEffect = fadedChars.find(c => c.x === x && c.y === y);
-                  if (fadeEffect) {
-                    style.opacity = String(fadeEffect.opacity);
-                  }
-                  
-                  if (glitchLevel >= 2 && Math.random() < 0.001 * glitchLevel) {
-                    style.color = accentColors[Math.floor(Math.random() * accentColors.length)];
-                    style.textShadow = `0 0 ${2 + glitchLevel}px ${style.color}`;
-                  }
-                  
-                  return (
-                    <span 
-                      key={`bg-${x}-${y}`}
-                      style={style}
-                    >
-                      {char}
-                    </span>
-                  );
-                })}
-              </div>
-            ))}
+            {caveBackground.map((row, y) => {
+              let line = '';
+              const veinSpans: Array<{x: number, color: string}> = [];
+              row.forEach((char, x) => {
+                const vein = coloredVeins.find(v => v.x === x && v.y === y);
+                if (vein) {
+                  veinSpans.push({ x, color: vein.color });
+                  line += '\u0000'; // Platzhalter für Vein
+                } else {
+                  line += char;
+                }
+              });
+              // Jetzt die Zeile als Text + Vein-Spans rendern
+              const parts = line.split('\u0000');
+              let partIndex = 0;
+              return (
+                <div key={y} style={{ lineHeight: '0.9', width: '100%', textAlign: 'center' }}>
+                  {parts.map((text, i) => (
+                    <React.Fragment key={i}>
+                      {text}
+                      {i < veinSpans.length && (
+                        <span
+                          style={{
+                            color: veinSpans[i].color,
+                            textShadow: `0 0 ${2 + glitchLevel}px ${veinSpans[i].color}`,
+                            display: 'inline-block',
+                            filter: `contrast(${0.65 + (glitchLevel * 0.05)})`,
+                            transform: ''
+                          }}
+                        >
+                          {row[veinSpans[i].x]}
+                        </span>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              );
+            })}
           </pre>
         </div>
       </div>
-      
       {/* Schwert im Vordergrund */}
       <pre
         className="relative z-10 font-mono text-xs sm:text-sm md:text-base lg:text-lg whitespace-pre select-none"
@@ -709,7 +826,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               const coloredTile = coloredTiles.find(t => t.x === x && t.y === y);
               const edgeEffect = edgeEffects.find(e => e.x === x && e.y === y);
               const isEdge = isEdgeChar(char) && !isHandlePosition(x, y, centeredSwordLines);
-              
               let style: React.CSSProperties = { 
                 display: 'inline-block',
                 transform: '',
@@ -718,7 +834,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                 color: undefined,
                 textShadow: undefined
               };
-              
               if (edgeEffect?.color) {
                 style.color = edgeEffect.color;
                 style.textShadow = `0 0 ${shadowSize}px ${edgeEffect.color}`;
@@ -726,31 +841,25 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                 style.color = coloredTile.color;
                 style.textShadow = `0 0 ${shadowSize}px ${coloredTile.color}`;
               }
-              
               if (edgeEffect?.offset) {
                 style.transform = `translate(${edgeEffect.offset.x}px, ${edgeEffect.offset.y}px)`;
               }
-              
               const isBlurred = blurredChars.some(c => c.x === x && c.y === y);
               if (isBlurred) {
                 style.filter = `${style.filter || ''} blur(1px)`.trim();
               }
-              
               const skewEffect = skewedChars.find(c => c.x === x && c.y === y);
               if (skewEffect) {
                 style.transform = `${style.transform || ''} skewX(${skewEffect.angle}deg)`.trim();
               }
-              
               const fadeEffect = fadedChars.find(c => c.x === x && c.y === y);
               if (fadeEffect) {
                 style.opacity = String(fadeEffect.opacity);
               }
-              
               const displayChar = unicodeGlitch ? unicodeGlitch.char : 
                                  glitch ? glitch.char : 
                                  edgeEffect?.char ? edgeEffect.char : 
                                  char;
-              
               return (
                 <span 
                   key={`sword-${x}-${y}`}
