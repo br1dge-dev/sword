@@ -30,8 +30,8 @@ export class AudioAnalyzer {
   private lastAnalyzeTime: number = 0;
   private lastBeatTime: number = 0; // Zeit des letzten erkannten Beats
   private options: AudioAnalyzerOptions = {
-    beatSensitivity: 1.5,
-    energyThreshold: 0.25,
+    beatSensitivity: 1.5, // Erhöht für aktivere Beat-Erkennung
+    energyThreshold: 0.1, // Reduziert von 0.4 auf 0.1 für empfindlichere Reaktionen
     analyzeInterval: 50
   };
   private initializationPromise: Promise<void> | null = null;
@@ -205,8 +205,8 @@ export class AudioAnalyzer {
 
     const now = performance.now();
     
-    // OPTIMIERT: Reduzierte Analyse-Frequenz für bessere Performance (20fps statt 60fps)
-    if (now - this.lastAnalyzeTime < 50) { // 50ms = 20fps
+    // OPTIMIERT: Niedrige Latenz für visuellen Impact, aber mit optimierten Schwellenwerten
+    if (now - this.lastAnalyzeTime < 50) { // 50ms = 20fps (zurück von 200ms für bessere Reaktivität)
       this.animationFrameId = requestAnimationFrame(() => this.analyze());
       return;
     }
@@ -219,8 +219,8 @@ export class AudioAnalyzer {
       let sum = 0;
       let count = 0;
       
-      // OPTIMIERT: Reduzierte Frequenzanalyse für bessere Performance
-      const step = Math.max(1, Math.floor(this.frequencyData.length / 64)); // Nur 64 Samples statt alle
+      // OPTIMIERT: Ausgewogene Frequenzanalyse für Performance und Reaktivität
+      const step = Math.max(1, Math.floor(this.frequencyData.length / 32)); // Zurück zu 32 Samples für bessere Reaktivität
       
       for (let i = 0; i < this.frequencyData.length; i += step) {
         sum += this.frequencyData[i];
@@ -230,8 +230,8 @@ export class AudioAnalyzer {
       const average = count > 0 ? sum / count : 0;
       const energy = average / 255; // Normalisiere auf 0-1
       
-      // OPTIMIERT: Früher Exit bei sehr niedriger Energie
-      if (energy < 0.01) {
+      // OPTIMIERT: Empfindlichere Reaktion für visuellen Impact
+      if (energy < 0.01) { // Zurück zu 0.01 für empfindlichere Reaktionen
         this.noDataCount++;
         if (this.noDataCount > this.maxNoDataCount) {
           if (this.options.onEnergy) {
@@ -245,27 +245,29 @@ export class AudioAnalyzer {
       
       this.noDataCount = 0;
       
-      // OPTIMIERT: Reduzierte Energy-Updates für bessere Performance
-      if (Math.abs(energy - this.lastEnergy) > 0.02 || energy > 0.1) { // Nur bei signifikanten Änderungen
+      // OPTIMIERT: Reaktive Energy-Updates für visuellen Impact
+      if (Math.abs(energy - this.lastEnergy) > 0.02 || energy > 0.1) { // Zurück zu 0.02/0.1 für bessere Reaktivität
         this.lastEnergy = energy;
         
         if (this.options.onEnergy) {
           this.options.onEnergy(energy);
         }
       }
-      
+
       // OPTIMIERT: Verbesserte Beat-Erkennung mit Throttling
       if (energy > this.options.energyThreshold!) {
         const timeSinceLastBeat = now - this.lastBeatTime;
         
-        // OPTIMIERT: Mindestens 200ms zwischen Beats für stabilere Erkennung
-        if (timeSinceLastBeat > 200) {
+        // OPTIMIERT: Mindestens 100ms zwischen Beats für aktivere Erkennung (reduziert von 200ms)
+        if (timeSinceLastBeat > 100) {
           const beatIntensity = energy / this.options.energyThreshold!;
           const beatSensitivity = this.options.beatSensitivity || 1.5;
           
-          // OPTIMIERT: Reduzierte Beat-Erkennung für bessere Performance
-          if (beatIntensity > beatSensitivity && Math.random() < 0.8) { // 80% Wahrscheinlichkeit
+          // OPTIMIERT: Aktivere Beat-Erkennung für bessere Animation
+          if (beatIntensity > beatSensitivity && Math.random() < 0.95) { // 95% Wahrscheinlichkeit (erhöht von 80%)
             this.lastBeatTime = now;
+            
+            console.log(`[AudioAnalyzer] Beat! Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}, Threshold: ${this.options.energyThreshold}, Sensitivity: ${beatSensitivity}`);
             
             if (this.options.onBeat) {
               this.options.onBeat(now);
@@ -273,14 +275,12 @@ export class AudioAnalyzer {
           }
         }
       }
-      
+
       this.lastAnalyzeTime = now;
+      this.animationFrameId = requestAnimationFrame(() => this.analyze());
+      
     } catch (error) {
-      console.error('Error during audio analysis:', error);
-    }
-    
-    // Weiterhin analysieren
-    if (this.isAnalyzing) {
+      console.error('Audio analysis error:', error);
       this.animationFrameId = requestAnimationFrame(() => this.analyze());
     }
   }

@@ -74,7 +74,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const beatDetected = directBeat !== undefined ? directBeat : storeBeat;
   
   // Automatisches Beat-Reset aktivieren
-  useBeatReset(100);
+  useBeatReset(500);
   
   // Fallback-Animation läuft jetzt im Layout, nicht mehr hier
   
@@ -266,8 +266,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       });
       // Dynamische Vein-Generierung
       let newVeins = 0;
-      if (energy > 0.1 && veinsMapRef.current.size < maxVeinsRef.current) {
-        const count = Math.floor(Math.random() * 3) + 1; // 1–3 neue Veins
+      if (energy > 0.05 && veinsMapRef.current.size < maxVeinsRef.current) {
+        const count = Math.floor(Math.random() * 11) + 10; // 10–20 neue Veins (erhöht von 1-3)
         for (let i = 0; i < count; i++) {
           let x, y, pos, tries = 0;
           do {
@@ -285,7 +285,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         }
       }
       if (beatDetected && veinsMapRef.current.size < maxVeinsRef.current) {
-        const count = Math.floor(Math.random() * 3) + 3; // 3–5 neue Veins
+        const count = Math.floor(Math.random() * 21) + 30; // 30–50 neue Veins (erhöht von 3-5)
         for (let i = 0; i < count; i++) {
           let x, y, pos, tries = 0;
           do {

@@ -204,7 +204,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
 }));
 
 // OPTIMIERT: Hook für automatisches Beat-Reset
-export function useBeatReset(delay: number = 300) {
+export function useBeatReset(delay: number = 500) {
   const { beatDetected, resetBeat } = useAudioReactionStore();
   
   useEffect(() => {
