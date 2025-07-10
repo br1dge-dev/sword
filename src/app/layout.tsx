@@ -8,7 +8,7 @@
 
 import { useEffect } from 'react';
 import { Inter, Press_Start_2P } from 'next/font/google';
-import { useAudioReactionStore, useFallbackAnimation } from '@/store/audioReactionStore';
+import { useAudioReactionStore, useIdleAnimation } from '@/store/audioReactionStore';
 import '../styles/globals.css';
 
 // Initialize the Inter font with Latin subset
@@ -27,12 +27,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Fallback-Animation im Layout starten, damit sie nicht bei Page-Wechseln unterbrochen wird
-  useFallbackAnimation();
+  // Idle-Animation im Layout starten, damit sie nicht bei Page-Wechseln unterbrochen wird
+  useIdleAnimation();
   
   useEffect(() => {
     // Setze nur den Titel und die Beschreibung
-    console.log('RootLayout mounted, fallback started');
+    console.log('RootLayout mounted, idle animation started');
     document.title = 'Griftblade - ASCII Blockchain Visualizer';
   }, []);
   

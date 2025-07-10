@@ -51,7 +51,7 @@ import {
 } from './utils/swordUtils';
 
 // Importiere Effekt-Generatoren
-import { generateCaveBackground, generateColoredVeins } from './effects/backgroundEffects';
+import { generateCaveBackground, generateColoredVeins, generateIdleVeinSequence } from './effects/backgroundEffects';
 import { generateHarmonicColorPair } from './effects/colorEffects';
 import {
   generateEdgeGlitches,
@@ -68,7 +68,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const { currentLevel, chargeLevel, glitchLevel } = usePowerUpStore();
   
   // Audio-Reaktionsdaten abrufen
-  const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying } = useAudioReactionStore();
+  const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying, isIdleActive } = useAudioReactionStore();
   
   // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
   const energy = directEnergy !== undefined ? directEnergy : storeEnergy;
@@ -77,7 +77,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // Automatisches Beat-Reset aktivieren
   useBeatReset(500);
   
-  // Fallback-Animation läuft jetzt im Layout, nicht mehr hier
+  // Idle-Animation läuft jetzt im Layout, nicht mehr hier
   
   // Performance Monitor
   // Entferne die Zeile mit getPerformanceMonitor und alle auskommentierten Performance-Optimizer-Zeilen
@@ -147,6 +147,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const veinCleanupIntervalRef = useRef<number>(20000); // Erhöht von 15000ms auf 20000ms für bessere Performance
   const veinGenerationIntervalRef = useRef<number>(12000); // Erhöht von 8000ms auf 12000ms für bessere Performance
   const lastVeinLogTimeRef = useRef<number>(0);
+  const idleStepRef = useRef<number>(0); // Für Idle-Animation Schritte
 
   // Vein-Handling als Map
   const veinsMapRef = useRef(new Map<string, {vein: {x: number, y: number, color: string}, birth: number}>());
@@ -647,6 +648,34 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     }
     
   }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions]);
+  
+  // OPTIMIERT: Separater useEffect für Idle-Animation
+  useEffect(() => {
+    if (isIdleActive()) {
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
+      
+      // Erhöhe den Idle-Schritt bei jedem Beat
+      if (beatDetected) {
+        idleStepRef.current = (idleStepRef.current + 1) % 10; // 10 Schritte pro Loop
+      }
+      
+      // Generiere vordefinierte Vein-Sequenz für den aktuellen Schritt
+      const idleVeins = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
+      
+      // Ersetze alle bestehenden Veins mit der Idle-Sequenz
+      veinsMapRef.current.clear();
+      const currentTime = Date.now();
+      idleVeins.forEach(vein => {
+        const key = `${vein.x}-${vein.y}`;
+        veinsMapRef.current.set(key, { vein, birth: currentTime });
+      });
+      
+      // Setze das State-Array für das Rendering
+      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+    }
+  }, [isIdleActive, beatDetected, getBackgroundDimensions]);
   
   // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
   useEffect(() => {

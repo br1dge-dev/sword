@@ -432,4 +432,144 @@ export function getBackgroundCacheStatus(): { background: number; veins: number 
     background: backgroundCache.size,
     veins: veinCache.size
   };
+}
+
+/**
+ * OPTIMIERT: Generiert vordefinierte Vein-Sequenzen für Idle-Animation
+ * 10 verschiedene Muster, die in einer Schleife abgespielt werden
+ */
+export function generateIdleVeinSequence(
+  width: number, 
+  height: number, 
+  step: number,
+  viewportWidth?: number,
+  viewportHeight?: number
+): Array<{x: number, y: number, color: string}> {
+  const adjustedWidth = Math.min(width, MAX_BG_WIDTH);
+  const adjustedHeight = Math.min(height, MAX_BG_HEIGHT);
+  const effectiveViewportWidth = viewportWidth || adjustedWidth;
+  const effectiveViewportHeight = viewportHeight || adjustedHeight;
+  
+  // Berechne sichtbaren Bereich
+  const viewportRegion = calculateViewportRegion(
+    adjustedWidth,
+    adjustedHeight,
+    effectiveViewportWidth,
+    effectiveViewportHeight
+  );
+  
+  const veins: Array<{x: number, y: number, color: string}> = [];
+  const stepIndex = step % 10; // 10 Schritte pro Loop
+  
+  // Vordefinierte Muster für jeden Schritt
+  const patterns = [
+    // Schritt 0: Horizontale Linie oben
+    () => {
+      const y = Math.floor(viewportRegion.startY + (viewportRegion.endY - viewportRegion.startY) * 0.1);
+      for (let x = viewportRegion.startX; x < viewportRegion.endX; x += 2) {
+        veins.push({ x, y, color: accentColors[0] });
+      }
+    },
+    // Schritt 1: Vertikale Linie links
+    () => {
+      const x = Math.floor(viewportRegion.startX + (viewportRegion.endX - viewportRegion.startX) * 0.1);
+      for (let y = viewportRegion.startY; y < viewportRegion.endY; y += 2) {
+        veins.push({ x, y, color: accentColors[1] });
+      }
+    },
+    // Schritt 2: Diagonale von oben-links nach unten-rechts
+    () => {
+      const startX = viewportRegion.startX;
+      const startY = viewportRegion.startY;
+      const endX = viewportRegion.endX;
+      const endY = viewportRegion.endY;
+      for (let i = 0; i < Math.min(endX - startX, endY - startY); i += 3) {
+        veins.push({ 
+          x: startX + i, 
+          y: startY + i, 
+          color: accentColors[2] 
+        });
+      }
+    },
+    // Schritt 3: Kleine Cluster in der Mitte
+    () => {
+      const centerX = Math.floor((viewportRegion.startX + viewportRegion.endX) / 2);
+      const centerY = Math.floor((viewportRegion.startY + viewportRegion.endY) / 2);
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dy = -2; dy <= 2; dy++) {
+          if (Math.abs(dx) + Math.abs(dy) <= 2) {
+            veins.push({ 
+              x: centerX + dx, 
+              y: centerY + dy, 
+              color: accentColors[3] 
+            });
+          }
+        }
+      }
+    },
+    // Schritt 4: Horizontale Linie in der Mitte
+    () => {
+      const y = Math.floor((viewportRegion.startY + viewportRegion.endY) / 2);
+      for (let x = viewportRegion.startX; x < viewportRegion.endX; x += 3) {
+        veins.push({ x, y, color: accentColors[4] });
+      }
+    },
+    // Schritt 5: Vertikale Linie in der Mitte
+    () => {
+      const x = Math.floor((viewportRegion.startX + viewportRegion.endX) / 2);
+      for (let y = viewportRegion.startY; y < viewportRegion.endY; y += 3) {
+        veins.push({ x, y, color: accentColors[0] });
+      }
+    },
+    // Schritt 6: Diagonale von oben-rechts nach unten-links
+    () => {
+      const startX = viewportRegion.endX - 1;
+      const startY = viewportRegion.startY;
+      const endX = viewportRegion.startX;
+      const endY = viewportRegion.endY;
+      for (let i = 0; i < Math.min(startX - endX, endY - startY); i += 3) {
+        veins.push({ 
+          x: startX - i, 
+          y: startY + i, 
+          color: accentColors[1] 
+        });
+      }
+    },
+    // Schritt 7: Horizontale Linie unten
+    () => {
+      const y = Math.floor(viewportRegion.startY + (viewportRegion.endY - viewportRegion.startY) * 0.9);
+      for (let x = viewportRegion.startX; x < viewportRegion.endX; x += 2) {
+        veins.push({ x, y, color: accentColors[2] });
+      }
+    },
+    // Schritt 8: Vertikale Linie rechts
+    () => {
+      const x = Math.floor(viewportRegion.startX + (viewportRegion.endX - viewportRegion.startX) * 0.9);
+      for (let y = viewportRegion.startY; y < viewportRegion.endY; y += 2) {
+        veins.push({ x, y, color: accentColors[3] });
+      }
+    },
+    // Schritt 9: Kreuz in der Mitte
+    () => {
+      const centerX = Math.floor((viewportRegion.startX + viewportRegion.endX) / 2);
+      const centerY = Math.floor((viewportRegion.startY + viewportRegion.endY) / 2);
+      // Horizontale Linie
+      for (let dx = -3; dx <= 3; dx++) {
+        veins.push({ x: centerX + dx, y: centerY, color: accentColors[4] });
+      }
+      // Vertikale Linie
+      for (let dy = -3; dy <= 3; dy++) {
+        if (dy !== 0) { // Vermeide Duplikat in der Mitte
+          veins.push({ x: centerX, y: centerY + dy, color: accentColors[4] });
+        }
+      }
+    }
+  ];
+  
+  // Generiere das Muster für den aktuellen Schritt
+  if (patterns[stepIndex]) {
+    patterns[stepIndex]();
+  }
+  
+  return veins;
 } 

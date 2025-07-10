@@ -15,8 +15,8 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
   const animationFrameRef = useRef<number | null>(null);
   const lastUpdateTimeRef = useRef(0);
   
-  // Zugriff auf den Fallback-Status
-  const isFallbackActive = useAudioReactionStore(state => state.isFallbackActive());
+  // Zugriff auf den Idle-Status
+  const isIdleActive = useAudioReactionStore(state => state.isIdleActive());
   
   // OPTIMIERT: Reaktive Update-Frequenz für visuellen Impact
   useEffect(() => {
@@ -60,33 +60,15 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
     transform: visualBeatActive ? 'scale(1.1)' : 'scale(1)',
     transition: 'transform 0.15s ease-out'
   }), [visualBeatActive]);
-  
-  const barStyle = useMemo(() => ({
-    transition: 'all 0.1s ease-out',
-    backgroundColor: visualBeatActive ? 'var(--color-neon-pink)' : 'var(--color-neon-green)',
-    boxShadow: visualBeatActive 
-      ? '0 0 10px var(--color-neon-pink), 0 0 20px var(--color-neon-pink)' 
-      : '0 0 5px var(--color-neon-green)'
-  }), [visualBeatActive]);
-  
+
   return (
-    <div className={`flex flex-col ${className}`}>
-      <div className="text-xs font-bold font-press-start-2p text-[#3EE6FF] mb-1">
-        AUDIO SYNC
-      </div>
-      
-      {/* Visualisierungs-Container */}
+    <div className={`flex flex-col items-center justify-center p-2 bg-black/20 rounded-lg border border-gray-700 ${className}`}>
       <div 
-        className="h-6 border border-gray-700 bg-gray-900 flex items-end p-0.5 overflow-hidden"
-        style={{ 
-          boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
-          transition: 'box-shadow 0.1s ease-out',
-          width: '100%', // Volle Breite des Containers
-          maxWidth: '200px' // Maximale Breite begrenzen
-        }}
+        className="w-full h-8 flex items-end justify-center gap-[1px] mb-1"
+        style={containerStyle}
       >
-        {isFallbackActive ? (
-          // IDLE-Anzeige für Fallback-Modus
+        {isIdleActive ? (
+          // IDLE-Anzeige für Idle-Modus
           <div className="w-full h-full flex items-center justify-center">
             <span className="text-xs font-press-start-2p text-[#3EE6FF]">IDLE</span>
           </div>
@@ -124,7 +106,7 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
           }}
         />
         <div className="text-[8px] font-mono text-gray-500">
-          {isFallbackActive ? "IDLE" : `E: ${(lastEnergyRef.current * 1.8).toFixed(2)}`}
+          {isIdleActive ? "IDLE" : `E: ${(lastEnergyRef.current * 1.8).toFixed(2)}`}
         </div>
       </div>
     </div>

@@ -2,24 +2,21 @@
  * Audio-Reaction-Store
  * 
  * Zentraler Store für Audio-Reaktionsdaten, der von allen Komponenten verwendet werden kann.
- * OPTIMIERT: Memory-Leak-Prävention, reduzierte Energy-Updates, bessere Performance
+ * OPTIMIERT: Einfache Idle-Animation mit vordefinierten Vein-Sequenzen
  */
 import { create } from 'zustand';
 import { useEffect } from 'react';
 
-// Globale Variablen für Fallback-Animation
-let fallbackActive = false;
-let beatInterval: NodeJS.Timeout | null = null;
-let energyInterval: NodeJS.Timeout | null = null;
-let fallbackInitialized = false;
-let lastFallbackEnergyLog = 0;
+// Globale Variablen für Idle-Animation
+let idleActive = false;
+let idleInterval: NodeJS.Timeout | null = null;
+let idleStep = 0;
+let idleInitialized = false;
 
-// OPTIMIERT: Stabilere Fallback-Animation um Einfrieren zu verhindern
-const MIN_ENERGY = 0.08; // Erhöht für stabilere Animation und bessere Sichtbarkeit
-const MAX_ENERGY = 0.35; // Erhöht für bessere Sichtbarkeit der Effekte
-const ENERGY_INTERVAL = 5000; // Reduziert auf 5s für häufigere Effekte
-const BEAT_INTERVAL = 8000; // Reduziert auf 8s für häufigere Beats
-const BEAT_CHANCE = 0.02; // Erhöht auf 2% für bessere Sichtbarkeit der Effekte
+// OPTIMIERT: Einfache Idle-Animation mit vordefinierten Sequenzen
+const IDLE_STEPS = 10; // 10 Schritte pro Loop
+const IDLE_INTERVAL = 2000; // 2 Sekunden pro Schritt
+const IDLE_ENERGY = 0.15; // Konstante, niedrige Energy für subtile Animation
 
 // OPTIMIERT: Reduziertes Throttling für bessere Reaktivität
 let lastEnergyUpdate = 0;
@@ -44,12 +41,11 @@ interface AudioReactionState {
   setAudioActive: (active: boolean) => void;
   setFallbackEnabled: (enabled: boolean) => void;
   setMusicPlaying: (playing: boolean) => void;
-  startFallback: () => void;
-  stopFallback: () => void;
-  isFallbackActive: () => boolean;
+  startIdle: () => void;
+  stopIdle: () => void;
+  isIdleActive: () => boolean;
 }
 
-// Erstelle den Store
 export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   energy: 0,
   beatDetected: false,
@@ -58,14 +54,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   fallbackEnabled: true,
   isMusicPlaying: false,
   
-  // OPTIMIERT: Throttled Energy-Updates
   updateEnergy: (energy, opts = {}) => {
-    // Blockiere externe Updates, wenn Fallback aktiv ist und das Update nicht explizit vom Fallback kommt
-    if (fallbackActive && !opts.forceFallback) {
-      // Debug-Log für Analyse
-      // console.log('updateEnergy blockiert: Fallback aktiv, Quelle nicht Fallback');
-      return;
-    }
     const now = Date.now();
     if (now - lastEnergyUpdate < ENERGY_UPDATE_THROTTLE) {
       return; // Skip update if too soon
@@ -93,123 +82,97 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   setMusicPlaying: (playing) => {
     set({ isMusicPlaying: playing });
     
-    // Wenn Musik gestoppt wird und Fallback aktiviert ist
+    // Wenn Musik gestoppt wird und Idle aktiviert ist
     if (!playing && get().fallbackEnabled) {
       // OPTIMIERT: Längere Verzögerung für stabilere Animation und um Track-Wechsel zu berücksichtigen
       setTimeout(() => {
         // Prüfe nochmal, ob Musik wirklich gestoppt ist (nicht nur Track-Wechsel)
         const currentState = get();
         if (!currentState.isMusicPlaying && currentState.fallbackEnabled) {
-          const { startFallback } = get();
-          startFallback();
-          console.log("Music paused, forcing fallback activation");
+          const { startIdle } = get();
+          startIdle();
+          console.log("Music paused, starting idle animation");
         }
       }, 5000); // Erhöht auf 5000ms um Track-Wechsel zu berücksichtigen
     }
-    // Wenn Musik gestartet wird und Fallback aktiv ist
-    else if (playing && fallbackActive) {
-      get().stopFallback();
+    // Wenn Musik gestartet wird und Idle aktiv ist
+    else if (playing && idleActive) {
+      get().stopIdle();
     }
   },
   
-  // OPTIMIERT: Stabilere Fallback-Verwaltung
-  startFallback: () => {
+  // OPTIMIERT: Einfache Idle-Animation mit vordefinierten Sequenzen
+  startIdle: () => {
     const store = get();
     if (!store.fallbackEnabled) return;
     
-    // Wenn der Fallback bereits aktiv ist, nichts tun
-    if (fallbackActive) {
-      console.log("Fallback is already active");
+    // Wenn die Idle-Animation bereits aktiv ist, nichts tun
+    if (idleActive) {
+      console.log("Idle animation is already active");
       return;
     }
     
     // OPTIMIERT: Sauberes Cleanup bestehender Intervalle
-    if (beatInterval) {
-      clearInterval(beatInterval);
-      beatInterval = null;
+    if (idleInterval) {
+      clearInterval(idleInterval);
+      idleInterval = null;
     }
     
-    if (energyInterval) {
-      clearInterval(energyInterval);
-      energyInterval = null;
-    }
-    
-    if (fallbackInitialized) {
-      console.log("Fallback already initialized, restarting animation");
+    if (idleInitialized) {
+      console.log("Idle animation already initialized, restarting");
     } else {
-      console.log("Starting fallback animation");
-      fallbackInitialized = true;
+      console.log("Starting idle animation");
+      idleInitialized = true;
     }
     
-    fallbackActive = true;
+    idleActive = true;
+    idleStep = 0;
     
-    // OPTIMIERT: Sanftere Start-Animation für Stabilität
-    const initialEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY) * 0.3; // Reduziert auf 0.3 für stabilere Animation
-    store.updateEnergy(initialEnergy, { forceFallback: true });
+    // Setze konstante, niedrige Energy für subtile Animation
+    store.updateEnergy(IDLE_ENERGY, { forceFallback: true });
     
-    // OPTIMIERT: Sanftere Beat-Generierung für Stabilität
-    beatInterval = setInterval(() => {
-      if (!fallbackActive) return;
+    // OPTIMIERT: Einfache Schritt-für-Schritt Animation
+    idleInterval = setInterval(() => {
+      if (!idleActive) return;
       
-      if (Math.random() < BEAT_CHANCE) {
-        console.log("Fallback: Triggering beat");
+      // Erhöhe den Schritt
+      idleStep = (idleStep + 1) % IDLE_STEPS;
+      
+      // Trigger einen subtilen Beat alle 3 Schritte für minimale Bewegung
+      if (idleStep % 3 === 0) {
+        console.log(`Idle: Step ${idleStep + 1}/${IDLE_STEPS} - triggering subtle beat`);
         store.triggerBeat();
         
-        // Automatisches Beat-Reset nach 100ms
+        // Automatisches Beat-Reset nach 200ms
         setTimeout(() => {
           if (useAudioReactionStore.getState().beatDetected) {
             const { resetBeat } = useAudioReactionStore.getState();
             resetBeat();
           }
-        }, 100);
-      }
-    }, BEAT_INTERVAL);
-    
-    // OPTIMIERT: Sanftere Energy-Generierung für Stabilität
-    let currentEnergy = initialEnergy;
-    let targetEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY);
-    let energyStep = 0;
-    
-    energyInterval = setInterval(() => {
-      if (!fallbackActive) return;
-      
-      // OPTIMIERT: Sanftere Energy-Änderungen für stabilere Animation
-      if (Math.abs(currentEnergy - targetEnergy) < 0.01) {
-        // Neues Ziel setzen
-        targetEnergy = MIN_ENERGY + Math.random() * (MAX_ENERGY - MIN_ENERGY);
-        energyStep = (targetEnergy - currentEnergy) / 20; // Erhöht auf 20 für sanftere Übergänge
+        }, 200);
       }
       
-      // Sanfterer Übergang zum Ziel
-      currentEnergy = Math.max(MIN_ENERGY, Math.min(MAX_ENERGY, currentEnergy + energyStep));
-      
-      const now = Date.now();
-      if (now - lastFallbackEnergyLog > 10000) {
-        console.log(`Fallback: Setting energy to ${currentEnergy.toFixed(3)}`);
-        lastFallbackEnergyLog = now;
+      // Log alle 10 Schritte (ein kompletter Loop)
+      if (idleStep === 0) {
+        console.log("Idle: Completed one animation loop");
       }
-      store.updateEnergy(currentEnergy, { forceFallback: true });
-    }, ENERGY_INTERVAL / 20); // Reduziert auf 20 für häufigere Updates
+    }, IDLE_INTERVAL);
   },
   
-  // OPTIMIERT: Verbesserte Fallback-Beendigung
-  stopFallback: () => {
-    console.log("Stopping fallback animation");
+  // OPTIMIERT: Verbesserte Idle-Beendigung
+  stopIdle: () => {
+    console.log("Stopping idle animation");
     
-    if (beatInterval) {
-      clearInterval(beatInterval);
-      beatInterval = null;
+    if (idleInterval) {
+      clearInterval(idleInterval);
+      idleInterval = null;
     }
     
-    if (energyInterval) {
-      clearInterval(energyInterval);
-      energyInterval = null;
-    }
-    
-    fallbackActive = false;
+    idleActive = false;
+    idleStep = 0;
   },
   
-  isFallbackActive: () => fallbackActive
+  isIdleActive: () => idleActive
 }));
 
 // OPTIMIERT: Hook für automatisches Beat-Reset
@@ -227,42 +190,38 @@ export function useBeatReset(delay: number = 500) {
   }, [beatDetected, resetBeat, delay]);
 }
 
-// OPTIMIERT: Hook für Fallback-Animation
-export function useFallbackAnimation() {
-  const { isMusicPlaying, fallbackEnabled, startFallback } = useAudioReactionStore();
+// OPTIMIERT: Hook für Idle-Animation
+export function useIdleAnimation() {
+  const { isMusicPlaying, fallbackEnabled, startIdle } = useAudioReactionStore();
   
-  // Initialisiere Fallback bei Komponentenladung und wenn Musik stoppt
+  // Initialisiere Idle bei Komponentenladung und wenn Musik stoppt
   useEffect(() => {
     if (!isMusicPlaying && fallbackEnabled) {
-      console.log("No music playing, activating fallback immediately");
+      console.log("No music playing, activating idle animation");
       // OPTIMIERT: Längere Verzögerung für stabilere Animation und um Track-Wechsel zu berücksichtigen
       const timer = setTimeout(() => {
         // Prüfe nochmal, ob Musik wirklich gestoppt ist (nicht nur Track-Wechsel)
         const currentState = useAudioReactionStore.getState();
         if (!currentState.isMusicPlaying && currentState.fallbackEnabled) {
-          startFallback();
+          startIdle();
         }
       }, 5000); // Erhöht auf 5000ms um Track-Wechsel zu berücksichtigen
       
       return () => clearTimeout(timer);
     }
-  }, [isMusicPlaying, fallbackEnabled, startFallback]);
+  }, [isMusicPlaying, fallbackEnabled, startIdle]);
   
-  return fallbackActive;
+  return idleActive;
 }
 
 // OPTIMIERT: Cleanup-Funktion für globale Intervalle
 export function cleanupAudioIntervals(): void {
-  if (beatInterval) {
-    clearInterval(beatInterval);
-    beatInterval = null;
+  if (idleInterval) {
+    clearInterval(idleInterval);
+    idleInterval = null;
   }
   
-  if (energyInterval) {
-    clearInterval(energyInterval);
-    energyInterval = null;
-  }
-  
-  fallbackActive = false;
+  idleActive = false;
+  idleStep = 0;
   console.log('🧹 Audio intervals cleaned up');
 } 
