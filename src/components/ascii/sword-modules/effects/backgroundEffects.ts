@@ -448,45 +448,36 @@ export function generateBeatVeins(
   const veins: Array<{x: number, y: number, color: string}> = [];
   
   // OPTIMIERT: Dynamische Vein-Anzahl basierend auf Energy und Beat
-  const baseVeinCount = Math.floor(20 + (energy * 80)); // 20-100 Veins basierend auf Energy
+  const baseVeinCount = Math.floor(60 + (energy * 240)); // 60-300 Veins basierend auf Energy (300% mehr)
   const beatMultiplier = beatDetected ? 2.5 : 1; // 2.5x mehr Veins bei Beat
   const totalVeinCount = Math.floor(baseVeinCount * beatMultiplier);
   
   // OPTIMIERT: Vordefinierte Beat-Patterns für bessere Performance
   const beatPatterns = [
-    // Pattern 1: Explosions-ähnlich (von der Mitte ausgehend)
+    // Pattern 1: Zufällig verteilt
     () => {
-      const centerX = Math.floor((viewportRegion.startX + viewportRegion.endX) / 2);
-      const centerY = Math.floor((viewportRegion.startY + viewportRegion.endY) / 2);
-      const radius = Math.min(viewportRegion.endX - viewportRegion.startX, viewportRegion.endY - viewportRegion.startY) / 4;
-      
       for (let i = 0; i < totalVeinCount; i++) {
-        const angle = (i / totalVeinCount) * Math.PI * 2;
-        const distance = Math.random() * radius;
-        const x = Math.floor(centerX + Math.cos(angle) * distance);
-        const y = Math.floor(centerY + Math.sin(angle) * distance);
-        
-        if (x >= viewportRegion.startX && x < viewportRegion.endX &&
-            y >= viewportRegion.startY && y < viewportRegion.endY) {
-          const colorIndex = Math.floor(i / 10) % accentColors.length;
-          veins.push({ x, y, color: accentColors[colorIndex] });
-        }
+        const x = viewportRegion.startX + Math.floor(Math.random() * (viewportRegion.endX - viewportRegion.startX));
+        const y = viewportRegion.startY + Math.floor(Math.random() * (viewportRegion.endY - viewportRegion.startY));
+        const colorIndex = i % accentColors.length;
+        veins.push({ x, y, color: accentColors[colorIndex] });
       }
     },
     
-    // Pattern 2: Wellen-ähnlich (horizontale Wellen)
+    // Pattern 2: Wellen-ähnlich (mehrere Wellen)
     () => {
-      const waveCount = Math.floor(3 + energy * 5); // 3-8 Wellen
-      const waveHeight = (viewportRegion.endY - viewportRegion.startY) / (waveCount * 2);
+      const waveCount = Math.floor(3 + energy * 8); // 3-11 Wellen (erhöht von 2-6)
+      const veinsPerWave = Math.floor(totalVeinCount / waveCount);
       
       for (let wave = 0; wave < waveCount; wave++) {
-        const baseY = viewportRegion.startY + (wave + 1) * (viewportRegion.endY - viewportRegion.startY) / (waveCount + 1);
-        const waveVeins = Math.floor(totalVeinCount / waveCount);
+        const waveY = viewportRegion.startY + (wave * (viewportRegion.endY - viewportRegion.startY) / waveCount);
+        const amplitude = 20 + Math.random() * 40; // 20-60 Pixel Amplitude (erhöht von 15-30)
+        const frequency = 0.02 + Math.random() * 0.03; // 0.02-0.05 Frequenz
         
-        for (let i = 0; i < waveVeins; i++) {
-          const x = viewportRegion.startX + (i / waveVeins) * (viewportRegion.endX - viewportRegion.startX);
-          const waveOffset = Math.sin((i / waveVeins) * Math.PI * 4) * waveHeight * 0.3;
-          const y = Math.floor(baseY + waveOffset);
+        for (let i = 0; i < veinsPerWave; i++) {
+          const x = viewportRegion.startX + (i * (viewportRegion.endX - viewportRegion.startX) / veinsPerWave);
+          const waveOffset = Math.sin(x * frequency) * amplitude;
+          const y = Math.floor(waveY + waveOffset);
           
           if (y >= viewportRegion.startY && y < viewportRegion.endY) {
             const colorIndex = wave % accentColors.length;
@@ -498,13 +489,13 @@ export function generateBeatVeins(
     
     // Pattern 3: Cluster-ähnlich (mehrere kleine Gruppen)
     () => {
-      const clusterCount = Math.floor(3 + energy * 7); // 3-10 Cluster
+      const clusterCount = Math.floor(5 + energy * 15); // 5-20 Cluster (erhöht von 3-10)
       const veinsPerCluster = Math.floor(totalVeinCount / clusterCount);
       
       for (let cluster = 0; cluster < clusterCount; cluster++) {
         const clusterX = viewportRegion.startX + Math.random() * (viewportRegion.endX - viewportRegion.startX);
         const clusterY = viewportRegion.startY + Math.random() * (viewportRegion.endY - viewportRegion.startY);
-        const clusterRadius = 10 + Math.random() * 20; // 10-30 Pixel Radius
+        const clusterRadius = 15 + Math.random() * 35; // 15-50 Pixel Radius (erhöht von 10-30)
         
         for (let i = 0; i < veinsPerCluster; i++) {
           const angle = Math.random() * Math.PI * 2;
