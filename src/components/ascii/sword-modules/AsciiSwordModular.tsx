@@ -542,7 +542,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       performanceMonitor.trackEffect();
       effectsTriggered++;
       // OPTIMIERT: Längere Cleanup-Dauer für sanftere Übergänge
-      const duration = beatDetected ? 1200 : 1000;
+      const duration = beatDetected ? 2000 : 1500; // Erhöht von 1200/1000 auf 2000/1500 für weniger Flackern
       const timeout = setTimeout(() => {
         setColoredTiles([]); // Nach Ablauf werden die Tiles entfernt
       }, duration);
@@ -559,7 +559,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       performanceMonitor.trackGlitch();
       
       // OPTIMIERT: Längere Cleanup-Dauer
-      const duration = beatDetected ? 300 : Math.max(250, Math.min(400, Math.floor(energy * 200))); // Erhöht Dauer
+      const duration = beatDetected ? 500 : Math.max(400, Math.min(600, Math.floor(energy * 300))); // Erhöht von 300/250-400 auf 500/400-600 für weniger Flackern
       const timeout = setTimeout(() => {
         setUnicodeGlitches([]);
       }, duration);
@@ -567,7 +567,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     }
     
     // OPTIMIERT: Reduzierte Hintergrund-Effekte für bessere Performance
-    if ((beatDetected && Math.random() < 0.001) || energy > 0.95) { // Reduziert von 0.005/0.9 auf 0.001/0.95
+    if ((beatDetected && Math.random() < 0.0008) || energy > 0.95) { // Reduziert von 0.001 auf 0.0008 (20% weniger)
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
@@ -701,7 +701,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       performanceMonitor.trackEffect();
       
       // Cleanup für Edge-Effekte - Längere Dauer für sanftere Übergänge
-      const duration = beatDetected ? 150 : Math.max(120, Math.min(200, Math.floor(energy * 120))); // Erhöht Dauer
+      const duration = beatDetected ? 250 : Math.max(200, Math.min(300, Math.floor(energy * 150))); // Erhöht von 150/120-200 auf 250/200-300 für weniger Flackern
       const timeout = setTimeout(() => {
         setEdgeEffects([]);
       }, duration);
