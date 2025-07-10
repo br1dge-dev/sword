@@ -176,7 +176,6 @@ export class AudioAnalyzer {
   }
 
   public stop(): void {
-    // Wenn keine Analyse läuft, nichts tun
     if (!this.isAnalyzing) {
       return;
     }

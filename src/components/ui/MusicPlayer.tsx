@@ -257,7 +257,8 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     if (wasPlaying && audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
-      setMusicPlaying(false);
+      // OPTIMIERT: Nicht sofort setMusicPlaying(false) setzen, um Fallback-Konflikte zu vermeiden
+      // setMusicPlaying(false);
     }
     
     // Wechsle zum nächsten Track (oder zurück zum ersten)
@@ -288,6 +289,8 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       } catch (err) {
         console.error("Fehler beim Abspielen:", err);
         setError("Wiedergabe nicht möglich");
+        // Bei Fehler setze Musik als nicht spielend
+        setMusicPlaying(false);
       }
     }
   };
@@ -361,6 +364,21 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       }
     }
   }, [currentTrackIndex, currentTrack.src]);
+
+  // OPTIMIERT: Effekt für bessere Audio-Analyzer-Koordination beim Track-Wechsel
+  useEffect(() => {
+    if (audioRef.current && isPlaying && isInitialized) {
+      // Kurze Verzögerung, um sicherzustellen, dass der neue Track geladen ist
+      const timer = setTimeout(() => {
+        if (isPlaying && !isAnalyzing) {
+          start();
+          console.log('Starting audio analysis after track change');
+        }
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentTrackIndex, isPlaying, isInitialized, isAnalyzing, start]);
 
   return (
     <div className={`flex flex-col ${className}`}>

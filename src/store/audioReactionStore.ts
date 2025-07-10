@@ -95,12 +95,16 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     
     // Wenn Musik gestoppt wird und Fallback aktiviert ist
     if (!playing && get().fallbackEnabled) {
-      // OPTIMIERT: Längere Verzögerung für stabilere Animation
+      // OPTIMIERT: Längere Verzögerung für stabilere Animation und um Track-Wechsel zu berücksichtigen
       setTimeout(() => {
-        const { startFallback } = get();
-        startFallback();
-        console.log("Music paused, forcing fallback activation");
-      }, 2000); // Erhöht auf 2000ms für stabilere Animation
+        // Prüfe nochmal, ob Musik wirklich gestoppt ist (nicht nur Track-Wechsel)
+        const currentState = get();
+        if (!currentState.isMusicPlaying && currentState.fallbackEnabled) {
+          const { startFallback } = get();
+          startFallback();
+          console.log("Music paused, forcing fallback activation");
+        }
+      }, 5000); // Erhöht auf 5000ms um Track-Wechsel zu berücksichtigen
     }
     // Wenn Musik gestartet wird und Fallback aktiv ist
     else if (playing && fallbackActive) {
@@ -231,10 +235,14 @@ export function useFallbackAnimation() {
   useEffect(() => {
     if (!isMusicPlaying && fallbackEnabled) {
       console.log("No music playing, activating fallback immediately");
-      // OPTIMIERT: Längere Verzögerung für stabilere Animation
+      // OPTIMIERT: Längere Verzögerung für stabilere Animation und um Track-Wechsel zu berücksichtigen
       const timer = setTimeout(() => {
-        startFallback();
-      }, 2000); // Erhöht auf 2000ms für stabilere Animation
+        // Prüfe nochmal, ob Musik wirklich gestoppt ist (nicht nur Track-Wechsel)
+        const currentState = useAudioReactionStore.getState();
+        if (!currentState.isMusicPlaying && currentState.fallbackEnabled) {
+          startFallback();
+        }
+      }, 5000); // Erhöht auf 5000ms um Track-Wechsel zu berücksichtigen
       
       return () => clearTimeout(timer);
     }
