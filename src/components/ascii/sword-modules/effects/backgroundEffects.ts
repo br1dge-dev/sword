@@ -448,31 +448,31 @@ export function generateBeatVeins(
   const veins: Array<{x: number, y: number, color: string}> = [];
   
   // OPTIMIERT: Dynamische Vein-Anzahl basierend auf Energy und Beat
-  const baseVeinCount = Math.floor(60 + (energy * 240)); // 60-300 Veins basierend auf Energy (300% mehr)
+  const baseVeinCount = Math.floor(120 + (energy * 480)); // 120-600 Veins basierend auf Energy (verdoppelt von 60-300)
   const beatMultiplier = beatDetected ? 2.5 : 1; // 2.5x mehr Veins bei Beat
   const totalVeinCount = Math.floor(baseVeinCount * beatMultiplier);
   
   // OPTIMIERT: Vordefinierte Beat-Patterns für bessere Performance
   const beatPatterns = [
-    // Pattern 1: Zufällig verteilt
+    // Pattern 1: Zufällig verteilt (deterministisch)
     () => {
       for (let i = 0; i < totalVeinCount; i++) {
-        const x = viewportRegion.startX + Math.floor(Math.random() * (viewportRegion.endX - viewportRegion.startX));
-        const y = viewportRegion.startY + Math.floor(Math.random() * (viewportRegion.endY - viewportRegion.startY));
+        const x = viewportRegion.startX + Math.floor(pseudoRandom(i, 0, 1) * (viewportRegion.endX - viewportRegion.startX));
+        const y = viewportRegion.startY + Math.floor(pseudoRandom(i, 1, 1) * (viewportRegion.endY - viewportRegion.startY));
         const colorIndex = i % accentColors.length;
         veins.push({ x, y, color: accentColors[colorIndex] });
       }
     },
     
-    // Pattern 2: Wellen-ähnlich (mehrere Wellen)
+    // Pattern 2: Wellen-ähnlich (mehrere Wellen, deterministisch)
     () => {
-      const waveCount = Math.floor(3 + energy * 8); // 3-11 Wellen (erhöht von 2-6)
+      const waveCount = Math.floor(3 + energy * 8); // 3-11 Wellen
       const veinsPerWave = Math.floor(totalVeinCount / waveCount);
       
       for (let wave = 0; wave < waveCount; wave++) {
         const waveY = viewportRegion.startY + (wave * (viewportRegion.endY - viewportRegion.startY) / waveCount);
-        const amplitude = 20 + Math.random() * 40; // 20-60 Pixel Amplitude (erhöht von 15-30)
-        const frequency = 0.02 + Math.random() * 0.03; // 0.02-0.05 Frequenz
+        const amplitude = 20 + pseudoRandom(wave, 0, 2) * 40; // 20-60 Pixel Amplitude
+        const frequency = 0.02 + pseudoRandom(wave, 1, 2) * 0.03; // 0.02-0.05 Frequenz
         
         for (let i = 0; i < veinsPerWave; i++) {
           const x = viewportRegion.startX + (i * (viewportRegion.endX - viewportRegion.startX) / veinsPerWave);
@@ -487,19 +487,19 @@ export function generateBeatVeins(
       }
     },
     
-    // Pattern 3: Cluster-ähnlich (mehrere kleine Gruppen)
+    // Pattern 3: Cluster-ähnlich (mehrere kleine Gruppen, deterministisch)
     () => {
-      const clusterCount = Math.floor(5 + energy * 15); // 5-20 Cluster (erhöht von 3-10)
+      const clusterCount = Math.floor(5 + energy * 15); // 5-20 Cluster
       const veinsPerCluster = Math.floor(totalVeinCount / clusterCount);
       
       for (let cluster = 0; cluster < clusterCount; cluster++) {
-        const clusterX = viewportRegion.startX + Math.random() * (viewportRegion.endX - viewportRegion.startX);
-        const clusterY = viewportRegion.startY + Math.random() * (viewportRegion.endY - viewportRegion.startY);
-        const clusterRadius = 15 + Math.random() * 35; // 15-50 Pixel Radius (erhöht von 10-30)
+        const clusterX = viewportRegion.startX + pseudoRandom(cluster, 0, 3) * (viewportRegion.endX - viewportRegion.startX);
+        const clusterY = viewportRegion.startY + pseudoRandom(cluster, 1, 3) * (viewportRegion.endY - viewportRegion.startY);
+        const clusterRadius = 15 + pseudoRandom(cluster, 2, 3) * 35; // 15-50 Pixel Radius
         
         for (let i = 0; i < veinsPerCluster; i++) {
-          const angle = Math.random() * Math.PI * 2;
-          const distance = Math.random() * clusterRadius;
+          const angle = pseudoRandom(i, cluster, 4) * Math.PI * 2;
+          const distance = pseudoRandom(i, cluster + 100, 4) * clusterRadius;
           const x = Math.floor(clusterX + Math.cos(angle) * distance);
           const y = Math.floor(clusterY + Math.sin(angle) * distance);
           
@@ -533,7 +533,7 @@ export function generateBeatVeins(
       }
     },
     
-    // Pattern 5: Grid-ähnlich (strukturiertes Raster)
+    // Pattern 5: Grid-ähnlich (strukturiertes Raster, deterministisch)
     () => {
       const gridSize = Math.floor(5 + energy * 10); // 5-15 Grid-Zellen
       const cellWidth = (viewportRegion.endX - viewportRegion.startX) / gridSize;
@@ -546,8 +546,8 @@ export function generateBeatVeins(
           const cellStartY = viewportRegion.startY + gridY * cellHeight;
           
           for (let i = 0; i < veinsPerCell; i++) {
-            const x = Math.floor(cellStartX + Math.random() * cellWidth);
-            const y = Math.floor(cellStartY + Math.random() * cellHeight);
+            const x = Math.floor(cellStartX + pseudoRandom(i, gridX, 5) * cellWidth);
+            const y = Math.floor(cellStartY + pseudoRandom(i, gridY, 5) * cellHeight);
             const colorIndex = (gridX + gridY) % accentColors.length;
             veins.push({ x, y, color: accentColors[colorIndex] });
           }

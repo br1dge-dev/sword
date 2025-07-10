@@ -883,40 +883,35 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         >
           <pre className="font-mono text-sm sm:text-base leading-[0.9] whitespace-pre select-none" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {caveBackground.map((row, y) => {
-              let line = '';
-              const veinSpans: Array<{x: number, color: string}> = [];
-              row.forEach((char, x) => {
-                const vein = coloredVeins.find(v => v.x === x && v.y === y);
-                if (vein) {
-                  veinSpans.push({ x, color: vein.color });
-                  line += '\u0000'; // Platzhalter für Vein
-                } else {
-                  line += char;
+              // OPTIMIERT: Effizienteres Vein-Rendering ohne Zeilensprünge
+              const veinMap = new Map<number, string>();
+              coloredVeins.forEach(vein => {
+                if (vein.y === y) {
+                  veinMap.set(vein.x, vein.color);
                 }
               });
-              // Jetzt die Zeile als Text + Vein-Spans rendern
-              const parts = line.split('\u0000');
-              let partIndex = 0;
+              
               return (
-                <div key={y} style={{ lineHeight: '0.9', width: '100%', textAlign: 'center' }}>
-                  {parts.map((text, i) => (
-                    <React.Fragment key={i}>
-                      {text}
-                      {i < veinSpans.length && (
+                <div key={y} style={{ lineHeight: '0.9', width: '100%', textAlign: 'center', whiteSpace: 'pre' }}>
+                  {row.map((char, x) => {
+                    const veinColor = veinMap.get(x);
+                    if (veinColor) {
+                      return (
                         <span
+                          key={x}
                           style={{
-                            color: veinSpans[i].color,
-                            textShadow: `0 0 ${2 + glitchLevel}px ${veinSpans[i].color}`,
+                            color: veinColor,
+                            textShadow: `0 0 ${2 + glitchLevel}px ${veinColor}`,
                             display: 'inline-block',
-                            filter: `contrast(${0.65 + (glitchLevel * 0.05)})`,
-                            transform: ''
+                            filter: `contrast(${0.65 + (glitchLevel * 0.05)})`
                           }}
                         >
-                          {row[veinSpans[i].x]}
+                          {char}
                         </span>
-                      )}
-                    </React.Fragment>
-                  ))}
+                      );
+                    }
+                    return char;
+                  })}
                 </div>
               );
             })}
