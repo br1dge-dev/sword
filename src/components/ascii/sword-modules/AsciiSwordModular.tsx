@@ -11,8 +11,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
 import { useAudioReactionStore, useBeatReset } from '@/store/audioReactionStore';
 import { useAudioAnalyzer } from '@/hooks/useAudioAnalyzer';
-// import { getPerformanceMonitor } from '@/lib/performance/performanceMonitor';
-// import { getPerformanceOptimizer } from '@/lib/performance/performanceOptimizer';
+
 
 // Importiere Typen
 import {
@@ -79,64 +78,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // Idle-Animation läuft jetzt im Layout, nicht mehr hier
   
-  // Performance Monitor
-  // Entferne die Zeile mit getPerformanceMonitor und alle auskommentierten Performance-Optimizer-Zeilen
-  
-  // OPTIMIERT: Performance Optimizer vorübergehend deaktiviert
-  // const performanceOptimizer = getPerformanceOptimizer();
-  
-  // OPTIMIERT: Performance-Optimierung basierend auf Optimizer-Status
-  // useEffect(() => {
-  //   const { effectReductionLevel, updateThrottleLevel, emergencyMode } = performanceOptimizer.getOptimizationStatus();
-  //   
-  //   // Reduziere Effekte basierend auf Performance-Level
-  //   if (effectReductionLevel > 0) {
-  //     // Reduziere Vein-Generierung durch Anpassung der maxVeinsRef
-  //     const veinReduction = Math.max(0.1, 1 - (effectReductionLevel * 0.3));
-  //     maxVeinsRef.current = Math.floor(300 * veinReduction);
-  //   }
-  //   
-  //   // Reduziere Update-Frequenz basierend auf Throttle-Level
-  //   if (updateThrottleLevel > 0) {
-  //     // Erhöhe Intervall-Zeiten durch längere Delays
-  //     const throttleMultiplier = 1 + (updateThrottleLevel * 0.5);
-  //     // Die Intervalle werden in den bestehenden useEffect-Hooks angepasst
-  //   }
-  //   
-  //   // Notfall-Modus: Deaktiviere alle nicht-essentiellen Effekte
-  //   if (emergencyMode) {
-  //     setGlowIntensity(0);
-  //     setColoredTiles([]);
-  //     setUnicodeGlitches([]);
-  //     // Stoppe alle Intervalle
-  //     clearAllIntervals();
-  //   }
-  // }, [performanceOptimizer]);
-  
-  // OPTIMIERT: Setup Performance Optimizer Callbacks
-  // useEffect(() => {
-  //   performanceOptimizer.setCallbacks({
-  //     onEmergencyMode: (enabled) => {
-  //       if (enabled) {
-  //         // console.log('🚨 Notfall-Modus aktiviert - Alle Effekte deaktiviert');
-  //         setGlowIntensity(0);
-  //         setColoredTiles([]);
-  //         setUnicodeGlitches([]);
-  //         // clearAllIntervals wird später definiert
-  //       } else {
-  //         // console.log('✅ Notfall-Modus deaktiviert - Effekte wieder aktiviert');
-  //       }
-  //     },
-  //     onEffectReduction: (level) => {
-  //       // console.log(`🔧 Effekt-Reduktion Level ${level} aktiviert`);
-  //       // Implementiere Effekt-Reduktion basierend auf Level
-  //     },
-  //     onUpdateThrottle: (level) => {
-  //       // console.log(`🔧 Update-Throttling Level ${level} aktiviert`);
-  //       // Implementiere Update-Throttling basierend auf Level
-  //     }
-  //   });
-  // }, [performanceOptimizer]);
+
   
   // OPTIMIERT: Intelligentes Vein-Management-System
   const lastUpdateTimeRef = useRef<number>(Date.now());
@@ -432,6 +374,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     
     setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
     
+    // OPTIMIERT: Statischen Hintergrund zurücksetzen, damit er neu generiert wird
+    setBackgroundGenerated(false);
+    
     // Initialisiere Lebensdauer-Tracking für alle initialen Veins
     const currentTime = Date.now();
     const baseVeins = Math.floor(10 + (glitchLevel * 5));
@@ -465,6 +410,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const viewportHeight = window.innerHeight;
 
       setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+      
+      // OPTIMIERT: Statischen Hintergrund zurücksetzen, damit er neu generiert wird
+      setBackgroundGenerated(false);
 
       const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
       const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
@@ -503,6 +451,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
       setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+      
+      // OPTIMIERT: Statischen Hintergrund zurücksetzen, damit er neu generiert wird
+      setBackgroundGenerated(false);
+      
       throttledLog('Background pattern changed');
     }, 10000);
     return () => clearInterval(interval);
@@ -518,6 +470,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       return row;
     });
   }
+
+  // OPTIMIERT: Statischer Hintergrund - nur einmal generieren und dann konstant halten
+  const [staticBackground, setStaticBackground] = useState<string[][]>([]);
+  const [backgroundGenerated, setBackgroundGenerated] = useState(false);
+
+  // OPTIMIERT: Statischen Hintergrund nur einmal generieren
+  useEffect(() => {
+    if (caveBackground.length > 0 && !backgroundGenerated) {
+      const paddedBackground = padBackgroundRows(caveBackground);
+      setStaticBackground(paddedBackground);
+      setBackgroundGenerated(true);
+    }
+  }, [caveBackground, backgroundGenerated]);
 
   // OPTIMIERT: Reaktive Audio-Effekte für visuellen Impact
   useEffect(() => {
@@ -544,7 +509,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     if ((beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || energy > 0.03) { // Noch empfindlicher: ab 0.03
       const randomIntensity = Math.random() * 0.15 + 0.05; // Zurück zu 0.15 für besseren visuellen Impact
       setGlowIntensity(randomIntensity);
-      // performanceMonitor.trackEffect(); // Entfernt
       effectsTriggered++;
     }
     
@@ -561,7 +525,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity);
       
       setColoredTiles(generatedTiles);
-      // performanceMonitor.trackEffect(); // Entfernt
       effectsTriggered++;
       
       // VARIABLE DARSTELLUNGSDAUER: 1000ms Minimum, 3000ms Maximum
@@ -584,7 +547,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const tempGlitchLevel = Math.min(1, Math.floor(glitchLevel + (energy * 1.0))); // Reduziert von 2/1.5 auf 1/1.0
       
       setUnicodeGlitches(generateUnicodeGlitches(swordPositions, tempGlitchLevel));
-      // performanceMonitor.trackGlitch(); // Entfernt
       
       // OPTIMIERT: Längere Cleanup-Dauer
       const duration = beatDetected ? 500 : Math.max(400, Math.min(600, Math.floor(energy * 300))); // Erhöht von 300/250-400 auf 500/400-600 für weniger Flackern
@@ -601,7 +563,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
       
       setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-      // performanceMonitor.trackBackgroundUpdate(); // Entfernt
+      
+      // OPTIMIERT: Statischen Hintergrund zurücksetzen, damit er neu generiert wird
+      setBackgroundGenerated(false);
     }
     
   }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions]);
@@ -696,8 +660,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setBgColor(newBgColor);
       setLastColorChangeTime(Date.now());
       setColorStability(newStability);
-      
-      // performanceMonitor.trackColorChange(); // Entfernt
     }
   }, [beatDetected, energy, lastColorChangeTime, colorStability]);
   
@@ -1144,7 +1106,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }}
         >
           <pre className="font-mono text-sm sm:text-base leading-[0.9] whitespace-pre select-none" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {caveBackground.map((row, y) => {
+            {(staticBackground.length > 0 ? staticBackground : caveBackground).map((row, y) => {
               // OPTIMIERT: Effizienteres Vein-Rendering ohne Zeilensprünge
               const veinMap = new Map<number, string>();
               coloredVeins.forEach(vein => {
