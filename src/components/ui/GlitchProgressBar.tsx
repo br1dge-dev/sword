@@ -120,7 +120,7 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
             
             {/* MAX-Text bei maximalem Level */}
             {isMaxLevel && (
-              <div className="max-level-text text-[#FF3EC8]">MAX</div>
+              <div className="max-level-text text-[#00FCA6]">MAX</div>
             )}
           </div>
           

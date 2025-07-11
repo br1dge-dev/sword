@@ -119,7 +119,7 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
             
             {/* MAX-Text bei maximalem Level */}
             {isMaxLevel && (
-              <div className="max-level-text text-[#F8E16C]">MAX</div>
+              <div className="max-level-text text-[#00FCA6]">MAX</div>
             )}
           </div>
           
