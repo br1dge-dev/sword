@@ -22,6 +22,18 @@ const IDLE_ENERGY = 0.15; // Konstante, niedrige Energy für subtile Animation
 let lastEnergyUpdate = 0;
 const ENERGY_UPDATE_THROTTLE = 200; // Reduziert auf 200ms für bessere Reaktivität
 
+// OPTIMIERT: Log-Throttling für bessere Performance
+let lastLogTime = 0;
+const LOG_THROTTLE_INTERVAL = 1000; // 1 Sekunde zwischen Logs
+
+const throttledLog = (message: string, force: boolean = false) => {
+  const now = Date.now();
+  if (force || now - lastLogTime > LOG_THROTTLE_INTERVAL) {
+    console.log(`[AudioStore] ${message}`);
+    lastLogTime = now;
+  }
+};
+
 interface UpdateEnergyOptions {
   forceIdle?: boolean;
 }
@@ -60,17 +72,27 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
       return; // Skip update if too soon
     }
     lastEnergyUpdate = now;
+    const currentState = get();
+    // Nur forceIdle-Updates blockieren, wenn Musik läuft
+    if (opts.forceIdle && currentState.isMusicPlaying) {
+      // Idle-Energy darf Musik-Energy nicht überschreiben
+      return;
+    }
     set((state) => ({ 
       energy,
       isAudioActive: energy > 0.02 ? true : state.isAudioActive // Reduziert von 0.05 auf 0.02 für empfindlichere Reaktionen
     }));
   },
   
-  triggerBeat: () => set({ 
-    beatDetected: true,
-    lastBeatTime: Date.now(),
-    isAudioActive: true
-  }),
+  triggerBeat: () => {
+    const currentState = get();
+    // OPTIMIERT: Setze isAudioActive nur wenn keine Idle-Animation läuft
+    set({ 
+      beatDetected: true,
+      lastBeatTime: Date.now(),
+      isAudioActive: !idleActive || currentState.isMusicPlaying
+    });
+  },
   
   resetBeat: () => set({ beatDetected: false }),
   
@@ -89,14 +111,17 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
         // Prüfe nochmal, ob Musik wirklich gestoppt ist (nicht nur Track-Wechsel)
         const currentState = get();
         if (!currentState.isMusicPlaying && currentState.idleEnabled) {
-          const { startIdle } = get();
+          // Setze explizit Audio auf inaktiv und Energie auf 0, damit Idle sicher starten kann
+          const { setAudioActive, updateEnergy, startIdle } = get();
+          setAudioActive(false);
+          updateEnergy(0);
           startIdle();
-          console.log("Music paused, starting idle animation");
+          throttledLog("Music paused, starting idle animation", true);
         }
       }, 5000); // Erhöht auf 5000ms um Track-Wechsel zu berücksichtigen
     }
-    // Wenn Musik gestartet wird und Idle aktiv ist
-    else if (playing && idleActive) {
+    // OPTIMIERT: Stoppe Idle IMMER wenn Musik spielt (nicht nur wenn idleActive bereits true ist)
+    else if (playing) {
       get().stopIdle();
     }
   },
@@ -106,9 +131,20 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     const store = get();
     if (!store.idleEnabled) return;
     
+    // OPTIMIERT: Starte Idle NICHT wenn Musik spielt
+    if (store.isMusicPlaying) {
+      throttledLog("Cannot start idle animation while music is playing", true);
+      return;
+    }
+    
+    // OPTIMIERT: Starte Idle NICHT wenn bereits Audio-Aktivität vorhanden ist
+    if (store.isAudioActive && store.energy > 0.05) {
+      throttledLog("Cannot start idle animation while audio is active", true);
+      return;
+    }
+    
     // Wenn die Idle-Animation bereits aktiv ist, nichts tun
     if (idleActive) {
-      console.log("Idle animation is already active");
       return;
     }
     
@@ -116,13 +152,6 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     if (idleInterval) {
       clearInterval(idleInterval);
       idleInterval = null;
-    }
-    
-    if (idleInitialized) {
-      console.log("Idle animation already initialized, restarting");
-    } else {
-      console.log("Starting idle animation");
-      idleInitialized = true;
     }
     
     idleActive = true;
@@ -140,7 +169,6 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
       
       // Trigger einen subtilen Beat alle 3 Schritte für minimale Bewegung
       if (idleStep % 3 === 0) {
-        console.log(`Idle: Step ${idleStep + 1}/${IDLE_STEPS} - triggering subtle beat`);
         store.triggerBeat();
         
         // Automatisches Beat-Reset nach 200ms
@@ -152,17 +180,17 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
         }, 200);
       }
       
-      // Log alle 10 Schritte (ein kompletter Loop)
+      // Log nur beim Start und alle 10 Schritte (ein kompletter Loop)
       if (idleStep === 0) {
-        console.log("Idle: Completed one animation loop");
+        throttledLog("Idle animation loop completed");
       }
     }, IDLE_INTERVAL);
+    
+    throttledLog("Idle animation started", true);
   },
   
   // OPTIMIERT: Verbesserte Idle-Beendigung
   stopIdle: () => {
-    console.log("Stopping idle animation");
-    
     if (idleInterval) {
       clearInterval(idleInterval);
       idleInterval = null;
@@ -170,6 +198,11 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     
     idleActive = false;
     idleStep = 0;
+    
+    // OPTIMIERT: Reset Energy auf 0 wenn Idle gestoppt wird
+    set({ energy: 0 });
+    
+    throttledLog("Idle animation stopped", true);
   },
   
   isIdleActive: () => idleActive
@@ -196,8 +229,8 @@ export function useIdleAnimation() {
   
   // Initialisiere Idle bei Komponentenladung und wenn Musik stoppt
   useEffect(() => {
+    // OPTIMIERT: Starte Idle nur wenn Musik NICHT spielt und Idle aktiviert ist
     if (!isMusicPlaying && idleEnabled) {
-      console.log("No music playing, activating idle animation");
       // OPTIMIERT: Längere Verzögerung für stabilere Animation und um Track-Wechsel zu berücksichtigen
       const timer = setTimeout(() => {
         // Prüfe nochmal, ob Musik wirklich gestoppt ist (nicht nur Track-Wechsel)
@@ -208,6 +241,11 @@ export function useIdleAnimation() {
       }, 5000); // Erhöht auf 5000ms um Track-Wechsel zu berücksichtigen
       
       return () => clearTimeout(timer);
+    }
+    // OPTIMIERT: Stoppe Idle sofort wenn Musik spielt
+    else if (isMusicPlaying && idleActive) {
+      const { stopIdle } = useAudioReactionStore.getState();
+      stopIdle();
     }
   }, [isMusicPlaying, idleEnabled, startIdle]);
   
@@ -223,5 +261,6 @@ export function cleanupAudioIntervals(): void {
   
   idleActive = false;
   idleStep = 0;
-  console.log('🧹 Audio intervals cleaned up');
+  
+  throttledLog('Audio intervals cleaned up', true);
 } 

@@ -39,6 +39,18 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
   const [analyzerInitialized, setAnalyzerInitialized] = useState(false);
   const initializationAttemptedRef = useRef<boolean>(false);
   
+  // OPTIMIERT: Log-Throttling für bessere Performance
+  const lastLogTimeRef = useRef<number>(0);
+  const logThrottleInterval = 1000; // 1 Sekunde zwischen Logs
+
+  const throttledLog = (message: string, force: boolean = false) => {
+    const now = Date.now();
+    if (force || now - lastLogTimeRef.current > logThrottleInterval) {
+      console.log(`[MusicPlayer] ${message}`);
+      lastLogTimeRef.current = now;
+    }
+  };
+  
   // Audio-Reaction-Store
   const { setMusicPlaying, setAudioActive } = useAudioReactionStore(state => ({
     setMusicPlaying: state.setMusicPlaying,
@@ -60,7 +72,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     energyThreshold: 0.03, // Reduziert von 0.4 auf 0.03 für empfindlichere Beat-Erkennung
     analyzeInterval: 50, // Reduziert von 200ms auf 50ms für schnellere Reaktionen
     onBeat: () => {
-      console.log('Beat callback triggered from analyzer');
       onBeat?.();
     },
     onEnergy: (e) => {
@@ -79,12 +90,12 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     try {
       await initialize(audioRef.current);
       setAnalyzerInitialized(true);
-      console.log('Audio analyzer initialized with audio element');
+      throttledLog('Audio analyzer initialized', true);
       
       // Starte die Analyse nur, wenn das Audio-Element tatsächlich abgespielt wird
       if (isInitialized && !isAnalyzing && isPlaying) {
         start();
-        console.log('Auto-starting audio analysis after initialization');
+        throttledLog('Auto-starting audio analysis', true);
       }
     } catch (err) {
       console.error('Failed to initialize audio analyzer:', err);
@@ -103,17 +114,17 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
   useEffect(() => {
     if (isInitialized && !isAnalyzing && isPlaying) {
       start();
-      console.log('Starting audio analysis based on playback status');
+      throttledLog('Starting audio analysis', true);
     } else if (isInitialized && isAnalyzing && !isPlaying) {
       stop();
-      console.log('Stopping audio analysis because playback stopped');
+      throttledLog('Stopping audio analysis', true);
     }
   }, [isInitialized, isAnalyzing, start, stop, isPlaying]);
   
   // Reagiere auf Beat-Erkennung mit visueller Anzeige
   useEffect(() => {
     if (beatDetected) {
-      console.log('Beat detected!');
+      // Beat wurde erkannt - keine Logs nötig
     }
   }, [beatDetected]);
   
@@ -135,7 +146,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     };
     
     const handleEnded = () => {
-      console.log('Audio playback ended - starting next track');
       // Automatisch zum nächsten Track wechseln (Endlosschleife)
       nextTrack();
     };
@@ -159,15 +169,14 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     if (globalAnalyzer && globalAnalyzer.getAudioContext) {
       const audioContext = globalAnalyzer.getAudioContext();
       if (audioContext && audioContext.state === 'suspended') {
-        console.log('Resuming AudioContext from user interaction');
+        throttledLog('Resuming AudioContext', true);
         try {
           await audioContext.resume();
-          console.log('AudioContext resumed successfully:', audioContext.state);
           
           // Starte die Audio-Analyse explizit nach der Aktivierung des AudioContext
           if (!isAnalyzing && isPlaying) {
             start();
-            console.log('Explicitly starting audio analysis after user interaction');
+            throttledLog('Explicitly starting audio analysis', true);
           }
           
           // Setze Audio als aktiv im Store
@@ -179,7 +188,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
           return false;
         }
       } else {
-        console.log('AudioContext is already running or not available');
         return true;
       }
     }
@@ -198,90 +206,78 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         audioRef.current.pause();
         setIsPlaying(false);
         
-        // Setze Musik als nicht spielend und aktiviere Idle
-        setMusicPlaying(false);
-        
-        // Stoppe die Audio-Analyse
+        // Stoppe Audio-Analyse wenn Wiedergabe pausiert wird
         if (isAnalyzing) {
           stop();
-          console.log("Stopping audio analysis because playback stopped");
+          throttledLog("Stopping audio analysis", true);
         }
-      } else {
-        // Erhöhe die Lautstärke, um sicherzustellen, dass Audio hörbar ist
-        audioRef.current.volume = Math.max(0.5, audioRef.current.volume);
         
-        // Spiele den Track ab
-        await audioRef.current.play();
+        // Markiere Musik als nicht spielend
+        setMusicPlaying(false);
+      } else {
+        audioRef.current.play();
         setIsPlaying(true);
         
-        // Setze Musik als spielend und deaktiviere Idle
-        setMusicPlaying(true);
-        
-        // Starte die Audio-Analyse
-        if (!isAnalyzing) {
+        // Starte Audio-Analyse wenn Wiedergabe startet
+        if (isInitialized && !isAnalyzing) {
           start();
-          console.log("Music playback started, idle should deactivate");
+          throttledLog("Starting audio analysis", true);
         }
+        
+        // Markiere Musik als spielend
+        setMusicPlaying(true);
+        throttledLog("Music playback started", true);
       }
-    } catch (error) {
-      console.error('Error toggling playback:', error);
-      setError('Fehler beim Abspielen der Musik.');
-      setIsPlaying(false);
-      
-      // Bei Fehler Idle aktivieren
-      setMusicPlaying(false);
+    } catch (err) {
+      console.error('Error toggling playback:', err);
+      setError("Fehler beim Abspielen der Musik");
     }
   };
 
-  // Zum nächsten Track wechseln
+  // Nächsten Track abspielen
   const nextTrack = async () => {
-    const wasPlaying = isPlaying;
-    
-    // Pausiere den aktuellen Track, falls er abgespielt wird
-    if (wasPlaying && audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      // OPTIMIERT: Nicht sofort setMusicPlaying(false) setzen, um Idle-Konflikte zu vermeiden
-      // setMusicPlaying(false);
-    }
-    
-    // NEU: Reset der Track-Analyse für adaptive Sensitivität
-    if (globalAnalyzer && globalAnalyzer.resetTrackAnalysis) {
-      globalAnalyzer.resetTrackAnalysis();
-      console.log('Track analysis reset for new track');
-    }
-    
-    // Wechsle zum nächsten Track (oder zurück zum ersten)
-    const nextIndex = (currentTrackIndex + 1) % tracks.length;
-    setCurrentTrackIndex(nextIndex);
-    
-    // Setze den Fortschritt zurück
-    setProgress(0);
-    
-    // Spiele den neuen Track ab, wenn der vorherige abgespielt wurde
-    if (wasPlaying && audioRef.current) {
-      try {
-        // Kurze Verzögerung, um sicherzustellen, dass der neue Track geladen ist
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Aktiviere den AudioContext bei jedem Trackwechsel
-        await resumeAudioContext();
-        
-        await audioRef.current.play();
-        setIsPlaying(true);
-        setMusicPlaying(true);
-        setError(null);
-        
-        // Stelle sicher, dass die Analyse läuft
-        if (isInitialized && !isAnalyzing) {
-          start();
-        }
-      } catch (err) {
-        console.error("Fehler beim Abspielen:", err);
-        setError("Wiedergabe nicht möglich");
-        // Bei Fehler setze Musik als nicht spielend
-        setMusicPlaying(false);
+    try {
+      // Stoppe aktuelle Wiedergabe
+      if (audioRef.current) {
+        audioRef.current.pause();
       }
+      
+      // Wechsle zum nächsten Track
+      const nextIndex = (currentTrackIndex + 1) % tracks.length;
+      setCurrentTrackIndex(nextIndex);
+      
+      // Kurze Pause für Track-Wechsel
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Starte neue Wiedergabe
+      if (audioRef.current) {
+        audioRef.current.src = tracks[nextIndex].src;
+        audioRef.current.load();
+        
+        // Wenn vorher gespielt wurde, starte automatisch
+        if (isPlaying) {
+          await audioRef.current.play();
+          
+          // Reset Audio-Analyzer für neuen Track
+          if (globalAnalyzer && globalAnalyzer.resetTrackAnalysis) {
+            globalAnalyzer.resetTrackAnalysis();
+            throttledLog('Track analysis reset for new track', true);
+          }
+          
+          // Starte Audio-Analyse nach Track-Wechsel
+          const timer = setTimeout(() => {
+            if (isInitialized && !isAnalyzing && isPlaying) {
+              start();
+              throttledLog('Starting audio analysis after track change', true);
+            }
+          }, 500);
+          
+          return () => clearTimeout(timer);
+        }
+      }
+    } catch (err) {
+      console.error('Error switching tracks:', err);
+      setError("Fehler beim Wechseln des Tracks");
     }
   };
   
@@ -362,7 +358,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       const timer = setTimeout(() => {
         if (isPlaying && !isAnalyzing) {
           start();
-          console.log('Starting audio analysis after track change');
+          throttledLog('Starting audio analysis after track change', true);
         }
       }, 200);
       

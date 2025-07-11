@@ -25,12 +25,16 @@ export default function HomePage() {
   const lastLogTimeRef = useRef(0);
   const lastEnergyRef = useRef(energy);
   
-  // OPTIMIERT: Beat-Effekt für Debugging (nur bei wichtigen Events)
-  useEffect(() => {
-    if (beatDetected) {
-      console.log('Beat detected in main component!');
+  // OPTIMIERT: Log-Throttling für bessere Performance
+  const logThrottleInterval = 1000; // 1 Sekunde zwischen Logs
+
+  const throttledLog = (message: string, force: boolean = false) => {
+    const now = Date.now();
+    if (force || now - lastLogTimeRef.current > logThrottleInterval) {
+      console.log(`[HomePage] ${message}`);
+      lastLogTimeRef.current = now;
     }
-  }, [beatDetected]);
+  };
   
   // Client-Side Rendering aktivieren
   useEffect(() => {
@@ -39,10 +43,10 @@ export default function HomePage() {
     // Musik als nicht spielend markieren, damit Idle aktiviert wird
     setMusicPlaying(false);
     
-    console.log('HomePage mounted');
+    throttledLog('HomePage mounted', true);
     
     return () => {
-      console.log('HomePage unmounted');
+      throttledLog('HomePage unmounted', true);
       // KEIN Cleanup beim Unmount, da die Idle-Animation im Layout läuft
     };
   }, [setMusicPlaying]);
@@ -54,16 +58,13 @@ export default function HomePage() {
     
     // OPTIMIERT: Log nur alle 10 Sekunden oder bei signifikanten Änderungen (erhöht von 5s auf 10s)
     if (timeSinceLastLog > 10000 || Math.abs(energy - lastEnergyRef.current) > 0.5 || beatDetected) { // Erhöht von 0.3 auf 0.5
-      console.log(`Energy changed: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
-      lastLogTimeRef.current = now;
+      throttledLog(`Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
       lastEnergyRef.current = energy;
     }
   }, [energy, beatDetected]);
   
   // Handle beat detection
   const handleBeat = () => {
-    console.log('Beat detected in main component!');
-    
     // Aktualisiere den Audio-Reaction-Store direkt
     const { triggerBeat } = useAudioReactionStore.getState();
     triggerBeat();

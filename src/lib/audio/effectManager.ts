@@ -106,7 +106,7 @@ export interface EffectConfig {
 export type EffectCallback = (intensity: number, type: EffectType) => void;
 
 // Globaler EffectManager für die gesamte Anwendung
-export let globalEffectManager: EffectManager;
+export let globalEffectManager: EffectManager | undefined = undefined;
 
 // OPTIMIERT: Drastische Performance-Optimierungen für Render-Zeit-Katastrophe
 const MAX_CALLBACKS_PER_TYPE = 5; // Reduziert von 10 auf 5
@@ -130,6 +130,18 @@ interface BatchUpdate {
 
 // OPTIMIERT: Effizientere Callback-Struktur mit Set statt Array
 const callbackRegistry = new Map<string, { callback: EffectCallback, unregister: () => void }>();
+
+// OPTIMIERT: Log-Throttling für bessere Performance
+let lastLogTime = 0;
+const LOG_THROTTLE_INTERVAL = 1000; // 1 Sekunde zwischen Logs
+
+const throttledLog = (message: string, force: boolean = false) => {
+  const now = Date.now();
+  if (force || now - lastLogTime > LOG_THROTTLE_INTERVAL) {
+    console.log(`[EffectManager] ${message}`);
+    lastLogTime = now;
+  }
+};
 
 // Effekt-Manager-Klasse
 export class EffectManager {
@@ -180,6 +192,8 @@ export class EffectManager {
     
     // Setze globalen EffectManager
     globalEffectManager = this;
+    
+    throttledLog('EffectManager initialized', true);
   }
 
   // Generiere eine eindeutige ID für einen Callback
@@ -196,7 +210,7 @@ export class EffectManager {
     const callbackId = this.generateCallbackId(type, callback);
     
     if (callbackRegistry.has(callbackId)) {
-      this.debugLog(`Callback ${callbackId} already registered for effect type: ${type}`);
+      throttledLog(`Callback ${callbackId} already registered for effect type: ${type}`);
       return callbackRegistry.get(callbackId)!.unregister;
     }
     
@@ -204,7 +218,7 @@ export class EffectManager {
     
     // Begrenze die Anzahl der Callbacks pro Typ
     if (callbacks.size >= MAX_CALLBACKS_PER_TYPE) {
-      this.debugLog(`Maximum number of callbacks (${MAX_CALLBACKS_PER_TYPE}) reached for effect type: ${type}. Removing oldest.`);
+      throttledLog(`Maximum number of callbacks (${MAX_CALLBACKS_PER_TYPE}) reached for effect type: ${type}. Removing oldest.`);
       
       // Entferne den ersten Callback (FIFO)
       const firstCallback = callbacks.values().next().value;
@@ -224,7 +238,7 @@ export class EffectManager {
     callbacks.add(callback);
     this.callbacks.set(type, callbacks);
     
-    this.debugLog(`Registered callback for effect type: ${type}, total callbacks: ${callbacks.size}`);
+    throttledLog(`Registered callback for effect type: ${type}, total callbacks: ${callbacks.size}`);
 
     const unregister = () => {
       const currentCallbacks = this.callbacks.get(type) || new Set();
@@ -234,7 +248,7 @@ export class EffectManager {
       callbackRegistry.delete(callbackId);
       this.callbackIds.delete(callback);
       
-      this.debugLog(`Removed callback for effect type: ${type}, remaining callbacks: ${currentCallbacks.size}`);
+      throttledLog(`Removed callback for effect type: ${type}, remaining callbacks: ${currentCallbacks.size}`);
     };
     
     callbackRegistry.set(callbackId, { callback, unregister });
@@ -248,7 +262,7 @@ export class EffectManager {
     if (effect) {
       effect.enabled = enabled;
       this.effects.set(type, effect);
-      this.debugLog(`Effect ${type} ${enabled ? 'enabled' : 'disabled'}`);
+      throttledLog(`Effect ${type} ${enabled ? 'enabled' : 'disabled'}`);
     }
   }
 
@@ -260,69 +274,67 @@ export class EffectManager {
       this.effects.set(type, effect);
       // OPTIMIERT: Cache invalidieren bei Reaktivitätsänderung
       this.energyCache.energyFactors.delete(type);
-      this.debugLog(`Updated reactivity for effect type: ${type}`);
+      throttledLog(`Updated reactivity for effect type: ${type}`);
     }
   }
 
   public start(): void {
-    if (this.isRunning || this.isDisposed) return;
+    if (this.isRunning) {
+      return;
+    }
     
     this.isRunning = true;
     this.lastUpdateTime = performance.now();
-    this.lastActiveCheck = Date.now();
-    
-    console.log('🎵 EffectManager gestartet');
-    
-    // OPTIMIERT: Reduzierte Update-Rate für bessere Performance
     this.update();
+    
+    throttledLog('EffectManager started', true);
   }
 
   public stop(): void {
-    if (!this.isRunning) return;
+    if (!this.isRunning) {
+      return;
+    }
     
     this.isRunning = false;
     
-    // OPTIMIERT: Sauberes Cleanup der Animation-Frame
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
     
-    // OPTIMIERT: Cleanup der Batch-Updates
+    // OPTIMIERT: Batch-Timeout aufräumen
     if (this.batchTimeout) {
       clearTimeout(this.batchTimeout);
       this.batchTimeout = null;
     }
     
-    // OPTIMIERT: Cleanup aller Effekte
-    this.effects.forEach(effect => {
-      effect.isActive = false;
-      effect.intensity = 0;
-    });
-    
-    console.log('⏹️ EffectManager gestoppt');
+    throttledLog('EffectManager stopped', true);
   }
 
   public dispose(): void {
     this.stop();
-    this.isDisposed = true;
     
-    // OPTIMIERT: Cleanup aller Callbacks
+    // OPTIMIERT: Alle Callbacks aufräumen
     this.callbacks.clear();
     this.callbackIds.clear();
     this.batchUpdates = [];
     
-    console.log('🗑️ EffectManager disposed');
+    // OPTIMIERT: Batch-Timeout aufräumen
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+      this.batchTimeout = null;
+    }
+    
+    this.isDisposed = true;
+    globalEffectManager = undefined;
+    
+    throttledLog('EffectManager disposed', true);
   }
 
-  // OPTIMIERT: Reduziertes Debug-Logging
+  // OPTIMIERT: Debug-Logging mit Throttling
   private debugLog(message: string): void {
-    if (!this.debugMode) return;
-    
-    const now = Date.now();
-    if (now - this.lastLogTime > 2000) { // OPTIMIERT: Max. 1 Log alle 2 Sekunden statt 1 Sekunde
-      console.log(`[EffectManager] ${message}`);
-      this.lastLogTime = now;
+    if (this.debugMode) {
+      throttledLog(message);
     }
   }
 
@@ -364,7 +376,7 @@ export class EffectManager {
     }
     
     if (cleanedUp > 0) {
-      this.debugLog(`Memory cleanup: removed ${cleanedUp} orphaned callbacks`);
+      throttledLog(`Memory cleanup: removed ${cleanedUp} orphaned callbacks`);
     }
     
     // OPTIMIERT: Effizientere Registry-Bereinigung
@@ -377,7 +389,7 @@ export class EffectManager {
         callbackRegistry.delete(id);
       });
       
-      this.debugLog(`Registry cleanup: removed ${entriesToRemove.length} old registry entries`);
+      throttledLog(`Registry cleanup: removed ${entriesToRemove.length} old registry entries`);
     }
   }
 
@@ -403,43 +415,49 @@ export class EffectManager {
     return energyFactor;
   }
 
-  // OPTIMIERT: Batch-Callback-Aufrufe
+  // OPTIMIERT: Batch-Update-Verarbeitung
   private scheduleBatchUpdate(type: EffectType, intensity: number): void {
-    const callbacks = this.callbacks.get(type) || new Set();
-    
-    // Füge zum Batch hinzu
     this.batchUpdates.push({
       type,
       intensity,
       timestamp: performance.now()
     });
     
-    // OPTIMIERT: Batch nach 16ms ausführen (60fps)
-    if (this.batchTimeout === null) {
+    // OPTIMIERT: Batch-Timeout nur setzen, wenn noch keiner läuft
+    if (!this.batchTimeout) {
       this.batchTimeout = window.setTimeout(() => {
         this.executeBatchUpdates();
-      }, 16);
+        this.batchTimeout = null;
+      }, 16); // 16ms = 60fps
     }
   }
 
-  // OPTIMIERT: Führe Batch-Updates aus
+  // OPTIMIERT: Batch-Updates ausführen
   private executeBatchUpdates(): void {
-    if (this.batchTimeout !== null) {
-      clearTimeout(this.batchTimeout);
-      this.batchTimeout = null;
+    if (this.batchUpdates.length === 0) return;
+    
+    const now = performance.now();
+    const callbacksToExecute = new Map<EffectType, number>();
+    
+    // OPTIMIERT: Batch-Updates gruppieren
+    for (const update of this.batchUpdates) {
+      const currentIntensity = callbacksToExecute.get(update.type) || 0;
+      callbacksToExecute.set(update.type, Math.max(currentIntensity, update.intensity));
     }
     
-          // OPTIMIERT: Führe alle Callbacks in einem Batch aus
-      for (const update of this.batchUpdates) {
-        const callbacks = this.callbacks.get(update.type) || new Set();
+    // OPTIMIERT: Callbacks in Batches ausführen
+    for (const [type, intensity] of Array.from(callbacksToExecute.entries())) {
+      const callbacks = this.callbacks.get(type);
+      if (callbacks) {
         for (const callback of Array.from(callbacks)) {
           try {
-            (callback as EffectCallback)(update.intensity, update.type);
+            callback(intensity, type);
           } catch (error) {
-            console.error(`Error in effect callback for ${update.type}:`, error);
+            console.error(`Error in effect callback for ${type}:`, error);
           }
         }
       }
+    }
     
     this.batchUpdates = [];
   }
@@ -555,19 +573,27 @@ export class EffectManager {
 
   // OPTIMIERT: Effizientere manuelle Effekt-Auslösung
   public triggerEffect(type: EffectType, intensity: number = 1.0, duration: number = 0): void {
+    if (!this.isRunning || this.isDisposed) return;
+    
     const effect = this.effects.get(type);
-    if (effect) {
-      const now = performance.now();
-      effect.lastTriggered = now;
-      effect.isActive = true;
-      effect.intensity = intensity;
-      effect.activeUntil = now + (duration || effect.reactivity.duration);
-      
-      // OPTIMIERT: Batch-Callback
-      this.scheduleBatchUpdate(type, intensity);
-      
-      console.log(`[${new Date().toLocaleTimeString()}] [${type}] Effect manually triggered: ${intensity.toFixed(2)}`);
+    if (!effect || !effect.enabled) return;
+    
+    const now = performance.now();
+    
+    // OPTIMIERT: Cooldown-Prüfung
+    if (now - effect.lastTriggered < effect.reactivity.cooldown) {
+      return;
     }
+    
+    effect.lastTriggered = now;
+    effect.isActive = true;
+    effect.intensity = Math.min(1, effect.intensity + intensity * 0.3);
+    effect.activeUntil = now + (effect.reactivity.duration * (0.3 + effect.intensity * 0.5));
+    
+    // OPTIMIERT: Batch-Update für bessere Performance
+    this.scheduleBatchUpdate(type, effect.intensity);
+    
+    throttledLog(`Effect ${type} triggered: ${intensity.toFixed(2)}`);
   }
   
   // OPTIMIERT: Effizientere Übersicht
@@ -585,25 +611,23 @@ export class EffectManager {
     return overview;
   }
   
+  // OPTIMIERT: Debug-Modus umschalten
   public setDebugMode(enabled: boolean): void {
     this.debugMode = enabled;
-    console.log(`EffectManager debug mode ${enabled ? 'enabled' : 'disabled'}`);
+    throttledLog(`Debug mode ${enabled ? 'enabled' : 'disabled'}`, true);
   }
   
-  // OPTIMIERT: Effizientere Callback-Bereinigung
-  public clearCallbacks(): void {
-    for (const [type, callbacks] of Array.from(this.callbacks.entries())) {
-      this.callbacks.set(type, new Set());
-    }
+  // OPTIMIERT: Alle Callbacks löschen
+  public clearAllCallbacks(): void {
+    this.callbacks.clear();
     this.callbackIds.clear();
-    callbackRegistry.clear();
-    console.log('All effect callbacks cleared');
+    throttledLog('All effect callbacks cleared', true);
   }
-  
+
+  // OPTIMIERT: Callback-Registry löschen
   public clearCallbackRegistry(): void {
     callbackRegistry.clear();
-    this.callbackIds.clear();
-    console.log('Effect callback registry cleared');
+    throttledLog('Effect callback registry cleared', true);
   }
 }
 

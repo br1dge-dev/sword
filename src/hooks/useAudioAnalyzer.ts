@@ -28,21 +28,17 @@ export let globalAnalyzer: AudioAnalyzer | null = null;
 // Flag, um zu verfolgen, ob eine Initialisierung im Gange ist
 let isGlobalInitializing = false;
 
-// Debounce-Funktion für Logging
-const createDebouncer = (interval: number = 1000) => {
-  const lastCalled: Record<string, number> = {};
-  
-  return (key: string, fn: Function) => {
-    const now = Date.now();
-    if (!lastCalled[key] || now - lastCalled[key] > interval) {
-      lastCalled[key] = now;
-      fn();
-    }
-  };
-};
+// OPTIMIERT: Log-Throttling für bessere Performance
+let lastLogTime = 0;
+const LOG_THROTTLE_INTERVAL = 1000; // 1 Sekunde zwischen Logs
 
-// Debouncer für Logs
-const logDebouncer = createDebouncer(2000);
+const throttledLog = (message: string, force: boolean = false) => {
+  const now = Date.now();
+  if (force || now - lastLogTime > LOG_THROTTLE_INTERVAL) {
+    console.log(`[useAudioAnalyzer] ${message}`);
+    lastLogTime = now;
+  }
+};
 
 export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAnalyzerReturn {
   const analyzerRef = useRef<AudioAnalyzer | null>(null);
@@ -56,7 +52,6 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   const [beatInfo, setBeatInfo] = useState<BeatDetectionResult | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const initializingRef = useRef<boolean>(false);
-  const lastLogTimeRef = useRef<number>(0);
   
   // Audio-Reaction-Store
   const { updateEnergy, triggerBeat, setAudioActive } = useAudioReactionStore();
@@ -93,7 +88,6 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       // Immer einen neuen Analyzer erstellen
       const analyzerOptions: AudioAnalyzerOptions = {
         onBeat: (time) => {
-          console.log(`Beat detected at time: ${time}, energy: ${energy.toFixed(2)}`);
           setBeatDetected(true);
           triggerBeat(); // Aktualisiere den globalen Store
           
@@ -116,7 +110,6 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
             
             // Mindestens 100ms zwischen Beats (reduziert von 150ms)
             if (timeSinceLastBeat > 100) {
-              console.log(`Energy-based beat detected: ${e.toFixed(2)}`);
               setBeatDetected(true);
               triggerBeat();
             }
@@ -128,15 +121,10 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       const newAnalyzer = new AudioAnalyzer(analyzerOptions);
       analyzerRef.current = newAnalyzer;
       globalAnalyzer = newAnalyzer; // Aktualisiere den globalen Analyzer
-      console.log('Created new audio analyzer with options:', analyzerOptions);
+      throttledLog('Created new audio analyzer', true);
     } else {
       // Verwende den existierenden globalen Analyzer
       analyzerRef.current = globalAnalyzer;
-      
-      // Debounce das Logging, um Konsolenflut zu vermeiden
-      logDebouncer('usingExistingAnalyzer', () => {
-        console.log('Using existing global audio analyzer');
-      });
     }
     
     return () => {
@@ -159,10 +147,6 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       
       // Vermeide mehrfache Initialisierungsversuche
       if (initializeAttemptedRef.current || initializingRef.current || isGlobalInitializing) {
-        // Debounce das Logging, um Konsolenflut zu vermeiden
-        logDebouncer('initializeAttempted', () => {
-          console.log('Initialize already attempted or in progress, skipping');
-        });
         return;
       }
       
@@ -174,7 +158,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       try {
         await analyzerRef.current.initialize(audioElement);
         setIsInitialized(true);
-        console.log('Audio analyzer initialized successfully');
+        throttledLog('Audio analyzer initialized successfully', true);
         
         // Audio als aktiv markieren
         setAudioActive(true);
@@ -186,7 +170,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
         if (options?.autoDetectBeat) {
           try {
             const result = await guessBeat();
-            console.log('Auto beat detection result:', result);
+            throttledLog('Auto beat detection completed', true);
           } catch (err) {
             console.error('Auto beat detection failed:', err);
           }
@@ -210,13 +194,12 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     }
     
     if (isAnalyzing) {
-      console.log('Audio analysis already running, not starting again');
       return;
     }
     
     analyzerRef.current.start();
     setIsAnalyzing(true);
-    console.log('Audio analysis started');
+    throttledLog('Audio analysis started', true);
     
     // Audio als aktiv markieren, wenn Analyse startet
     setAudioActive(true);
@@ -229,7 +212,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     
     analyzerRef.current.stop();
     setIsAnalyzing(false);
-    console.log('Audio analysis stopped');
+    throttledLog('Audio analysis stopped', true);
   };
   
   const detectTempo = async (): Promise<number> => {
@@ -240,7 +223,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       
       const detectedTempo = await analyzerRef.current.detectTempo();
       setTempo(detectedTempo);
-      console.log('Detected tempo:', detectedTempo, 'BPM');
+      throttledLog(`Detected tempo: ${detectedTempo} BPM`, true);
       return detectedTempo;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
@@ -258,7 +241,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       
       const result = await analyzerRef.current.guessBeat();
       setBeatInfo(result);
-      console.log('Guessed beat:', result);
+      throttledLog(`Guessed beat: ${result.bpm} BPM`, true);
       return result;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
