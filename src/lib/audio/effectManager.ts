@@ -131,17 +131,16 @@ interface BatchUpdate {
 // OPTIMIERT: Effizientere Callback-Struktur mit Set statt Array
 const callbackRegistry = new Map<string, { callback: EffectCallback, unregister: () => void }>();
 
-// OPTIMIERT: Log-Throttling für bessere Performance
-let lastLogTime = 0;
-const LOG_THROTTLE_INTERVAL = 1000; // 1 Sekunde zwischen Logs
+// ENTFERNT: Logging-Variablen (lastLogTime, LOG_THROTTLE_INTERVAL)
 
-const throttledLog = (message: string, force: boolean = false) => {
-  const now = Date.now();
-  if (force || now - lastLogTime > LOG_THROTTLE_INTERVAL) {
-    console.log(`[EffectManager] ${message}`);
-    lastLogTime = now;
-  }
-};
+// DEAKTIVIERT: Logging-Funktion
+// const throttledLog = (message: string, force: boolean = false) => {
+//   const now = Date.now();
+//   if (force || now - lastLogTime > LOG_THROTTLE_INTERVAL) {
+//     console.log(`[EffectManager] ${message}`);
+//     lastLogTime = now;
+//   }
+// };
 
 // Effekt-Manager-Klasse
 export class EffectManager {
@@ -193,7 +192,7 @@ export class EffectManager {
     // Setze globalen EffectManager
     globalEffectManager = this;
     
-    throttledLog('EffectManager initialized', true);
+    // throttledLog('EffectManager initialized', true);
   }
 
   // Generiere eine eindeutige ID für einen Callback
@@ -210,7 +209,7 @@ export class EffectManager {
     const callbackId = this.generateCallbackId(type, callback);
     
     if (callbackRegistry.has(callbackId)) {
-      throttledLog(`Callback ${callbackId} already registered for effect type: ${type}`);
+      // throttledLog(`Callback ${callbackId} already registered for effect type: ${type}`);
       return callbackRegistry.get(callbackId)!.unregister;
     }
     
@@ -218,7 +217,7 @@ export class EffectManager {
     
     // Begrenze die Anzahl der Callbacks pro Typ
     if (callbacks.size >= MAX_CALLBACKS_PER_TYPE) {
-      throttledLog(`Maximum number of callbacks (${MAX_CALLBACKS_PER_TYPE}) reached for effect type: ${type}. Removing oldest.`);
+      // throttledLog(`Maximum number of callbacks (${MAX_CALLBACKS_PER_TYPE}) reached for effect type: ${type}. Removing oldest.`);
       
       // Entferne den ersten Callback (FIFO)
       const firstCallback = callbacks.values().next().value;
@@ -238,7 +237,7 @@ export class EffectManager {
     callbacks.add(callback);
     this.callbacks.set(type, callbacks);
     
-    throttledLog(`Registered callback for effect type: ${type}, total callbacks: ${callbacks.size}`);
+    // throttledLog(`Registered callback for effect type: ${type}, total callbacks: ${callbacks.size}`);
 
     const unregister = () => {
       const currentCallbacks = this.callbacks.get(type) || new Set();
@@ -248,7 +247,7 @@ export class EffectManager {
       callbackRegistry.delete(callbackId);
       this.callbackIds.delete(callback);
       
-      throttledLog(`Removed callback for effect type: ${type}, remaining callbacks: ${currentCallbacks.size}`);
+      // throttledLog(`Removed callback for effect type: ${type}, remaining callbacks: ${currentCallbacks.size}`);
     };
     
     callbackRegistry.set(callbackId, { callback, unregister });
@@ -262,7 +261,7 @@ export class EffectManager {
     if (effect) {
       effect.enabled = enabled;
       this.effects.set(type, effect);
-      throttledLog(`Effect ${type} ${enabled ? 'enabled' : 'disabled'}`);
+      // throttledLog(`Effect ${type} ${enabled ? 'enabled' : 'disabled'}`);
     }
   }
 
@@ -274,7 +273,7 @@ export class EffectManager {
       this.effects.set(type, effect);
       // OPTIMIERT: Cache invalidieren bei Reaktivitätsänderung
       this.energyCache.energyFactors.delete(type);
-      throttledLog(`Updated reactivity for effect type: ${type}`);
+      // throttledLog(`Updated reactivity for effect type: ${type}`);
     }
   }
 
@@ -287,7 +286,7 @@ export class EffectManager {
     this.lastUpdateTime = performance.now();
     this.update();
     
-    throttledLog('EffectManager started', true);
+    // throttledLog('EffectManager started', true);
   }
 
   public stop(): void {
@@ -308,7 +307,7 @@ export class EffectManager {
       this.batchTimeout = null;
     }
     
-    throttledLog('EffectManager stopped', true);
+    // throttledLog('EffectManager stopped', true);
   }
 
   public dispose(): void {
@@ -328,13 +327,13 @@ export class EffectManager {
     this.isDisposed = true;
     globalEffectManager = undefined;
     
-    throttledLog('EffectManager disposed', true);
+    // throttledLog('EffectManager disposed', true);
   }
 
   // OPTIMIERT: Debug-Logging mit Throttling
   private debugLog(message: string): void {
     if (this.debugMode) {
-      throttledLog(message);
+      // throttledLog(message);
     }
   }
 
@@ -376,7 +375,7 @@ export class EffectManager {
     }
     
     if (cleanedUp > 0) {
-      throttledLog(`Memory cleanup: removed ${cleanedUp} orphaned callbacks`);
+      // throttledLog(`Memory cleanup: removed ${cleanedUp} orphaned callbacks`);
     }
     
     // OPTIMIERT: Effizientere Registry-Bereinigung
@@ -389,7 +388,7 @@ export class EffectManager {
         callbackRegistry.delete(id);
       });
       
-      throttledLog(`Registry cleanup: removed ${entriesToRemove.length} old registry entries`);
+      // throttledLog(`Registry cleanup: removed ${entriesToRemove.length} old registry entries`);
     }
   }
 
@@ -453,7 +452,8 @@ export class EffectManager {
           try {
             callback(intensity, type);
           } catch (error) {
-            console.error(`Error in effect callback for ${type}:`, error);
+            // DEAKTIVIERT: Logging
+            // console.error(`Error in effect callback for ${type}:`, error);
           }
         }
       }
@@ -566,7 +566,8 @@ export class EffectManager {
       this.animationFrameId = requestAnimationFrame(() => this.update());
       
     } catch (error) {
-      console.error('EffectManager update error:', error);
+      // DEAKTIVIERT: Logging
+      // console.error('EffectManager update error:', error);
       this.animationFrameId = requestAnimationFrame(() => this.update());
     }
   }
@@ -593,7 +594,7 @@ export class EffectManager {
     // OPTIMIERT: Batch-Update für bessere Performance
     this.scheduleBatchUpdate(type, effect.intensity);
     
-    throttledLog(`Effect ${type} triggered: ${intensity.toFixed(2)}`);
+    // throttledLog(`Effect ${type} triggered: ${intensity.toFixed(2)}`);
   }
   
   // OPTIMIERT: Effizientere Übersicht
@@ -614,20 +615,20 @@ export class EffectManager {
   // OPTIMIERT: Debug-Modus umschalten
   public setDebugMode(enabled: boolean): void {
     this.debugMode = enabled;
-    throttledLog(`Debug mode ${enabled ? 'enabled' : 'disabled'}`, true);
+    // throttledLog(`Debug mode ${enabled ? 'enabled' : 'disabled'}`, true);
   }
   
   // OPTIMIERT: Alle Callbacks löschen
   public clearAllCallbacks(): void {
     this.callbacks.clear();
     this.callbackIds.clear();
-    throttledLog('All effect callbacks cleared', true);
+    // throttledLog('All effect callbacks cleared', true);
   }
 
   // OPTIMIERT: Callback-Registry löschen
   public clearCallbackRegistry(): void {
     callbackRegistry.clear();
-    throttledLog('Effect callback registry cleared', true);
+    // throttledLog('Effect callback registry cleared', true);
   }
 }
 
@@ -645,7 +646,8 @@ export function useEffectManager(
   
   useEffect(() => {
     if (!globalEffectManager) {
-      console.warn('No global EffectManager instance found, creating one');
+      // DEAKTIVIERT: Logging
+      // console.warn('No global EffectManager instance found, creating one');
       globalEffectManager = new EffectManager();
       globalEffectManager.start();
     }

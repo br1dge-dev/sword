@@ -28,13 +28,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   // Idle-Animation im Layout starten, damit sie nicht bei Page-Wechseln unterbrochen wird
+  const { startIdle, stopIdle } = useAudioReactionStore();
   useIdleAnimation();
   
   useEffect(() => {
-    // Setze nur den Titel und die Beschreibung
-    console.log('RootLayout mounted, idle animation started');
-    document.title = 'Griftblade - ASCII Blockchain Visualizer';
-  }, []);
+    // Starte Idle-Animation beim Mount
+    startIdle();
+    
+    // DEAKTIVIERT: Logging
+    // console.log('RootLayout mounted, idle animation started');
+    
+    return () => {
+      // Cleanup beim Unmount
+      stopIdle();
+    };
+  }, [startIdle, stopIdle]);
   
   return (
     <html lang="en" className={`dark overflow-hidden ${pressStart2P.variable}`}>

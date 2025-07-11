@@ -25,7 +25,11 @@ const tracks = [
   { src: "/music/atarisword.mp3", name: "ATARISWORD" },
   { src: "/music/DR4GONSWORD.mp3", name: "DR4GONSWORD" },
   { src: "/music/PUNCHSWORD.mp3", name: "PUNCHSWORD" },
-  { src: "/music/NIGHTSWORD.mp3", name: "NIGHTSWORD" }
+  { src: "/music/NIGHTSWORD.mp3", name: "NIGHTSWORD" },
+  // NEU:
+  { src: "/music/DANGERSWORD.mp3", name: "DANGERSWORD" },
+  { src: "/music/SHONENSWORD.mp3", name: "SHONENSWORD" },
+  { src: "/music/WORFSWORD.mp3", name: "WORFSWORD" }
 ];
 
 export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: MusicPlayerProps) {
@@ -38,18 +42,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
   const [showAnalyzerInfo, setShowAnalyzerInfo] = useState(false);
   const [analyzerInitialized, setAnalyzerInitialized] = useState(false);
   const initializationAttemptedRef = useRef<boolean>(false);
-  
-  // OPTIMIERT: Log-Throttling für bessere Performance
-  const lastLogTimeRef = useRef<number>(0);
-  const logThrottleInterval = 1000; // 1 Sekunde zwischen Logs
-
-  const throttledLog = (message: string, force: boolean = false) => {
-    const now = Date.now();
-    if (force || now - lastLogTimeRef.current > logThrottleInterval) {
-      console.log(`[MusicPlayer] ${message}`);
-      lastLogTimeRef.current = now;
-    }
-  };
   
   // Audio-Reaction-Store
   const { setMusicPlaying, setAudioActive } = useAudioReactionStore(state => ({
@@ -91,17 +83,15 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     try {
       await initialize(audioRef.current);
       setAnalyzerInitialized(true);
-      throttledLog('Audio analyzer initialized', true);
       
       // Starte die Analyse nur, wenn das Audio-Element tatsächlich abgespielt wird
       if (isInitialized && !isAnalyzing && isPlaying) {
         start();
-        throttledLog('Auto-starting audio analysis', true);
       }
     } catch (err) {
-      console.error('Failed to initialize audio analyzer:', err);
-      // Wir setzen keinen Fehler mehr, da das die Benutzererfahrung nicht beeinträchtigen soll
-      // setError('Analyzer-Fehler');
+      // DEAKTIVIERT: Logging
+      // console.error('Failed to initialize audio analyzer:', err);
+      // setError(err instanceof Error ? err : new Error('Failed to initialize audio analyzer'));
     }
   }, [audioRef.current, initialize, isInitialized, isAnalyzing, start, isPlaying, analyzerInitialized]);
   
@@ -115,10 +105,8 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
   useEffect(() => {
     if (isInitialized && !isAnalyzing && isPlaying) {
       start();
-      throttledLog('Starting audio analysis', true);
     } else if (isInitialized && isAnalyzing && !isPlaying) {
       stop();
-      throttledLog('Stopping audio analysis', true);
     }
   }, [isInitialized, isAnalyzing, start, stop, isPlaying]);
   
@@ -141,7 +129,8 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     };
     
     const handleError = (e: ErrorEvent) => {
-      console.error('Audio error:', e);
+      // DEAKTIVIERT: Logging
+      // console.error('Audio error:', e);
       setError("Fehler beim Laden der Audiodatei");
       setIsPlaying(false);
     };
@@ -170,14 +159,12 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     if (globalAnalyzer && globalAnalyzer.getAudioContext) {
       const audioContext = globalAnalyzer.getAudioContext();
       if (audioContext && audioContext.state === 'suspended') {
-        throttledLog('Resuming AudioContext', true);
         try {
           await audioContext.resume();
           
           // Starte die Audio-Analyse explizit nach der Aktivierung des AudioContext
           if (!isAnalyzing && isPlaying) {
             start();
-            throttledLog('Explicitly starting audio analysis', true);
           }
           
           // Setze Audio als aktiv im Store
@@ -185,7 +172,8 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
           
           return true;
         } catch (err) {
-          console.error('Failed to resume AudioContext:', err);
+          // DEAKTIVIERT: Logging
+          // console.error('Failed to resume AudioContext:', err);
           return false;
         }
       } else {
@@ -210,7 +198,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         // Stoppe Audio-Analyse wenn Wiedergabe pausiert wird
         if (isAnalyzing) {
           stop();
-          throttledLog("Stopping audio analysis", true);
         }
         
         // Markiere Musik als nicht spielend
@@ -222,15 +209,14 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         // Starte Audio-Analyse wenn Wiedergabe startet
         if (isInitialized && !isAnalyzing) {
           start();
-          throttledLog("Starting audio analysis", true);
         }
         
         // Markiere Musik als spielend
         setMusicPlaying(true);
-        throttledLog("Music playback started", true);
       }
     } catch (err) {
-      console.error('Error toggling playback:', err);
+      // DEAKTIVIERT: Logging
+      // console.error('Error toggling playback:', err);
       setError("Fehler beim Abspielen der Musik");
     }
   };
@@ -262,14 +248,12 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
           // Reset Audio-Analyzer für neuen Track
           if (globalAnalyzer && globalAnalyzer.resetTrackAnalysis) {
             globalAnalyzer.resetTrackAnalysis();
-            throttledLog('Track analysis reset for new track', true);
           }
           
           // Starte Audio-Analyse nach Track-Wechsel
           const timer = setTimeout(() => {
             if (isInitialized && !isAnalyzing && isPlaying) {
               start();
-              throttledLog('Starting audio analysis after track change', true);
             }
           }, 500);
           
@@ -277,7 +261,8 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         }
       }
     } catch (err) {
-      console.error('Error switching tracks:', err);
+      // DEAKTIVIERT: Logging
+      // console.error('Error switching tracks:', err);
       setError("Fehler beim Wechseln des Tracks");
     }
   };
@@ -343,7 +328,8 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       // Wenn vorher abgespielt wurde, auch den neuen Track abspielen
       if (isPlaying) {
         audioRef.current.play().catch(error => {
-          console.error('Error playing new track:', error);
+          // DEAKTIVIERT: Logging
+          // console.error('Error playing new track:', error);
           setError('Neuer Track konnte nicht abgespielt werden.');
           setIsPlaying(false);
           setMusicPlaying(false);
@@ -359,7 +345,6 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
       const timer = setTimeout(() => {
         if (isPlaying && !isAnalyzing) {
           start();
-          throttledLog('Starting audio analysis after track change', true);
         }
       }, 200);
       
@@ -385,7 +370,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
                fontFamily: 'var(--font-press-start-2p)'
              }}
         >
-          <div className="truncate mr-2">{currentTrack.name}</div>
+          <div className="truncate mr-2">DANKNESS</div>
           {!isPlaying && !isAnalyzing && (
             <div className="text-[#FF3EC8] text-[8px] whitespace-nowrap">PRESS PLAY</div>
           )}

@@ -28,8 +28,25 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
       // Alle Fortschritte zurücksetzen
       resetAllEffects();
     } catch (error) {
-      console.error("Fehler beim Ausführen der Cleanse-Aktion:", error);
-      handleError();
+      // DEAKTIVIERT: Logging
+      // console.error("Fehler beim Ausführen der Cleanse-Aktion:", error);
+      
+      // Bei zu vielen Fehlern alle Effekte zurücksetzen
+      setErrorCount(prev => {
+        if (prev > 3) {
+          // DEAKTIVIERT: Logging
+          // console.warn("Zu viele Fehler aufgetreten, setze alle Effekte zurück");
+          try {
+            // Reset aller Effekte
+            resetAllEffects();
+          } catch (e) {
+            // DEAKTIVIERT: Logging
+            // console.error("Fehler beim Zurücksetzen der Effekte:", e);
+          }
+          return 0;
+        }
+        return prev + 1;
+      });
     }
   }, [resetAllEffects]);
   
@@ -38,11 +55,13 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
     setErrorCount(prev => {
       // Bei zu vielen Fehlern alle Effekte zurücksetzen
       if (prev >= 3) {
-        console.warn("Zu viele Fehler aufgetreten, setze alle Effekte zurück");
+        // DEAKTIVIERT: Logging
+        // console.warn("Zu viele Fehler aufgetreten, setze alle Effekte zurück");
         try {
           resetAllEffects();
         } catch (e) {
-          console.error("Fehler beim Zurücksetzen der Effekte:", e);
+          // DEAKTIVIERT: Logging
+          // console.error("Fehler beim Zurücksetzen der Effekte:", e);
         }
         return 0;
       }

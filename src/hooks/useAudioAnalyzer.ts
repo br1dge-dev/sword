@@ -28,17 +28,16 @@ export let globalAnalyzer: AudioAnalyzer | null = null;
 // Flag, um zu verfolgen, ob eine Initialisierung im Gange ist
 let isGlobalInitializing = false;
 
-// OPTIMIERT: Log-Throttling für bessere Performance
-let lastLogTime = 0;
-const LOG_THROTTLE_INTERVAL = 1000; // 1 Sekunde zwischen Logs
+// ENTFERNT: Logging-Variablen (lastLogTimeRef, logThrottleInterval)
 
-const throttledLog = (message: string, force: boolean = false) => {
-  const now = Date.now();
-  if (force || now - lastLogTime > LOG_THROTTLE_INTERVAL) {
-    console.log(`[useAudioAnalyzer] ${message}`);
-    lastLogTime = now;
-  }
-};
+// DEAKTIVIERT: Logging-Funktion
+// const throttledLog = (message: string, force: boolean = false) => {
+//   const now = Date.now();
+//   if (force || now - lastLogTimeRef.current > logThrottleInterval) {
+//     console.log(`[useAudioAnalyzer] ${message}`);
+//     lastLogTimeRef.current = now;
+//   }
+// };
 
 export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAnalyzerReturn {
   const analyzerRef = useRef<AudioAnalyzer | null>(null);
@@ -121,7 +120,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       const newAnalyzer = new AudioAnalyzer(analyzerOptions);
       analyzerRef.current = newAnalyzer;
       globalAnalyzer = newAnalyzer; // Aktualisiere den globalen Analyzer
-      throttledLog('Created new audio analyzer', true);
+      // throttledLog('Created new audio analyzer', true);
     } else {
       // Verwende den existierenden globalen Analyzer
       analyzerRef.current = globalAnalyzer;
@@ -158,7 +157,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       try {
         await analyzerRef.current.initialize(audioElement);
         setIsInitialized(true);
-        throttledLog('Audio analyzer initialized successfully', true);
+        // throttledLog('Audio analyzer initialized successfully', true);
         
         // Audio als aktiv markieren
         setAudioActive(true);
@@ -170,9 +169,10 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
         if (options?.autoDetectBeat) {
           try {
             const result = await guessBeat();
-            throttledLog('Auto beat detection completed', true);
+            // throttledLog('Auto beat detection completed', true);
           } catch (err) {
-            console.error('Auto beat detection failed:', err);
+            // DEAKTIVIERT: Logging
+            // console.error('Auto beat detection failed:', err);
           }
         }
       } finally {
@@ -182,14 +182,16 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
       setError(error);
-      console.error('Failed to initialize audio analyzer:', error);
+      // DEAKTIVIERT: Logging
+      // console.error('Failed to initialize audio analyzer:', error);
       throw error;
     }
   };
   
   const start = () => {
     if (!analyzerRef.current) {
-      console.warn('Cannot start: analyzer not initialized');
+      // DEAKTIVIERT: Logging
+      // console.warn('Cannot start: analyzer not initialized');
       return;
     }
     
@@ -199,7 +201,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     
     analyzerRef.current.start();
     setIsAnalyzing(true);
-    throttledLog('Audio analysis started', true);
+    // throttledLog('Audio analysis started', true);
     
     // Audio als aktiv markieren, wenn Analyse startet
     setAudioActive(true);
@@ -212,7 +214,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     
     analyzerRef.current.stop();
     setIsAnalyzing(false);
-    throttledLog('Audio analysis stopped', true);
+    // throttledLog('Audio analysis stopped', true);
   };
   
   const detectTempo = async (): Promise<number> => {
@@ -223,12 +225,13 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       
       const detectedTempo = await analyzerRef.current.detectTempo();
       setTempo(detectedTempo);
-      throttledLog(`Detected tempo: ${detectedTempo} BPM`, true);
+      // throttledLog(`Detected tempo: ${detectedTempo} BPM`, true);
       return detectedTempo;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
       setError(error);
-      console.error('Tempo detection failed:', error);
+      // DEAKTIVIERT: Logging
+      // console.error('Tempo detection failed:', error);
       throw error;
     }
   };
@@ -241,12 +244,13 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       
       const result = await analyzerRef.current.guessBeat();
       setBeatInfo(result);
-      throttledLog(`Guessed beat: ${result.bpm} BPM`, true);
+      // throttledLog(`Guessed beat: ${result.bpm} BPM`, true);
       return result;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
       setError(error);
-      console.error('Beat guessing failed:', error);
+      // DEAKTIVIERT: Logging
+      // console.error('Beat guessing failed:', error);
       throw error;
     }
   };

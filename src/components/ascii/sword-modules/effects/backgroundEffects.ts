@@ -7,6 +7,10 @@
 import { caveBgPatterns, accentColors } from '../constants/swordConstants';
 import { generateCluster } from '../utils/swordUtils';
 
+// --- NEU: Globaler Vein-Lifetime-Cache für längere Lebensdauer ---
+const VEIN_LIFETIME_FRAMES = 8; // Wie viele Frames Veins sichtbar bleiben
+let veinLifetimeCache: Array<Array<{x: number, y: number, color: string}>> = [];
+
 // Maximale Dimensionen für Hintergründe
 export const MAX_BG_WIDTH = 200;
 export const MAX_BG_HEIGHT = 120;
@@ -116,20 +120,21 @@ function generateBackgroundRegion(
   
   // OPTIMIERT: Nur den sichtbaren Bereich generieren
   const charSets = [
+    // --- NEU: Glitchige, kleinpartikeldominierte Patterns ---
     {
-      light: ['·', ':', '.', '˙', '°', ' ', ' '],
-      medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '│', '─', '┬', '┴', '┼'],
-      dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻', '┃', '━', '╸', '╹', '╺', '╻']
+      light: ['.', ':', '˙', '°', ' ', ' ', 'x', '+'],
+      medium: ['*', '░', '▒', '╳', '╱', '╲', '┼', '┴', '┬', '┤', '├', '┐', '└', '┘', '┌'],
+      dense: ['┼', '╳', '╱', '╲', '⎔', '⎕', '⎖', '⎗', '⎘', '⎙', '⎚', '⎛', '⎜', '⎝', '⎞', '⎟', '⎠', '⎡', '⎢', '◆', '◈', '◦', '◎', '○', '◌', '◉', '◍', '░', '▒', '▓']
     },
     {
-      light: ['·', ':', '.', '˙', '°', ' '],
-      medium: ['╱', '╲', '╳', '┌', '┐', '└', '┘', '┤', '├', '┬', '┴'],
-      dense: ['┼', '╋', '╬', '╪', '╫', '┣', '┫', '┳', '┻']
+      light: ['.', ':', '˙', '°', ' ', ' ', 'x', '+'],
+      medium: ['*', '░', '▒', '╳', '╱', '╲', '┼', '┴', '┬', '┤', '├', '┐', '└', '┘', '┌'],
+      dense: ['┼', '╳', '╱', '╲', '⎔', '⎕', '⎖', '⎗', '⎘', '⎙', '⎚', '⎛', '⎜', '⎝', '⎞', '⎟', '⎠', '⎡', '⎢', '◆', '◈', '◦', '◎', '○', '◌', '◉', '◍', '░', '▒', '▓']
     },
     {
-      light: ['·', ':', '.', '˙', '°', ' '],
-      medium: ['◇', '◆', '◊', '◈', '◦', '◎', '○', '◌'],
-      dense: ['◊', '◈', '◎', '◉', '◍', '◐', '◑', '◒', '◓', '◔', '◕']
+      light: ['.', ':', '˙', '°', ' ', ' ', 'x', '+'],
+      medium: ['*', '░', '▒', '╳', '╱', '╲', '┼', '┴', '┬', '┤', '├', '┐', '└', '┘', '┌'],
+      dense: ['┼', '╳', '╱', '╲', '⎔', '⎕', '⎖', '⎗', '⎘', '⎙', '⎚', '⎛', '⎜', '⎝', '⎞', '⎟', '⎠', '⎡', '⎢', '◆', '◈', '◦', '◎', '○', '◌', '◉', '◍', '░', '▒', '▓']
     },
     {
       light: ['⌐', '¬', '⌙', '⌖', '·', ':', '.', ' '],
@@ -215,6 +220,28 @@ function generateBackgroundRegion(
       } else {
         background[y][x] = charSet[Math.floor(pseudoRandom(x + 4000, y + 4000, patternType) * charSet.length)];
       }
+
+      // --- NEU: Vertikale Linien konsistenter fortsetzen ---
+      // Prüfe, ob das aktuelle charSet ein vertikales Zeichen enthält
+      const verticalChars = ['│', '┃'];
+      let isVerticalAbove = false;
+      if (y > 0 && background[y - 1] && verticalChars.includes(background[y - 1][x])) {
+        isVerticalAbove = true;
+      }
+      // Wenn oben ein vertikaler Strich ist, erhöhe die Wahrscheinlichkeit, dass hier auch einer ist
+      if (isVerticalAbove && charSet.includes('│')) {
+        if (pseudoRandom(x, y, patternType + 5000) < 0.7) {
+          background[y][x] = '│';
+          continue;
+        }
+      }
+      if (isVerticalAbove && charSet.includes('┃')) {
+        if (pseudoRandom(x, y, patternType + 6000) < 0.7) {
+          background[y][x] = '┃';
+          continue;
+        }
+      }
+      // --- ENDE NEU ---
     }
   }
 }
@@ -454,102 +481,99 @@ export function generateBeatVeins(
   
   // OPTIMIERT: Vordefinierte Beat-Patterns für bessere Performance
   const beatPatterns = [
-    // Pattern 1: Zufällig verteilt (deterministisch)
+    // Pattern 1: Zufällig verteilt (deterministisch, aber mit zusätzlichem Jitter)
     () => {
+      const jitterSeed = Math.floor(pseudoRandom(totalVeinCount, Date.now() % 10000, 99) * 10000);
       for (let i = 0; i < totalVeinCount; i++) {
-        const x = viewportRegion.startX + Math.floor(pseudoRandom(i, 0, 1) * (viewportRegion.endX - viewportRegion.startX));
-        const y = viewportRegion.startY + Math.floor(pseudoRandom(i, 1, 1) * (viewportRegion.endY - viewportRegion.startY));
+        const jitterX = Math.floor((pseudoRandom(i, jitterSeed, 7) - 0.5) * 3); // -1, 0, 1
+        const jitterY = Math.floor((pseudoRandom(i, jitterSeed, 8) - 0.5) * 3);
+        const x = viewportRegion.startX + Math.floor(pseudoRandom(i, 0, 1) * (viewportRegion.endX - viewportRegion.startX)) + jitterX;
+        const y = viewportRegion.startY + Math.floor(pseudoRandom(i, 1, 1) * (viewportRegion.endY - viewportRegion.startY)) + jitterY;
         const colorIndex = i % accentColors.length;
-        veins.push({ x, y, color: accentColors[colorIndex] });
+        if (x >= viewportRegion.startX && x < viewportRegion.endX && y >= viewportRegion.startY && y < viewportRegion.endY) {
+          veins.push({ x, y, color: accentColors[colorIndex] });
+        }
       }
     },
-    
-    // Pattern 2: Wellen-ähnlich (mehrere Wellen, deterministisch)
+    // Pattern 2: Wellen-ähnlich (mit zufälligem Offset und Jitter)
     () => {
-      const waveCount = Math.floor(3 + energy * 8); // 3-11 Wellen
+      const waveSeed = Math.floor(pseudoRandom(totalVeinCount, Date.now() % 10000, 77) * 10000);
+      const waveCount = Math.floor(3 + energy * 8);
       const veinsPerWave = Math.floor(totalVeinCount / waveCount);
-      
       for (let wave = 0; wave < waveCount; wave++) {
-        const waveY = viewportRegion.startY + (wave * (viewportRegion.endY - viewportRegion.startY) / waveCount);
-        const amplitude = 20 + pseudoRandom(wave, 0, 2) * 40; // 20-60 Pixel Amplitude
-        const frequency = 0.02 + pseudoRandom(wave, 1, 2) * 0.03; // 0.02-0.05 Frequenz
-        
+        const waveY = viewportRegion.startY + (wave * (viewportRegion.endY - viewportRegion.startY) / waveCount) + Math.floor((pseudoRandom(wave, waveSeed, 1) - 0.5) * 8);
+        const amplitude = 20 + pseudoRandom(wave, 0, 2) * 40 + pseudoRandom(wave, waveSeed, 2) * 10;
+        const frequency = 0.02 + pseudoRandom(wave, 1, 2) * 0.03 + pseudoRandom(wave, waveSeed, 3) * 0.01;
+        const phase = pseudoRandom(wave, waveSeed, 4) * Math.PI * 2;
         for (let i = 0; i < veinsPerWave; i++) {
           const x = viewportRegion.startX + (i * (viewportRegion.endX - viewportRegion.startX) / veinsPerWave);
-          const waveOffset = Math.sin(x * frequency) * amplitude;
+          const waveOffset = Math.sin(x * frequency + phase) * amplitude + (pseudoRandom(i, waveSeed, 5) - 0.5) * 4;
           const y = Math.floor(waveY + waveOffset);
-          
           if (y >= viewportRegion.startY && y < viewportRegion.endY) {
-            const colorIndex = wave % accentColors.length;
+            const colorIndex = (wave + i) % accentColors.length;
             veins.push({ x: Math.floor(x), y, color: accentColors[colorIndex] });
           }
         }
       }
     },
-    
-    // Pattern 3: Cluster-ähnlich (mehrere kleine Gruppen, deterministisch)
+    // Pattern 3: Cluster-ähnlich (Clusterzentren und Punkte mit Jitter)
     () => {
-      const clusterCount = Math.floor(5 + energy * 15); // 5-20 Cluster
+      const clusterSeed = Math.floor(pseudoRandom(totalVeinCount, Date.now() % 10000, 55) * 10000);
+      const clusterCount = Math.floor(5 + energy * 15);
       const veinsPerCluster = Math.floor(totalVeinCount / clusterCount);
-      
       for (let cluster = 0; cluster < clusterCount; cluster++) {
-        const clusterX = viewportRegion.startX + pseudoRandom(cluster, 0, 3) * (viewportRegion.endX - viewportRegion.startX);
-        const clusterY = viewportRegion.startY + pseudoRandom(cluster, 1, 3) * (viewportRegion.endY - viewportRegion.startY);
-        const clusterRadius = 15 + pseudoRandom(cluster, 2, 3) * 35; // 15-50 Pixel Radius
-        
+        const clusterX = viewportRegion.startX + pseudoRandom(cluster, 0, 3) * (viewportRegion.endX - viewportRegion.startX) + (pseudoRandom(cluster, clusterSeed, 1) - 0.5) * 10;
+        const clusterY = viewportRegion.startY + pseudoRandom(cluster, 1, 3) * (viewportRegion.endY - viewportRegion.startY) + (pseudoRandom(cluster, clusterSeed, 2) - 0.5) * 10;
+        const clusterRadius = 15 + pseudoRandom(cluster, 2, 3) * 35 + pseudoRandom(cluster, clusterSeed, 3) * 10;
         for (let i = 0; i < veinsPerCluster; i++) {
-          const angle = pseudoRandom(i, cluster, 4) * Math.PI * 2;
-          const distance = pseudoRandom(i, cluster + 100, 4) * clusterRadius;
+          const angle = pseudoRandom(i, cluster, 4) * Math.PI * 2 + pseudoRandom(i, clusterSeed, 4) * 0.5;
+          const distance = pseudoRandom(i, cluster + 100, 4) * clusterRadius + (pseudoRandom(i, clusterSeed, 5) - 0.5) * 3;
           const x = Math.floor(clusterX + Math.cos(angle) * distance);
           const y = Math.floor(clusterY + Math.sin(angle) * distance);
-          
-          if (x >= viewportRegion.startX && x < viewportRegion.endX &&
-              y >= viewportRegion.startY && y < viewportRegion.endY) {
-            const colorIndex = cluster % accentColors.length;
+          if (x >= viewportRegion.startX && x < viewportRegion.endX && y >= viewportRegion.startY && y < viewportRegion.endY) {
+            const colorIndex = (cluster + i) % accentColors.length;
             veins.push({ x, y, color: accentColors[colorIndex] });
           }
         }
       }
     },
-    
-    // Pattern 4: Spiral-ähnlich (von außen nach innen)
+    // Pattern 4: Spiral-ähnlich (Startwinkel und Radius mit Jitter)
     () => {
-      const centerX = Math.floor((viewportRegion.startX + viewportRegion.endX) / 2);
-      const centerY = Math.floor((viewportRegion.startY + viewportRegion.endY) / 2);
-      const maxRadius = Math.min(viewportRegion.endX - viewportRegion.startX, viewportRegion.endY - viewportRegion.startY) / 2;
-      
+      const spiralSeed = Math.floor(pseudoRandom(totalVeinCount, Date.now() % 10000, 33) * 10000);
+      const centerX = Math.floor((viewportRegion.startX + viewportRegion.endX) / 2) + Math.floor((pseudoRandom(spiralSeed, 1, 1) - 0.5) * 10);
+      const centerY = Math.floor((viewportRegion.startY + viewportRegion.endY) / 2) + Math.floor((pseudoRandom(spiralSeed, 2, 2) - 0.5) * 10);
+      const maxRadius = Math.min(viewportRegion.endX - viewportRegion.startX, viewportRegion.endY - viewportRegion.startY) / 2 + pseudoRandom(spiralSeed, 3, 3) * 10;
+      const spiralPhase = pseudoRandom(spiralSeed, 4, 4) * Math.PI * 2;
       for (let i = 0; i < totalVeinCount; i++) {
         const progress = i / totalVeinCount;
-        const angle = progress * Math.PI * 8; // 4 Umdrehungen
-        const radius = maxRadius * (1 - progress); // Von außen nach innen
+        const angle = progress * Math.PI * 8 + spiralPhase + (pseudoRandom(i, spiralSeed, 5) - 0.5) * 0.5;
+        const radius = maxRadius * (1 - progress) + (pseudoRandom(i, spiralSeed, 6) - 0.5) * 5;
         const x = Math.floor(centerX + Math.cos(angle) * radius);
         const y = Math.floor(centerY + Math.sin(angle) * radius);
-        
-        if (x >= viewportRegion.startX && x < viewportRegion.endX &&
-            y >= viewportRegion.startY && y < viewportRegion.endY) {
+        if (x >= viewportRegion.startX && x < viewportRegion.endX && y >= viewportRegion.startY && y < viewportRegion.endY) {
           const colorIndex = Math.floor(progress * accentColors.length);
           veins.push({ x, y, color: accentColors[colorIndex] });
         }
       }
     },
-    
-    // Pattern 5: Grid-ähnlich (strukturiertes Raster, deterministisch)
+    // Pattern 5: Grid-ähnlich (Zellen und Punkte mit Jitter)
     () => {
-      const gridSize = Math.floor(5 + energy * 10); // 5-15 Grid-Zellen
+      const gridSeed = Math.floor(pseudoRandom(totalVeinCount, Date.now() % 10000, 22) * 10000);
+      const gridSize = Math.floor(5 + energy * 10);
       const cellWidth = (viewportRegion.endX - viewportRegion.startX) / gridSize;
       const cellHeight = (viewportRegion.endY - viewportRegion.startY) / gridSize;
       const veinsPerCell = Math.floor(totalVeinCount / (gridSize * gridSize));
-      
       for (let gridX = 0; gridX < gridSize; gridX++) {
         for (let gridY = 0; gridY < gridSize; gridY++) {
-          const cellStartX = viewportRegion.startX + gridX * cellWidth;
-          const cellStartY = viewportRegion.startY + gridY * cellHeight;
-          
+          const cellStartX = viewportRegion.startX + gridX * cellWidth + (pseudoRandom(gridX, gridSeed, 1) - 0.5) * 4;
+          const cellStartY = viewportRegion.startY + gridY * cellHeight + (pseudoRandom(gridY, gridSeed, 2) - 0.5) * 4;
           for (let i = 0; i < veinsPerCell; i++) {
-            const x = Math.floor(cellStartX + pseudoRandom(i, gridX, 5) * cellWidth);
-            const y = Math.floor(cellStartY + pseudoRandom(i, gridY, 5) * cellHeight);
-            const colorIndex = (gridX + gridY) % accentColors.length;
-            veins.push({ x, y, color: accentColors[colorIndex] });
+            const x = Math.floor(cellStartX + pseudoRandom(i, gridX, 5) * cellWidth + (pseudoRandom(i, gridSeed, 3) - 0.5) * 2);
+            const y = Math.floor(cellStartY + pseudoRandom(i, gridY, 5) * cellHeight + (pseudoRandom(i, gridSeed, 4) - 0.5) * 2);
+            const colorIndex = (gridX + gridY + i) % accentColors.length;
+            if (x >= viewportRegion.startX && x < viewportRegion.endX && y >= viewportRegion.startY && y < viewportRegion.endY) {
+              veins.push({ x, y, color: accentColors[colorIndex] });
+            }
           }
         }
       }
@@ -558,23 +582,40 @@ export function generateBeatVeins(
   
   // OPTIMIERT: Wähle Pattern basierend auf Energy und Beat
   let patternIndex;
+  // --- NEU: Zufallsfaktor für Pattern-Auswahl ---
+  const patternRandom = Math.floor(pseudoRandom(Date.now() % 10000, totalVeinCount, 42) * 5); // 0-4
   if (beatDetected) {
     // Bei Beat: Explosions- oder Wellen-Pattern
-    patternIndex = energy > 0.5 ? 0 : 1; // Explosion bei hoher Energy, Wellen bei niedriger
+    if (energy > 0.5) {
+      patternIndex = patternRandom; // Zufälliges Pattern bei hoher Energie
+    } else {
+      patternIndex = (1 + patternRandom) % 5; // Zufälliges Pattern, aber nicht immer 0
+    }
   } else {
-    // Ohne Beat: Cluster, Spiral oder Grid basierend auf Energy
-    if (energy > 0.7) patternIndex = 2; // Cluster bei hoher Energy
-    else if (energy > 0.4) patternIndex = 3; // Spiral bei mittlerer Energy
-    else patternIndex = 4; // Grid bei niedriger Energy
+    // Ohne Beat: Cluster, Spiral oder Grid basierend auf Energy, aber zufällig
+    if (energy > 0.7) patternIndex = (2 + patternRandom) % 5;
+    else if (energy > 0.4) patternIndex = (3 + patternRandom) % 5;
+    else patternIndex = (4 + patternRandom) % 5;
   }
+  // --- ENDE NEU ---
   
   // Generiere das ausgewählte Pattern
   const selectedPattern = beatPatterns[patternIndex];
+  let newVeins: Array<{x: number, y: number, color: string}> = [];
   if (selectedPattern) {
     selectedPattern();
+    newVeins = veins.slice();
   }
-  
-  return veins;
+  // --- NEU: Veins länger sichtbar halten ---
+  veinLifetimeCache.push(newVeins);
+  if (veinLifetimeCache.length > VEIN_LIFETIME_FRAMES) {
+    veinLifetimeCache.shift();
+  }
+  // Mische alle Veins der letzten Frames zusammen (ältere Veins werden leicht bevorzugt entfernt)
+  const allVeins = veinLifetimeCache.flat();
+  // Optional: Duplikate entfernen (nach x/y/color)
+  const uniqueVeins = Array.from(new Map(allVeins.map((v: {x: number, y: number, color: string}) => [v.x + ',' + v.y + ',' + v.color, v])).values()) as Array<{x: number, y: number, color: string}>;
+  return uniqueVeins;
 }
 
 // OPTIMIERT: Export-Funktion für Cache-Management

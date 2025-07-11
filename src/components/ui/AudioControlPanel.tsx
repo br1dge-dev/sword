@@ -18,7 +18,11 @@ const tracks = [
   { src: "/music/atarisword.mp3", name: "ATARISWORD" },
   { src: "/music/DR4GONSWORD.mp3", name: "DR4GONSWORD" },
   { src: "/music/PUNCHSWORD.mp3", name: "PUNCHSWORD" },
-  { src: "/music/NIGHTSWORD.mp3", name: "NIGHTSWORD" }
+  { src: "/music/NIGHTSWORD.mp3", name: "NIGHTSWORD" },
+  // NEU:
+  { src: "/music/DANGERSWORD.mp3", name: "DANGERSWORD" },
+  { src: "/music/SHONENSWORD.mp3", name: "SHONENSWORD" },
+  { src: "/music/WORFSWORD.mp3", name: "WORFSWORD" }
 ];
 
 // Pseudo-zufällige Reihenfolge für Highlight-Position und Farbe
@@ -45,16 +49,16 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const [lastEnergy, setLastEnergy] = useState(0);
   
   const initializationAttemptedRef = useRef<boolean>(false);
-  const lastLogTimeRef = useRef<number>(0);
-  const logThrottleInterval = 1000;
+  // ENTFERNT: Logging-Variablen (lastLogTimeRef, logThrottleInterval)
 
-  const throttledLog = (message: string, force: boolean = false) => {
-    const now = Date.now();
-    if (force || now - lastLogTimeRef.current > logThrottleInterval) {
-      console.log(`[AudioControlPanel] ${message}`);
-      lastLogTimeRef.current = now;
-    }
-  };
+  // DEAKTIVIERT: Logging-Funktion
+  // const throttledLog = (message: string, force: boolean = false) => {
+  //   const now = Date.now();
+  //   if (force || now - lastLogTimeRef.current > logThrottleInterval) {
+  //     console.log(`[AudioControlPanel] ${message}`);
+  //     lastLogTimeRef.current = now;
+  //   }
+  // };
   
   // Audio-Reaction-Store
   const { setMusicPlaying, setAudioActive, energy, beatDetected, isIdleActive, swordColor } = useAudioReactionStore(state => ({
@@ -99,14 +103,15 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     try {
       await initialize(audioRef.current);
       setAnalyzerInitialized(true);
-      throttledLog('Audio analyzer initialized', true);
+      // throttledLog('Audio analyzer initialized', true);
       
       if (isInitialized && !isAnalyzing && isPlaying) {
         start();
-        throttledLog('Auto-starting audio analysis', true);
+        // throttledLog('Auto-starting audio analysis', true);
       }
     } catch (err) {
-      console.error('Failed to initialize audio analyzer:', err);
+      // DEAKTIVIERT: Logging
+      // console.error('Failed to initialize audio analyzer:', err);
     }
   }, [audioRef.current, initialize, isInitialized, isAnalyzing, start, isPlaying, analyzerInitialized]);
   
@@ -120,10 +125,10 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   useEffect(() => {
     if (isInitialized && !isAnalyzing && isPlaying) {
       start();
-      throttledLog('Starting audio analysis', true);
+      // throttledLog('Starting audio analysis', true);
     } else if (isInitialized && isAnalyzing && !isPlaying) {
       stop();
-      throttledLog('Stopping audio analysis', true);
+      // throttledLog('Stopping audio analysis', true);
     }
   }, [isInitialized, isAnalyzing, start, stop, isPlaying]);
   
@@ -157,19 +162,20 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     if (globalAnalyzer && globalAnalyzer.getAudioContext) {
       const audioContext = globalAnalyzer.getAudioContext();
       if (audioContext && audioContext.state === 'suspended') {
-        throttledLog('Resuming AudioContext', true);
+        // throttledLog('Resuming AudioContext', true);
         try {
           await audioContext.resume();
           
           if (!isAnalyzing && isPlaying) {
             start();
-            throttledLog('Explicitly starting audio analysis', true);
+            // throttledLog('Explicitly starting audio analysis', true);
           }
           
           setAudioActive(true);
           return true;
         } catch (err) {
-          console.error('Failed to resume AudioContext:', err);
+          // DEAKTIVIERT: Logging
+          // console.error('Failed to resume AudioContext:', err);
           return false;
         }
       } else {
@@ -192,7 +198,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         
         if (isAnalyzing) {
           stop();
-          throttledLog("Stopping audio analysis", true);
+          // throttledLog("Stopping audio analysis", true);
         }
         
         setMusicPlaying(false);
@@ -202,14 +208,15 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         
         if (isInitialized && !isAnalyzing) {
           start();
-          throttledLog("Starting audio analysis", true);
+          // throttledLog("Starting audio analysis", true);
         }
         
         setMusicPlaying(true);
-        throttledLog("Music playback started", true);
+        // throttledLog("Music playback started", true);
       }
     } catch (err) {
-      console.error('Error toggling playback:', err);
+      // DEAKTIVIERT: Logging
+      // console.error('Error toggling playback:', err);
     }
   };
 
@@ -234,7 +241,8 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         }
       }
     } catch (err) {
-      console.error('Error switching track:', err);
+      // DEAKTIVIERT: Logging
+      // console.error('Error switching track:', err);
     }
   };
 
@@ -259,7 +267,8 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         }
       }
     } catch (err) {
-      console.error('Error switching track:', err);
+      // DEAKTIVIERT: Logging
+      // console.error('Error switching track:', err);
     }
   };
 
@@ -302,7 +311,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
                textShadow: '0 0 1px #3EE6FF',
                letterSpacing: '0.05em'
              }}>
-          AUDIO
+          DANKNESS
         </div>
         
         {/* Audio Visualizer */}

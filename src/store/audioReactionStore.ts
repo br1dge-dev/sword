@@ -6,6 +6,7 @@
  */
 import { create } from 'zustand';
 import { useEffect } from 'react';
+import { useRef } from 'react';
 
 // Globale Variablen für Idle-Animation
 let idleActive = false;
@@ -22,17 +23,7 @@ const IDLE_ENERGY = 0.15; // Konstante, niedrige Energy für subtile Animation
 let lastEnergyUpdate = 0;
 const ENERGY_UPDATE_THROTTLE = 200; // Reduziert auf 200ms für bessere Reaktivität
 
-// OPTIMIERT: Log-Throttling für bessere Performance
-let lastLogTime = 0;
-const LOG_THROTTLE_INTERVAL = 1000; // 1 Sekunde zwischen Logs
-
-const throttledLog = (message: string, force: boolean = false) => {
-  const now = Date.now();
-  if (force || now - lastLogTime > LOG_THROTTLE_INTERVAL) {
-    console.log(`[AudioStore] ${message}`);
-    lastLogTime = now;
-  }
-};
+// ENTFERNT: Logging-Variablen (lastLogTimeRef, logThrottleInterval)
 
 interface UpdateEnergyOptions {
   forceIdle?: boolean;
@@ -132,7 +123,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
           setAudioActive(false);
           updateEnergy(0);
           startIdle();
-          throttledLog("Music paused, starting idle animation", true);
+          // throttledLog("Music paused, starting idle animation", true);
         }
       }, 5000); // Erhöht auf 5000ms um Track-Wechsel zu berücksichtigen
     }
@@ -149,13 +140,13 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     
     // WICHTIG: Starte Idle NICHT wenn Musik spielt
     if (store.isMusicPlaying) {
-      throttledLog("Cannot start idle animation while music is playing", true);
+      // throttledLog("Cannot start idle animation while music is playing", true);
       return;
     }
     
     // WICHTIG: Starte Idle NICHT wenn bereits Audio-Aktivität vorhanden ist
     if (store.isAudioActive && store.energy > 0.02) {
-      throttledLog("Cannot start idle animation while audio is active", true);
+      // throttledLog("Cannot start idle animation while audio is active", true);
       return;
     }
     
@@ -205,11 +196,11 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
       
       // Log nur beim Start und alle 10 Schritte (ein kompletter Loop)
       if (idleStep === 0) {
-        throttledLog("Idle animation loop completed");
+        // throttledLog("Idle animation loop completed");
       }
     }, IDLE_INTERVAL);
     
-    throttledLog("Idle animation started", true);
+    // throttledLog("Idle animation started", true);
   },
   
   // OPTIMIERT: Verbesserte Idle-Beendigung
@@ -225,7 +216,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     // OPTIMIERT: Reset Energy auf 0 wenn Idle gestoppt wird
     set({ energy: 0 });
     
-    throttledLog("Idle animation stopped", true);
+    // throttledLog("Idle animation stopped", true);
   },
   
   isIdleActive: () => idleActive
@@ -285,5 +276,5 @@ export function cleanupAudioIntervals(): void {
   idleActive = false;
   idleStep = 0;
   
-  throttledLog('Audio intervals cleaned up', true);
+  // throttledLog('Audio intervals cleaned up', true);
 } 

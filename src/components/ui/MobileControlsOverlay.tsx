@@ -16,8 +16,14 @@ export default function MobileControlsOverlay({
 }: MobileControlsOverlayProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  // AudioControlPanel bleibt immer im DOM, aber außerhalb des Overlays (unsichtbar)
+  // Sichtbare UI nur im Overlay
   return (
     <>
+      {/* Immer im DOM, aber unsichtbar, wenn Overlay zu */}
+      <div style={{ display: 'none' }}>
+        <AudioControlPanel onBeat={onBeat} onEnergyChange={onEnergyChange} />
+      </div>
       {/* Overlay-Button (immer sichtbar) */}
       <button
         onClick={() => setIsOpen(prev => !prev)}
@@ -39,10 +45,9 @@ export default function MobileControlsOverlay({
       >
         <div className="w-full max-w-sm p-6 flex flex-col items-center gap-8">
           <div className="text-xl font-press-start-2p text-grifter-blue mb-4">CONTROLS</div>
-          
           <div className="w-full flex flex-col items-center gap-8">
             <SideButtons className="items-center" />
-            
+            {/* Sichtbare UI */}
             <AudioControlPanel 
               onBeat={onBeat}
               onEnergyChange={onEnergyChange}

@@ -95,6 +95,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const currentTilesRef = useRef<Array<{x: number, y: number, color: string}>>([]);
   const tileTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tileBirthTimeRef = useRef<number>(0); // Geburtszeit der aktuellen Tiles
+  // --- TILE-LOCK für Mindestlebensdauer ---
+  const TILE_LOCK_MS = 200;
+  const tileLockedRef = useRef(false);
 
   // OPTIMIERT: Log-Throttling für bessere Performance
   const lastLogTimeRef = useRef<number>(0);
@@ -519,17 +522,73 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     
     // Tile-Effekte - REAKTIVER: Bei jedem Beat oder höherer Energy
     if (beatDetected || energy > 0.02) { // Empfindlicher: ab 0.02 statt 0.03
-      // NEU: Entferne alte Tiles sofort für neue Reaktivität
+      const now = Date.now();
+      // Wenn Tiles gelockt sind, keine neue Generierung zulassen
+      if (tileLockedRef.current) {
+        throttledLog(`Tile-Lock aktiv, keine neue Generierung erlaubt.`);
+        return;
+      }
+      // Wenn Tiles existieren, entferne sie (nach Ablauf des Locks)
       if (currentTilesRef.current.length > 0) {
-        throttledLog(`Removing old tiles for new generation (${currentTilesRef.current.length} tiles)`);
+        const removeAge = now - tileBirthTimeRef.current;
+        if (removeAge < TILE_LOCK_MS) {
+          throttledLog(`Tile-Lock: Tiles erst ${removeAge}ms alt, warte auf Ablauf von ${TILE_LOCK_MS - removeAge}ms.`);
+          if (tileTimeoutRef.current) {
+            clearTimeout(tileTimeoutRef.current);
+            tileTimeoutRef.current = null;
+          }
+          tileLockedRef.current = true;
+          tileTimeoutRef.current = setTimeout(() => {
+            console.log(`[TILE-LIFETIME-LOG] Entferne Tiles nach Tile-Lock, tatsächliche Lebensdauer: ${Date.now() - tileBirthTimeRef.current}ms`);
+            currentTilesRef.current = [];
+            setColoredTiles([]);
+            tileBirthTimeRef.current = 0;
+            tileLockedRef.current = false;
+            // Nach Ablauf des Locks: neue Tiles generieren, falls Event noch gültig
+            if (beatDetected || energy > 0.02) {
+              // (Kopiere den Generierungsblock von unten hierher)
+              const tempIntensity = { ...colorEffectIntensity };
+              for (const level in tempIntensity) {
+                if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
+                  const numLevel = Number(level) as keyof typeof colorEffectIntensity;
+                  tempIntensity[numLevel] = Math.min(2, tempIntensity[numLevel] + Math.floor(energy * (beatDetected ? 1 : 0.5)));
+                }
+              }
+              const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity, energy);
+              throttledLog(`(Tile-Lock) Generating tiles: ${generatedTiles.length} tiles, energy: ${energy.toFixed(3)}, beat: ${beatDetected}`);
+              currentTilesRef.current = generatedTiles;
+              tileBirthTimeRef.current = Date.now();
+              setColoredTiles(generatedTiles);
+              // Lock erneut setzen
+              tileLockedRef.current = true;
+              if (tileTimeoutRef.current) {
+                clearTimeout(tileTimeoutRef.current);
+              }
+              tileTimeoutRef.current = setTimeout(() => {
+                const removeAge2 = Date.now() - tileBirthTimeRef.current;
+                console.log(`[TILE-LIFETIME-LOG] Entferne Tiles nach regulärem Timeout (Tile-Lock), tatsächliche Lebensdauer: ${removeAge2}ms`);
+                currentTilesRef.current = [];
+                tileBirthTimeRef.current = 0;
+                setColoredTiles([]);
+                tileTimeoutRef.current = null;
+                tileLockedRef.current = false;
+              }, TILE_LOCK_MS);
+            }
+          }, TILE_LOCK_MS - removeAge);
+          return;
+        }
+        // Tiles sind alt genug, können entfernt werden
+        console.log(`[TILE-LIFETIME-LOG] Entferne Tiles für neue Generation (Tile-Lock), tatsächliche Lebensdauer: ${removeAge}ms`);
         currentTilesRef.current = [];
         setColoredTiles([]);
+        tileBirthTimeRef.current = 0;
+        tileLockedRef.current = false;
         if (tileTimeoutRef.current) {
           clearTimeout(tileTimeoutRef.current);
           tileTimeoutRef.current = null;
         }
       }
-      
+      // Jetzt neue Tiles generieren
       const tempIntensity = { ...colorEffectIntensity };
       for (const level in tempIntensity) {
         if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
@@ -537,43 +596,28 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           tempIntensity[numLevel] = Math.min(2, tempIntensity[numLevel] + Math.floor(energy * (beatDetected ? 1 : 0.5)));
         }
       }
-      
       const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity, energy);
-      
       throttledLog(`Generating tiles: ${generatedTiles.length} tiles, energy: ${energy.toFixed(3)}, beat: ${beatDetected}`);
-      
-      // NEU: Speichere Tiles im Ref und setze State
       currentTilesRef.current = generatedTiles;
-      tileBirthTimeRef.current = now; // Setze Geburtszeit
+      tileBirthTimeRef.current = now;
       setColoredTiles(generatedTiles);
       effectsTriggered++;
-      
-      // REAKTIVE DARSTELLUNGSDAUER: 75ms Minimum, 800ms Maximum (50% längere Mindestlebensdauer)
-      // Bei hoher Intensität sehr kurz, bei niedriger Intensität länger
-      const intensity = Math.min(1, (energy * 3) + (beatDetected ? 0.8 : 0)); // Stärkere Reaktion
-      const minDuration = 75; // Minimum 75ms (0,075 Sekunde) - 50% länger als vorher
-      const maxDuration = 800; // Maximum 800ms (0,8 Sekunde) - nicht zu lang
-      const duration = maxDuration - (intensity * (maxDuration - minDuration));
-      
-      throttledLog(`PUNCHY TILES: ${generatedTiles.length} tiles, ${duration}ms duration (intensity: ${intensity.toFixed(2)}, energy: ${energy.toFixed(3)}, beat: ${beatDetected})`);
-      
-      // NEU: Clear previous timeout
+      // Lock setzen
+      tileLockedRef.current = true;
       if (tileTimeoutRef.current) {
         clearTimeout(tileTimeoutRef.current);
         throttledLog(`Cleared previous timeout`);
       }
-      
-      const timeout = setTimeout(() => {
-        throttledLog(`Removing tiles after ${duration}ms - current tiles: ${currentTilesRef.current.length}`);
-        currentTilesRef.current = []; // Clear Ref
-        tileBirthTimeRef.current = 0; // Reset birth time
-        setColoredTiles([]); // Nach Ablauf werden die Tiles entfernt
+      tileTimeoutRef.current = setTimeout(() => {
+        const removeAge = Date.now() - tileBirthTimeRef.current;
+        console.log(`[TILE-LIFETIME-LOG] Entferne Tiles nach regulärem Timeout (Tile-Lock), tatsächliche Lebensdauer: ${removeAge}ms`);
+        currentTilesRef.current = [];
+        tileBirthTimeRef.current = 0;
+        setColoredTiles([]);
         tileTimeoutRef.current = null;
-      }, duration);
-      
-      tileTimeoutRef.current = timeout;
-      cleanupTimeoutsRef.current.add(timeout);
-      throttledLog(`Timeout set for ${duration}ms`);
+        tileLockedRef.current = false;
+      }, TILE_LOCK_MS);
+      throttledLog(`Timeout set for ${TILE_LOCK_MS}ms (Tile-Lock)`);
     } else {
       throttledLog(`No tile generation: energy=${energy.toFixed(3)}, beat=${beatDetected}, effectsTriggered=${effectsTriggered}, currentTiles=${currentTilesRef.current.length}`);
     }

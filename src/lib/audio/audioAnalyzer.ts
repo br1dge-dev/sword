@@ -59,18 +59,18 @@ export class AudioAnalyzer {
       this.options = { ...this.options, ...options };
     }
     
-    // OPTIMIERT: Nur einmal beim Start loggen
-    console.log('AudioAnalyzer initialized');
+    // DEAKTIVIERT: Logging
+    // console.log('AudioAnalyzer initialized');
   }
 
-  // OPTIMIERT: Throttled Logging-Funktion
-  private throttledLog(message: string, force: boolean = false): void {
-    const now = Date.now();
-    if (force || now - this.lastLogTime > this.logThrottleInterval) {
-      console.log(`[AudioAnalyzer] ${message}`);
-      this.lastLogTime = now;
-    }
-  }
+  // DEAKTIVIERT: Logging-Methode
+  // private throttledLog(message: string, force: boolean = false): void {
+  //   const now = Date.now();
+  //   if (force || now - this.lastLogTime > this.logThrottleInterval) {
+  //     console.log(`[AudioAnalyzer] ${message}`);
+  //     this.lastLogTime = now;
+  //   }
+  // }
 
   public async initialize(audioElement: HTMLAudioElement): Promise<void> {
     // Wenn bereits eine Initialisierung läuft, gib diese zurück
@@ -116,10 +116,12 @@ export class AudioAnalyzer {
           this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
         }
         
-        this.throttledLog('Audio analyzer setup complete', true);
+        // DEAKTIVIERT: Logging
+        // this.throttledLog('Audio analyzer setup complete', true);
         resolve();
       } catch (error) {
-        console.error('Failed to initialize audio analyzer:', error);
+        // DEAKTIVIERT: Logging
+        // console.error('Failed to initialize audio analyzer:', error);
         reject(error);
       } finally {
         this.initializationPromise = null;
@@ -131,7 +133,8 @@ export class AudioAnalyzer {
 
   private setupAnalyzerNodes(): void {
     if (!this.audioContext || !this.audioSource) {
-      console.error('Cannot setup analyzer nodes: audioContext or audioSource is null');
+      // DEAKTIVIERT: Logging
+      // console.error('Cannot setup analyzer nodes: audioContext or audioSource is null');
       return;
     }
     
@@ -149,13 +152,16 @@ export class AudioAnalyzer {
       this.analyser.connect(this.gainNode);
       this.gainNode.connect(this.audioContext.destination);
     } catch (error) {
-      console.error('Error setting up analyzer nodes:', error);
+      // DEAKTIVIERT: Logging
+      // console.error('Error setting up analyzer nodes:', error);
+      throw error;
     }
   }
 
   public start(): void {
     if (!this.audioContext || !this.analyser) {
-      console.warn('Cannot start analysis: analyzer not initialized');
+      // DEAKTIVIERT: Logging
+      // console.warn('Cannot start analysis: analyzer not initialized');
       return;
     }
     
@@ -166,7 +172,8 @@ export class AudioAnalyzer {
 
     this.isAnalyzing = true;
     this.noDataCount = 0;
-    this.throttledLog('Audio analysis started', true);
+    // DEAKTIVIERT: Logging
+    // this.throttledLog('Audio analysis started', true);
     
     // Resume audio context if it's suspended
     if (this.audioContext.state === 'suspended') {
@@ -175,11 +182,13 @@ export class AudioAnalyzer {
         this.lastAnalyzeTime = performance.now();
         this.analyze();
       }).catch(err => {
-        console.error('Failed to resume AudioContext:', err);
+        // DEAKTIVIERT: Logging
+        // console.error('Failed to resume AudioContext:', err);
         this.isAnalyzing = false;
         
         // Zeige einen Hinweis, dass eine Benutzerinteraktion erforderlich ist
-        console.warn('The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio');
+        // DEAKTIVIERT: Logging
+        // console.warn('The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio');
       });
     } else {
       // AudioContext ist bereits aktiv
@@ -200,7 +209,8 @@ export class AudioAnalyzer {
       this.animationFrameId = null;
     }
     
-    this.throttledLog('Audio analysis stopped', true);
+    // DEAKTIVIERT: Logging
+    // this.throttledLog('Audio analysis stopped', true);
   }
 
   public setVolume(volume: number): void {
@@ -310,7 +320,8 @@ export class AudioAnalyzer {
           
           if (beatIntensity > effectiveThreshold && Math.random() < 0.85) { // Erhöht von 0.75 auf 0.85 für mehr Beats
             this.lastBeatTime = now;
-            this.throttledLog(`Beat detected - Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}`);
+            // DEAKTIVIERT: Logging
+            // this.throttledLog(`Beat detected - Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}`);
             if (this.options.onBeat) {
               this.options.onBeat(now);
             }
@@ -323,19 +334,22 @@ export class AudioAnalyzer {
       this.animationFrameId = requestAnimationFrame(() => this.analyze());
       
     } catch (error) {
-      console.error('Audio analysis error:', error);
+      // DEAKTIVIERT: Logging
+      // console.error('Audio analysis error:', error);
       this.animationFrameId = requestAnimationFrame(() => this.analyze());
     }
   }
 
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.warn(`Maximum reconnect attempts (${this.maxReconnectAttempts}) reached, giving up`);
+      // DEAKTIVIERT: Logging
+      // console.warn(`Maximum reconnect attempts (${this.maxReconnectAttempts}) reached, giving up`);
       return;
     }
     
     this.reconnectAttempts++;
-    this.throttledLog(`Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+    // DEAKTIVIERT: Logging
+    // this.throttledLog(`Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
     
     try {
       // Stoppe die aktuelle Analyse
@@ -370,10 +384,13 @@ export class AudioAnalyzer {
         // Starte die Analyse erneut
         this.start();
         
-        this.throttledLog('Audio analyzer reconnected successfully', true);
+        // DEAKTIVIERT: Logging
+        // this.throttledLog('Audio analyzer reconnected successfully', true);
       }
     } catch (error) {
-      console.error('Failed to reconnect audio analyzer:', error);
+      // DEAKTIVIERT: Logging
+      // console.error('Failed to reconnect audio analyzer:', error);
+      this.reconnectAttempts++;
     }
   }
 
@@ -479,7 +496,8 @@ export class AudioAnalyzer {
       this.adaptiveSensitivity = Math.max(0.3, this.adaptiveSensitivity * 0.7); // Reduziert von 0.5/0.8 auf 0.3/0.7
     }
     
-    this.throttledLog(`Track analysis complete - Threshold: ${this.adaptiveThreshold.toFixed(4)}, Sensitivity: ${this.adaptiveSensitivity.toFixed(2)}, AvgEnergy: ${avgEnergy.toFixed(4)}, PeakEnergy: ${peakEnergy.toFixed(4)}`, true);
+    // DEAKTIVIERT: Logging
+    // this.throttledLog(`Track analysis complete - Threshold: ${this.adaptiveThreshold.toFixed(4)}, Sensitivity: ${this.adaptiveSensitivity.toFixed(2)}, AvgEnergy: ${avgEnergy.toFixed(4)}, PeakEnergy: ${peakEnergy.toFixed(4)}`, true);
   }
 
   public resetTrackAnalysis(): void {
@@ -496,16 +514,19 @@ export class AudioAnalyzer {
     }
 
     try {
-      this.throttledLog('Starting tempo detection...', true);
+      // DEAKTIVIERT: Logging
+      // this.throttledLog('Starting tempo detection...', true);
       const response = await fetch(this.audioElement.src);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       
       const tempo = await analyze(audioBuffer);
-      this.throttledLog(`Tempo detected: ${tempo} BPM`, true);
+      // DEAKTIVIERT: Logging
+      // this.throttledLog(`Tempo detected: ${tempo} BPM`, true);
       return tempo;
     } catch (error) {
-      console.error('Tempo detection failed:', error);
+      // DEAKTIVIERT: Logging
+      // console.error('Tempo detection failed:', error);
       throw error;
     }
   }
@@ -516,16 +537,19 @@ export class AudioAnalyzer {
     }
 
     try {
-      this.throttledLog('Starting beat guessing...', true);
+      // DEAKTIVIERT: Logging
+      // this.throttledLog('Starting beat guessing...', true);
       const response = await fetch(this.audioElement.src);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       
       const result = await guess(audioBuffer);
-      this.throttledLog(`Beat analysis complete: ${result.bpm} BPM`, true);
+      // DEAKTIVIERT: Logging
+      // this.throttledLog(`Beat analysis complete: ${result.bpm} BPM`, true);
       return result;
     } catch (error) {
-      console.error('Beat guessing failed:', error);
+      // DEAKTIVIERT: Logging
+      // console.error('Beat guessing failed:', error);
       throw error;
     }
   }
@@ -561,7 +585,8 @@ export class AudioAnalyzer {
     this.frequencyData = null;
     this.animationFrameId = null;
     
-    this.throttledLog('AudioAnalyzer disposed', true);
+    // DEAKTIVIERT: Logging
+    // this.throttledLog('AudioAnalyzer disposed', true);
   }
 
   public getAnalyzingState(): boolean {
