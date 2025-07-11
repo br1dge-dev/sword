@@ -74,8 +74,9 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     isInitialized,
     isAnalyzing
   } = useAudioAnalyzer({
-    energyThreshold: 0.03,
+    energyThreshold: 0.015, // Reduziert von 0.03 für empfindlichere Reaktion
     analyzeInterval: 50,
+    beatSensitivity: 1.2, // Erhöht für bessere Beat-Erkennung
     onBeat: () => {
       onBeat?.();
       setVisualBeatActive(true);

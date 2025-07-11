@@ -75,11 +75,11 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   
   // Initialize analyzer with options
   useEffect(() => {
-    // Standard-Analyseintervall für bessere Performance
+    // NEU: Optimierte Standard-Optionen für bessere Beat-Erkennung
     const defaultOptions = {
-      analyzeInterval: 50, // Reduziert von 100ms auf 50ms für schnellere Reaktion
-      energyThreshold: 0.03, // Noch niedriger für bessere Beat-Erkennung
-      beatSensitivity: 0.8, // Noch empfindlicher
+      analyzeInterval: 50, // 50ms für schnelle Reaktion
+      energyThreshold: 0.015, // Reduziert von 0.03 für empfindlichere Reaktion
+      beatSensitivity: 1.2, // Erhöht von 0.8 für bessere Beat-Erkennung
       ...options
     };
     
@@ -98,18 +98,18 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
           setEnergy(e);
           updateEnergy(e); // Aktualisiere den globalen Store
           
-          // Wenn Energie über 0.03 liegt, setzen wir Audio als aktiv (reduziert von 0.05)
-          if (e > 0.03) {
+          // NEU: Empfindlichere Audio-Aktivierung
+          if (e > 0.015) { // Reduziert von 0.03 für empfindlichere Reaktion
             setAudioActive(true);
           }
           
-          // Wenn Energie über dem Schwellenwert liegt, könnte es ein Beat sein
-          if (e > (analyzerOptions.energyThreshold || 0.05)) { // Reduziert von 0.1 auf 0.05
+          // NEU: Verbesserte Beat-Erkennung mit niedrigeren Schwellenwerten
+          if (e > (analyzerOptions.energyThreshold || 0.02)) { // Reduziert von 0.05 für empfindlichere Reaktion
             const now = Date.now();
             const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
             
-            // Mindestens 100ms zwischen Beats (reduziert von 150ms)
-            if (timeSinceLastBeat > 100) {
+            // Mindestens 80ms zwischen Beats (reduziert von 100ms für schnellere Beats)
+            if (timeSinceLastBeat > 80) {
               setBeatDetected(true);
               triggerBeat();
             }

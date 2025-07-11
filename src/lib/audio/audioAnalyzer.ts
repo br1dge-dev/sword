@@ -31,7 +31,7 @@ export class AudioAnalyzer {
   private lastBeatTime: number = 0; // Zeit des letzten erkannten Beats
   private options: AudioAnalyzerOptions = {
     beatSensitivity: 1.0,
-    energyThreshold: 0.04, // Fester Wert, nicht mehr dynamisch
+    energyThreshold: 0.02, // Reduziert für empfindlichere Reaktionen
     analyzeInterval: 50
   };
   private initializationPromise: Promise<void> | null = null;
@@ -234,26 +234,45 @@ export class AudioAnalyzer {
       // Hole Frequenzdaten
       this.analyser.getByteFrequencyData(this.frequencyData);
       
-      // Berechne Energie
+      // NEU: Verbesserte Energie-Berechnung mit Frequenzgewichtung
       let sum = 0;
       let count = 0;
       
-      // OPTIMIERT: Ausgewogene Frequenzanalyse für Performance und Reaktivität
-      const step = Math.max(1, Math.floor(this.frequencyData.length / 32)); // Zurück zu 32 Samples für bessere Reaktivität
+      // NEU: Frequenzgewichtung für bessere Beat-Erkennung
+      const bassWeight = 2.0; // Bass stärker gewichten
+      const midWeight = 1.5;  // Mitten mittel gewichten
+      const highWeight = 0.8; // Höhen weniger gewichten
       
-      for (let i = 0; i < this.frequencyData.length; i += step) {
-        sum += this.frequencyData[i];
-        count++;
+      // Bass-Bereich (0-20% der Frequenzen)
+      const bassEnd = Math.floor(this.frequencyData.length * 0.2);
+      for (let i = 0; i < bassEnd; i++) {
+        sum += this.frequencyData[i] * bassWeight;
+        count += bassWeight;
+      }
+      
+      // Mid-Bereich (20-60% der Frequenzen)
+      const midStart = bassEnd;
+      const midEnd = Math.floor(this.frequencyData.length * 0.6);
+      for (let i = midStart; i < midEnd; i++) {
+        sum += this.frequencyData[i] * midWeight;
+        count += midWeight;
+      }
+      
+      // High-Bereich (60-100% der Frequenzen, jeden 2. Wert für Performance)
+      const highStart = midEnd;
+      for (let i = highStart; i < this.frequencyData.length; i += 2) {
+        sum += this.frequencyData[i] * highWeight;
+        count += highWeight;
       }
       
       const average = count > 0 ? sum / count : 0;
-      const energy = average / 255; // Normalisiere auf 0-1
+      const energy = (average / 255) * 1.5; // NEU: Verstärkung um 50% für bessere Werte
       
       // NEU: Dynamische Track-Analyse für adaptive Sensitivität
       this.updateTrackAnalysis(energy, now);
       
-      // OPTIMIERT: Empfindlichere Reaktion für visuellen Impact
-      if (energy < 0.005) { // Reduziert von 0.01 auf 0.005 für empfindlichere Reaktionen
+      // NEU: Empfindlichere Reaktion für bessere Beat-Erkennung
+      if (energy < 0.002) { // Noch empfindlicher für bessere Reaktivität
         this.noDataCount++;
         if (this.noDataCount > this.maxNoDataCount) {
           if (this.options.onEnergy) {
@@ -267,8 +286,8 @@ export class AudioAnalyzer {
       
       this.noDataCount = 0;
       
-      // OPTIMIERT: Reaktive Energy-Updates für visuellen Impact
-      if (Math.abs(energy - this.lastEnergy) > 0.01 || energy > 0.05) { // Reduziert von 0.02/0.1 auf 0.01/0.05 für empfindlichere Reaktionen
+      // NEU: Reaktive Energy-Updates für bessere Beat-Erkennung
+      if (Math.abs(energy - this.lastEnergy) > 0.005 || energy > 0.02) { // Noch empfindlicher für bessere Reaktivität
         this.lastEnergy = energy;
         
         if (this.options.onEnergy) {
@@ -276,22 +295,22 @@ export class AudioAnalyzer {
         }
       }
 
-      // NEU: Verwende adaptive Schwellenwerte statt feste Werte
+      // NEU: Verbesserte Beat-Erkennung mit adaptiven Schwellenwerten
       const currentThreshold = this.trackAnalysisComplete ? this.adaptiveThreshold : this.options.energyThreshold!;
       const currentSensitivity = this.trackAnalysisComplete ? this.adaptiveSensitivity : this.options.beatSensitivity!;
       
-      // Nur noch die neue Schwellen-Logik:
+      // NEU: Empfindlichere Beat-Erkennung für bessere Reaktivität
       if (energy > currentThreshold) {
         const timeSinceLastBeat = now - this.lastBeatTime;
-        if (timeSinceLastBeat > 180) {
+        if (timeSinceLastBeat > 120) { // Reduziert von 180ms auf 120ms für schnellere Beats
           const beatIntensity = energy / currentThreshold;
-          const minSensitivity = 0.5;
-          const maxSensitivity = 3.0;
-          const effectiveThreshold = 5 + (maxSensitivity - currentSensitivity) * 5;
+          const minSensitivity = 0.3; // Reduziert von 0.5 für empfindlichere Reaktion
+          const maxSensitivity = 2.5; // Reduziert von 3.0 für realistischere Werte
+          const effectiveThreshold = 3 + (maxSensitivity - currentSensitivity) * 3; // Reduziert von 5+5 auf 3+3
           
-          if (beatIntensity > effectiveThreshold && Math.random() < 0.75) {
+          if (beatIntensity > effectiveThreshold && Math.random() < 0.85) { // Erhöht von 0.75 auf 0.85 für mehr Beats
             this.lastBeatTime = now;
-            this.throttledLog(`Beat detected - Energy: ${energy.toFixed(3)}`);
+            this.throttledLog(`Beat detected - Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}`);
             if (this.options.onBeat) {
               this.options.onBeat(now);
             }
@@ -432,36 +451,35 @@ export class AudioAnalyzer {
     const peakIndex = Math.floor(sortedEnergy.length * 0.95);
     const peakEnergy = sortedEnergy[peakIndex];
     
-    // Adaptive Threshold-Anpassung
-    // Für leise Tracks: niedrigerer Threshold, für laute Tracks: höherer Threshold
-    const baseThreshold = 0.04;
+    // NEU: Verbesserte adaptive Threshold-Anpassung für realistische Energy-Werte
+    const baseThreshold = 0.02; // Reduziert von 0.04 für realistischere Werte
     const energyRatio = avgEnergy / baseThreshold;
     
-    if (energyRatio < 0.5) {
-      // Leiser Track
-      this.adaptiveThreshold = Math.max(0.02, avgEnergy * 0.8);
-      this.adaptiveSensitivity = Math.min(2.0, this.options.beatSensitivity! * 1.5);
-    } else if (energyRatio > 2.0) {
+    if (energyRatio < 0.8) {
+      // Leiser Track (wie Nightsword)
+      this.adaptiveThreshold = Math.max(0.01, avgEnergy * 0.6); // Noch niedriger für empfindlichere Reaktion
+      this.adaptiveSensitivity = Math.min(2.5, this.options.beatSensitivity! * 2.0); // Erhöht für bessere Beat-Erkennung
+    } else if (energyRatio > 1.5) {
       // Lauter Track
-      this.adaptiveThreshold = Math.min(0.15, avgEnergy * 1.2);
-      this.adaptiveSensitivity = Math.max(0.5, this.options.beatSensitivity! * 0.7);
+      this.adaptiveThreshold = Math.min(0.1, avgEnergy * 1.0); // Reduziert von 0.15 auf 0.1
+      this.adaptiveSensitivity = Math.max(0.3, this.options.beatSensitivity! * 0.8); // Reduziert von 0.5 auf 0.3
     } else {
       // Normaler Track
-      this.adaptiveThreshold = Math.max(0.02, Math.min(0.15, avgEnergy));
+      this.adaptiveThreshold = Math.max(0.01, Math.min(0.1, avgEnergy)); // Reduziert von 0.02/0.15 auf 0.01/0.1
       this.adaptiveSensitivity = this.options.beatSensitivity!;
     }
     
-    // Dynamik-basierte Sensitivitätsanpassung
+    // NEU: Verbesserte dynamik-basierte Sensitivitätsanpassung
     const dynamicRange = peakEnergy / avgEnergy;
-    if (dynamicRange > 3.0) {
+    if (dynamicRange > 2.5) { // Reduziert von 3.0 für empfindlichere Reaktion
       // Hohe Dynamik - erhöhe Sensitivität
-      this.adaptiveSensitivity = Math.min(2.0, this.adaptiveSensitivity * 1.3);
-    } else if (dynamicRange < 1.5) {
+      this.adaptiveSensitivity = Math.min(3.0, this.adaptiveSensitivity * 1.5); // Erhöht von 2.0/1.3 auf 3.0/1.5
+    } else if (dynamicRange < 2.0) { // Erhöht von 1.5 für bessere Anpassung
       // Niedrige Dynamik - reduziere Sensitivität
-      this.adaptiveSensitivity = Math.max(0.5, this.adaptiveSensitivity * 0.8);
+      this.adaptiveSensitivity = Math.max(0.3, this.adaptiveSensitivity * 0.7); // Reduziert von 0.5/0.8 auf 0.3/0.7
     }
     
-    this.throttledLog(`Track analysis complete - Threshold: ${this.adaptiveThreshold.toFixed(4)}, Sensitivity: ${this.adaptiveSensitivity.toFixed(2)}`, true);
+    this.throttledLog(`Track analysis complete - Threshold: ${this.adaptiveThreshold.toFixed(4)}, Sensitivity: ${this.adaptiveSensitivity.toFixed(2)}, AvgEnergy: ${avgEnergy.toFixed(4)}, PeakEnergy: ${peakEnergy.toFixed(4)}`, true);
   }
 
   public resetTrackAnalysis(): void {

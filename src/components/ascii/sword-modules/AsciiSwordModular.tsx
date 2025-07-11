@@ -538,7 +538,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         }
       }
       
-      const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity);
+      const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity, energy);
       
       throttledLog(`Generating tiles: ${generatedTiles.length} tiles, energy: ${energy.toFixed(3)}, beat: ${beatDetected}`);
       
@@ -548,10 +548,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setColoredTiles(generatedTiles);
       effectsTriggered++;
       
-      // REAKTIVE DARSTELLUNGSDAUER: 50ms Minimum, 800ms Maximum
+      // REAKTIVE DARSTELLUNGSDAUER: 75ms Minimum, 800ms Maximum (50% längere Mindestlebensdauer)
       // Bei hoher Intensität sehr kurz, bei niedriger Intensität länger
       const intensity = Math.min(1, (energy * 3) + (beatDetected ? 0.8 : 0)); // Stärkere Reaktion
-      const minDuration = 50; // Minimum 50ms (0,05 Sekunde) - sehr reaktiv
+      const minDuration = 75; // Minimum 75ms (0,075 Sekunde) - 50% länger als vorher
       const maxDuration = 800; // Maximum 800ms (0,8 Sekunde) - nicht zu lang
       const duration = maxDuration - (intensity * (maxDuration - minDuration));
       
@@ -690,19 +690,26 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     }
   }, [beatDetected, getBackgroundDimensions, isMusicPlaying]);
   
-  // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
+  // NEU: Adaptive Audio-reaktive Farb-Effekte basierend auf tatsächlichen Energy-Werten
   useEffect(() => {
-    if ((energy > 0.05 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) { // Noch empfindlicher: ab 0.05
+    // NEU: Adaptive Schwellenwerte basierend auf tatsächlichen Energy-Werten
+    const adaptiveEnergyThreshold = 0.15; // Reduziert von 0.05 für bessere Reaktivität
+    const adaptiveHighEnergyThreshold = 0.3; // Reduziert von 0.8 für realistische Werte
+    
+    if ((energy > adaptiveEnergyThreshold || beatDetected) && Date.now() - lastColorChangeTime > colorStability) {
       const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
       
-      const newStability = energy > 0.8 // Erhöht von 0.7 auf 0.8 für längere Stabilität
-        ? Math.max(800, Math.floor(1500 - (energy * 300))) // Erhöht von 500/1200 auf 800/1500
-        : Math.floor(2000 + Math.random() * 2500); // Erhöht von 1500+2000 auf 2000+2500
+      // NEU: Adaptive Stabilität basierend auf realen Energy-Werten
+      const newStability = energy > adaptiveHighEnergyThreshold
+        ? Math.max(600, Math.floor(1200 - (energy * 200))) // 600-1200ms bei hoher Energy
+        : Math.floor(1500 + Math.random() * 2000); // 1500-3500ms bei niedriger Energy
       
       setBaseColor(swordColor);
       setBgColor(newBgColor);
       setLastColorChangeTime(Date.now());
       setColorStability(newStability);
+      
+      throttledLog(`Color change: energy=${energy.toFixed(3)}, stability=${newStability}ms, beat=${beatDetected}`);
     }
   }, [beatDetected, energy, lastColorChangeTime, colorStability]);
   

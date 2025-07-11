@@ -69,8 +69,9 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
     beatInfo,
     error: analyzerError
   } = useAudioAnalyzer({
-    energyThreshold: 0.03, // Reduziert von 0.4 auf 0.03 für empfindlichere Beat-Erkennung
-    analyzeInterval: 50, // Reduziert von 200ms auf 50ms für schnellere Reaktionen
+    energyThreshold: 0.015, // Reduziert von 0.03 für empfindlichere Beat-Erkennung
+    analyzeInterval: 50, // 50ms für schnelle Reaktionen
+    beatSensitivity: 1.2, // Erhöht für bessere Beat-Erkennung
     onBeat: () => {
       onBeat?.();
     },

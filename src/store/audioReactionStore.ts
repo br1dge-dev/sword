@@ -78,8 +78,8 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     lastEnergyUpdate = now;
     const currentState = get();
     
-    // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt und Energy > 0
-    if (currentState.isMusicPlaying && energy > 0.02 && idleActive) {
+    // NEU: Empfindlichere Idle-Animation-Deaktivierung
+    if (currentState.isMusicPlaying && energy > 0.01 && idleActive) { // Reduziert von 0.02 für empfindlichere Reaktion
       get().stopIdle();
     }
     
@@ -91,7 +91,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     
     set((state) => ({ 
       energy,
-      isAudioActive: energy > 0.02 ? true : state.isAudioActive // Reduziert von 0.05 auf 0.02 für empfindlichere Reaktionen
+      isAudioActive: energy > 0.01 ? true : state.isAudioActive // Reduziert von 0.02 für empfindlichere Reaktionen
     }));
   },
   
