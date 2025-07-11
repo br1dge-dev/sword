@@ -18,50 +18,31 @@ export default function HomePage() {
   const baseSwordLevel = 1;
   
   const [isClient, setIsClient] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { energy, beatDetected, setMusicPlaying } = useAudioReactionStore();
-  
-  // OPTIMIERT: Throttled Logging für bessere Performance
-  // const lastLogTimeRef = useRef<number>(0);
-  // const lastEnergyRef = useRef(energy);
-  
-  // OPTIMIERT: Log-Throttling für bessere Performance
-  // const logThrottleInterval = 1000; // 1 Sekunde zwischen Logs
-
-  // DEAKTIVIERT: Logging-Funktion
-  // const throttledLog = (message: string, force: boolean = false) => {
-  //   const now = Date.now();
-  //   if (force || now - lastLogTimeRef.current > logThrottleInterval) {
-  //     console.log(`[HomePage] ${message}`);
-  //     lastLogTimeRef.current = now;
-  //   }
-  // };
   
   // Client-Side Rendering aktivieren
   useEffect(() => {
     setIsClient(true);
     
+    // Prüfe, ob es ein mobiles Gerät ist
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    
+    // Initial check
+    checkMobile();
+    
+    // Event-Listener für Resize
+    window.addEventListener('resize', checkMobile);
+    
     // Musik als nicht spielend markieren, damit Idle aktiviert wird
     setMusicPlaying(false);
     
-    // throttledLog('HomePage mounted', true);
-    
     return () => {
-      // throttledLog('HomePage unmounted', true);
-      // KEIN Cleanup beim Unmount, da die Idle-Animation im Layout läuft
+      window.removeEventListener('resize', checkMobile);
     };
   }, [setMusicPlaying]);
-  
-  // OPTIMIERT: Reduzierte Energie- und Beat-Logs
-  useEffect(() => {
-    const now = Date.now();
-    // const timeSinceLastLog = now - lastLogTimeRef.current;
-    
-    // OPTIMIERT: Log nur alle 10 Sekunden oder bei signifikanten Änderungen (erhöht von 5s auf 10s)
-    // if (timeSinceLastLog > 10000 || Math.abs(energy - lastEnergyRef.current) > 0.5 || beatDetected) { // Erhöht von 0.3 auf 0.5
-      // throttledLog(`Energy: ${energy.toFixed(2)}, Beat: ${beatDetected}`);
-      // lastEnergyRef.current = energy;
-    // }
-  }, [energy, beatDetected]);
   
   // Handle beat detection
   const handleBeat = () => {
@@ -90,11 +71,12 @@ export default function HomePage() {
           />
         </div>
         
-        {/* UI-Elemente auf der rechten Seite */}
-        <div className="hidden sm:flex absolute top-1/2 left-[75vw] transform -translate-x-1/2 -translate-y-1/2 z-10">
+        {/* Gemeinsamer Audio-Player (immer aktiv, aber nur auf Desktop sichtbar) */}
+        <div className={`absolute top-1/2 left-[75vw] transform -translate-x-1/2 -translate-y-1/2 z-10 ${isMobile ? 'hidden' : 'flex'}`}>
           <AudioControlPanel 
             onBeat={handleBeat} 
             onEnergyChange={handleEnergyChange} 
+            alwaysActive={true}
           />
         </div>
         

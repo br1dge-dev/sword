@@ -8,6 +8,8 @@ interface AudioControlPanelProps {
   className?: string;
   onBeat?: () => void;
   onEnergyChange?: (energy: number) => void;
+  alwaysActive?: boolean;  // Neuer Prop: Immer aktiv halten, auch wenn versteckt
+  controlOnly?: boolean;   // Neuer Prop: Nur Steuerelemente anzeigen, Audio-Element woanders
 }
 
 // Verfügbare Tracks
@@ -39,11 +41,23 @@ const highlightPattern = [
   { idx: 1, color: '#FF3EC8' },
 ];
 
-export default function AudioControlPanel({ className = '', onBeat, onEnergyChange }: AudioControlPanelProps) {
+// Globale Variablen für die Synchronisierung zwischen Instanzen
+let globalIsPlaying = false;
+let globalCurrentTrackIndex = 0;
+let globalProgress = 0;
+let globalAudioElement: HTMLAudioElement | null = null;
+
+export default function AudioControlPanel({ 
+  className = '', 
+  onBeat, 
+  onEnergyChange, 
+  alwaysActive = false,
+  controlOnly = false
+}: AudioControlPanelProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(globalIsPlaying);
+  const [progress, setProgress] = useState(globalProgress);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(globalCurrentTrackIndex);
   const [analyzerInitialized, setAnalyzerInitialized] = useState(false);
   const [visualBeatActive, setVisualBeatActive] = useState(false);
   const [lastEnergy, setLastEnergy] = useState(0);
@@ -103,34 +117,66 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     try {
       await initialize(audioRef.current);
       setAnalyzerInitialized(true);
-      // throttledLog('Audio analyzer initialized', true);
       
-      if (isInitialized && !isAnalyzing && isPlaying) {
+      if (isInitialized && !isAnalyzing && (isPlaying || alwaysActive)) {
         start();
-        // throttledLog('Auto-starting audio analysis', true);
       }
     } catch (err) {
-      // DEAKTIVIERT: Logging
-      // console.error('Failed to initialize audio analyzer:', err);
+      console.error('Failed to initialize audio analyzer:', err);
+      // Versuche erneut nach einer kurzen Verzögerung (besonders wichtig für mobile Geräte)
+      setTimeout(() => {
+        initializationAttemptedRef.current = false;
+        if (audioRef.current) {
+          initializeAudioAnalyzer();
+        }
+      }, 1000);
     }
-  }, [audioRef.current, initialize, isInitialized, isAnalyzing, start, isPlaying, analyzerInitialized]);
+  }, [audioRef.current, initialize, isInitialized, isAnalyzing, start, isPlaying, analyzerInitialized, alwaysActive]);
   
+  // Synchronisiere mit globalen Variablen
   useEffect(() => {
+    if (audioRef.current && !controlOnly) {
+      // Setze das globale Audio-Element, wenn diese Instanz das primäre Audio-Element hat
+      globalAudioElement = audioRef.current;
+    } else if (controlOnly && globalAudioElement) {
+      // Verwende das globale Audio-Element für diese Instanz
+      audioRef.current = globalAudioElement;
+    }
+    
+    // Synchronisiere den Status
+    setIsPlaying(globalIsPlaying);
+    setCurrentTrackIndex(globalCurrentTrackIndex);
+    setProgress(globalProgress);
+    
+    // Initialisiere den Analyzer, wenn das Audio-Element verfügbar ist
     if (audioRef.current && !analyzerInitialized) {
       initializeAudioAnalyzer();
     }
-  }, [audioRef.current, analyzerInitialized, initializeAudioAnalyzer]);
+  }, [controlOnly]);
+
+  // Aktualisiere globale Variablen, wenn sich der lokale Status ändert
+  useEffect(() => {
+    globalIsPlaying = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    globalCurrentTrackIndex = currentTrackIndex;
+  }, [currentTrackIndex]);
+
+  useEffect(() => {
+    globalProgress = progress;
+  }, [progress]);
   
   // Starte/Stoppe Analyzer basierend auf Wiedergabestatus
   useEffect(() => {
-    if (isInitialized && !isAnalyzing && isPlaying) {
+    if (isInitialized && !isAnalyzing && (isPlaying || alwaysActive)) {
       start();
       // throttledLog('Starting audio analysis', true);
-    } else if (isInitialized && isAnalyzing && !isPlaying) {
+    } else if (isInitialized && isAnalyzing && !isPlaying && !alwaysActive) {
       stop();
       // throttledLog('Stopping audio analysis', true);
     }
-  }, [isInitialized, isAnalyzing, start, stop, isPlaying]);
+  }, [isInitialized, isAnalyzing, start, stop, isPlaying, alwaysActive]);
   
   // Audio-Element Event Handler
   useEffect(() => {
@@ -139,7 +185,9 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     
     const updateProgress = () => {
       if (audio.duration) {
-        setProgress((audio.currentTime / audio.duration) * 100);
+        const newProgress = (audio.currentTime / audio.duration) * 100;
+        setProgress(newProgress);
+        globalProgress = newProgress;
       }
     };
     
@@ -147,15 +195,45 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       nextTrack(true);
     };
     
+    const handlePlay = () => {
+      setIsPlaying(true);
+      globalIsPlaying = true;
+      
+      // Starte Audio-Analyse wenn Wiedergabe startet
+      if (isInitialized && !isAnalyzing) {
+        start();
+      }
+      
+      // Aktualisiere den globalen Store
+      setMusicPlaying(true);
+    };
+    
+    const handlePause = () => {
+      setIsPlaying(false);
+      globalIsPlaying = false;
+      
+      // Stoppe Audio-Analyse wenn Wiedergabe pausiert wird
+      if (isAnalyzing && !alwaysActive) {
+        stop();
+      }
+      
+      // Aktualisiere den globalen Store
+      setMusicPlaying(false);
+    };
+    
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
     audio.volume = 0.5; // Feste Lautstärke
     
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
     };
-  }, []);
+  }, [isInitialized, isAnalyzing, start, stop, alwaysActive]);
   
   // AudioContext aktivieren
   const resumeAudioContext = useCallback(async () => {
@@ -166,7 +244,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         try {
           await audioContext.resume();
           
-          if (!isAnalyzing && isPlaying) {
+          if (!isAnalyzing && (isPlaying || alwaysActive)) {
             start();
             // throttledLog('Explicitly starting audio analysis', true);
           }
@@ -183,7 +261,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       }
     }
     return false;
-  }, [isInitialized, isAnalyzing, isPlaying, start]);
+  }, [isInitialized, isAnalyzing, isPlaying, alwaysActive, start]);
   
   // Wiedergabe starten/pausieren
   const togglePlay = async () => {
@@ -194,29 +272,13 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       
       if (isPlaying) {
         audioRef.current.pause();
-        setIsPlaying(false);
-        
-        if (isAnalyzing) {
-          stop();
-          // throttledLog("Stopping audio analysis", true);
-        }
-        
-        setMusicPlaying(false);
+        // setIsPlaying und setMusicPlaying werden durch den 'pause'-Event-Handler gesetzt
       } else {
         audioRef.current.play();
-        setIsPlaying(true);
-        
-        if (isInitialized && !isAnalyzing) {
-          start();
-          // throttledLog("Starting audio analysis", true);
-        }
-        
-        setMusicPlaying(true);
-        // throttledLog("Music playback started", true);
+        // setIsPlaying und setMusicPlaying werden durch den 'play'-Event-Handler gesetzt
       }
     } catch (err) {
-      // DEAKTIVIERT: Logging
-      // console.error('Error toggling playback:', err);
+      console.error('Error toggling playback:', err);
     }
   };
 
@@ -229,6 +291,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       
       const nextIndex = (currentTrackIndex + 1) % tracks.length;
       setCurrentTrackIndex(nextIndex);
+      globalCurrentTrackIndex = nextIndex;
       
       await new Promise(resolve => setTimeout(resolve, 100));
       
@@ -241,8 +304,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         }
       }
     } catch (err) {
-      // DEAKTIVIERT: Logging
-      // console.error('Error switching track:', err);
+      console.error('Error switching track:', err);
     }
   };
 
@@ -255,6 +317,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       
       const prevIndex = currentTrackIndex === 0 ? tracks.length - 1 : currentTrackIndex - 1;
       setCurrentTrackIndex(prevIndex);
+      globalCurrentTrackIndex = prevIndex;
       
       await new Promise(resolve => setTimeout(resolve, 100));
       
@@ -267,8 +330,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         }
       }
     } catch (err) {
-      // DEAKTIVIERT: Logging
-      // console.error('Error switching track:', err);
+      console.error('Error switching track:', err);
     }
   };
 
@@ -296,13 +358,23 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
   return (
     <div className={`flex flex-col ${className}`} style={{ width: '100%', maxWidth: '280px' }}>
-      {/* Audio-Element */}
-      <audio
-        ref={audioRef}
-        src={tracks[currentTrackIndex].src}
-        preload="metadata"
-        className="hidden"
-      />
+      {/* Audio-Element - immer im DOM, aber nur sichtbar wenn nicht controlOnly */}
+      {!controlOnly && (
+        <audio
+          ref={audioRef}
+          src={tracks[currentTrackIndex].src}
+          preload="metadata"
+          className="hidden"
+        />
+      )}
+      
+      {/* Wenn controlOnly, dann nur das Audio-Element als Referenz ohne src */}
+      {controlOnly && (
+        <audio
+          ref={audioRef}
+          className="hidden"
+        />
+      )}
       
       {/* Header mit Titel */}
       <div className="flex flex-col mb-3">
