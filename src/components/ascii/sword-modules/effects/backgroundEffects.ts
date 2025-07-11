@@ -447,8 +447,8 @@ export function generateBeatVeins(
   
   const veins: Array<{x: number, y: number, color: string}> = [];
   
-  // OPTIMIERT: Dynamische Vein-Anzahl basierend auf Energy und Beat
-  const baseVeinCount = Math.floor(120 + (energy * 480)); // 120-600 Veins basierend auf Energy (verdoppelt von 60-300)
+  // OPTIMIERT: Dynamische Vein-Anzahl basierend auf Energy und Beat (30% erhöht)
+  const baseVeinCount = Math.floor(156 + (energy * 624)); // 156-780 Veins basierend auf Energy (30% erhöht von 120-600)
   const beatMultiplier = beatDetected ? 2.5 : 1; // 2.5x mehr Veins bei Beat
   const totalVeinCount = Math.floor(baseVeinCount * beatMultiplier);
   

@@ -198,8 +198,8 @@ export const unicodeGlitchChars = {
 
 // Hintergrund-Äderchen-Intensität für verschiedene Level
 export const veinIntensity = {
-  0: 2.0,    // Normal (stark erhöht)
-  1: 3.0,    // Etwas mehr (stark erhöht)
-  2: 5.0,    // Deutlich mehr (stark erhöht)
-  3: 7.0     // Viele Äderchen (stark erhöht)
+  0: 2.6,    // Normal (um 30% erhöht)
+  1: 3.9,    // Etwas mehr (um 30% erhöht)
+  2: 6.5,    // Deutlich mehr (um 30% erhöht)
+  3: 9.1     // Viele Äderchen (um 30% erhöht)
 }; 

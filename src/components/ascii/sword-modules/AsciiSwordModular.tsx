@@ -594,8 +594,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
       
-      // OPTIMIERT: Kürzere Lebensdauer für Beat-Veins (3-8 Sekunden)
-      const veinLifetime = beatDetected ? 3000 : Math.max(3000, Math.min(8000, Math.floor(energy * 10000)));
+      // OPTIMIERT: Längere Lebensdauer für Beat-Veins (4-10 Sekunden)
+      const veinLifetime = beatDetected ? 4000 : Math.max(4000, Math.min(10000, Math.floor(energy * 12000)));
       
       // Cleanup nach der Lebensdauer
       const timeout = setTimeout(() => {
@@ -846,8 +846,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
       
-      // OPTIMIERT: Kürzere Lebensdauer für Beat-Veins (3-8 Sekunden)
-      const veinLifetime = beatDetected ? 3000 : Math.max(3000, Math.min(8000, Math.floor(energy * 10000)));
+      // OPTIMIERT: Längere Lebensdauer für Beat-Veins (4-10 Sekunden)
+      const veinLifetime = beatDetected ? 4000 : Math.max(4000, Math.min(10000, Math.floor(energy * 12000)));
       
       // Cleanup nach der Lebensdauer
       const timeout = setTimeout(() => {
@@ -1107,35 +1107,45 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         >
           <pre className="font-mono text-sm sm:text-base leading-[0.9] whitespace-pre select-none" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {(staticBackground.length > 0 ? staticBackground : caveBackground).map((row, y) => {
-              // OPTIMIERT: Effizienteres Vein-Rendering ohne Zeilensprünge
+              // Map für Vein-Farben in dieser Zeile
               const veinMap = new Map<number, string>();
               coloredVeins.forEach(vein => {
                 if (vein.y === y) {
                   veinMap.set(vein.x, vein.color);
                 }
               });
-              
+              // DOM-Optimierung: Nur animierte Zeichen als <span>, Rest als String
+              const elements = [];
+              let buffer = '';
+              for (let x = 0; x < row.length; x++) {
+                const char = row[x];
+                const veinColor = veinMap.get(x);
+                if (veinColor) {
+                  if (buffer) {
+                    elements.push(buffer);
+                    buffer = '';
+                  }
+                  elements.push(
+                    <span
+                      key={x}
+                      style={{
+                        color: veinColor,
+                        textShadow: `0 0 ${2 + glitchLevel}px ${veinColor}`,
+                        display: 'inline-block',
+                        filter: `contrast(${0.65 + (glitchLevel * 0.05)})`
+                      }}
+                    >
+                      {char}
+                    </span>
+                  );
+                } else {
+                  buffer += char;
+                }
+              }
+              if (buffer) elements.push(buffer);
               return (
                 <div key={y} style={{ lineHeight: '0.9', width: '100%', textAlign: 'center', whiteSpace: 'pre' }}>
-                  {row.map((char, x) => {
-                    const veinColor = veinMap.get(x);
-                    if (veinColor) {
-                      return (
-                        <span
-                          key={x}
-                          style={{
-                            color: veinColor,
-                            textShadow: `0 0 ${2 + glitchLevel}px ${veinColor}`,
-                            display: 'inline-block',
-                            filter: `contrast(${0.65 + (glitchLevel * 0.05)})`
-                          }}
-                        >
-                          {char}
-                        </span>
-                      );
-                    }
-                    return char;
-                  })}
+                  {elements}
                 </div>
               );
             })}
