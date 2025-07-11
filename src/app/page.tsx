@@ -9,8 +9,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAudioReactionStore } from '@/store/audioReactionStore';
 import AsciiSword from '@/components/ascii/AsciiSword';
-import MusicPlayer from '@/components/ui/MusicPlayer';
-import AudioVisualizer from '@/components/ui/AudioVisualizer';
+import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 
@@ -90,30 +89,22 @@ export default function HomePage() {
           />
         </div>
         
-        {/* UI-Elemente auf der linken Seite, untereinander angeordnet */}
-        <div className="hidden sm:flex absolute left-[10%] top-1/2 transform -translate-y-1/2 z-10 flex-col gap-8">
-          {/* AudioVisualizer oben */}
-          <AudioVisualizer 
-            energy={energy} 
-            beatDetected={beatDetected} 
-          />
-          
-          {/* MusicPlayer in der Mitte */}
-          <MusicPlayer 
+        {/* UI-Elemente auf der rechten Seite */}
+        <div className="hidden sm:flex absolute top-1/2 left-[75vw] transform -translate-x-1/2 -translate-y-1/2 z-10">
+          <AudioControlPanel 
             onBeat={handleBeat} 
             onEnergyChange={handleEnergyChange} 
-            className="min-w-[200px]"
           />
-          
-          {/* SideButtons unten */}
+        </div>
+        
+        {/* SideButtons auf der linken Seite */}
+        <div className="hidden sm:flex absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10">
           <SideButtons />
         </div>
         
         {/* Mobile Steuerelemente */}
         <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20">
           <MobileControlsOverlay
-            audioEnergy={energy}
-            beatDetected={beatDetected}
             onBeat={handleBeat}
             onEnergyChange={handleEnergyChange}
           />

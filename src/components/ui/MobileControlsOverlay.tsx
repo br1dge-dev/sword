@@ -2,20 +2,15 @@
 
 import React, { useState } from 'react';
 import SideButtons from './SideButtons';
-import MusicPlayer from './MusicPlayer';
-import AudioVisualizer from './AudioVisualizer';
+import AudioControlPanel from './AudioControlPanel';
 import { IoMdSettings } from 'react-icons/io';
 
 interface MobileControlsOverlayProps {
-  audioEnergy: number;
-  beatDetected: boolean;
   onBeat: () => void;
   onEnergyChange: (energy: number) => void;
 }
 
 export default function MobileControlsOverlay({
-  audioEnergy,
-  beatDetected,
   onBeat,
   onEnergyChange
 }: MobileControlsOverlayProps) {
@@ -48,15 +43,9 @@ export default function MobileControlsOverlay({
           <div className="w-full flex flex-col items-center gap-8">
             <SideButtons className="items-center" />
             
-            <MusicPlayer 
+            <AudioControlPanel 
               onBeat={onBeat}
               onEnergyChange={onEnergyChange}
-              className="items-center"
-            />
-            
-            <AudioVisualizer 
-              energy={audioEnergy}
-              beatDetected={beatDetected}
               className="items-center"
             />
           </div>

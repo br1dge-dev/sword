@@ -45,6 +45,8 @@ interface AudioReactionState {
   isAudioActive: boolean;
   idleEnabled: boolean;
   isMusicPlaying: boolean;
+  swordColor: string; // HEX
+  setSwordColor: (color: string) => void;
   
   // Aktionen
   updateEnergy: (energy: number, opts?: UpdateEnergyOptions) => void;
@@ -65,6 +67,8 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   isAudioActive: false,
   idleEnabled: true,
   isMusicPlaying: false,
+  swordColor: '#00FCA6',
+  setSwordColor: (color) => set({ swordColor: color }),
   
   updateEnergy: (energy, opts = {}) => {
     const now = Date.now();

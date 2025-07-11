@@ -1093,6 +1093,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const backgroundColor = useMemo(() => getDarkerColor(bgColor), [bgColor]);
   const lighterBgColor = useMemo(() => getLighterColor(bgColor), [bgColor]);
 
+  const setSwordColor = useAudioReactionStore(state => state.setSwordColor);
+
+  useEffect(() => {
+    setSwordColor(baseColor);
+  }, [baseColor, setSwordColor]);
+
   return (
     <div 
       className="relative flex items-center justify-center w-full h-full overflow-hidden"
