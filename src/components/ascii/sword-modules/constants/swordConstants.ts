@@ -91,12 +91,12 @@ export const glitchIntensity = {
   3: 1.0   // Starke Glitches
 };
 
-// Glitch-Häufigkeit für verschiedene Level
+// Glitch-Häufigkeit für verschiedene Level - um 20% erhöht
 export const glitchFrequency = {
   0: 0,    // Kein Glitch
-  1: 0.1,  // 10% Chance für Glitch
-  2: 0.25, // 25% Chance für Glitch
-  3: 0.4   // 40% Chance für Glitch
+  1: 0.12, // 12% Chance für Glitch (erhöht von 10%)
+  2: 0.3,  // 30% Chance für Glitch (erhöht von 25%)
+  3: 0.48  // 48% Chance für Glitch (erhöht von 40%)
 };
 
 // Farbeffekt-Häufigkeit für verschiedene Level
@@ -107,12 +107,12 @@ export const colorEffectFrequency = {
   3: 0.4    // 40% Chance für Farbeffekte
 };
 
-// Farbeffekt-Intensität (Anzahl der farbigen Tiles)
+// Farbeffekt-Intensität (Anzahl der farbigen Tiles) - um 20% erhöht
 export const colorEffectIntensity = {
-  0: 2,     // Minimale Farbeffekte (erhöht von 1)
-  1: 4,     // 4 Cluster (erhöht von 3)
-  2: 7,     // 7 Cluster (erhöht von 5)
-  3: 10     // 10 Cluster (erhöht von 8)
+  0: 2,     // Minimale Farbeffekte (unverändert)
+  1: 5,     // 5 Cluster (erhöht von 4 um 25%)
+  2: 8,     // 8 Cluster (erhöht von 7 um ~14%)
+  3: 12     // 12 Cluster (erhöht von 10 um 20%)
 };
 
 // Höhlen/Fels Hintergrund-Muster

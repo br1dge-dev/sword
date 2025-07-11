@@ -90,6 +90,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const veinGenerationIntervalRef = useRef<number>(12000); // Erhöht von 8000ms auf 12000ms für bessere Performance
   const lastVeinLogTimeRef = useRef<number>(0);
   const idleStepRef = useRef<number>(0); // Für Idle-Animation Schritte
+  
+  // NEU: Tile-Management-System
+  const currentTilesRef = useRef<Array<{x: number, y: number, color: string}>>([]);
+  const tileTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tileBirthTimeRef = useRef<number>(0); // Geburtszeit der aktuellen Tiles
 
   // OPTIMIERT: Log-Throttling für bessere Performance
   const lastLogTimeRef = useRef<number>(0);
@@ -490,12 +495,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     const now = Date.now();
     const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
     
-    if (timeSinceLastUpdate < 100) { // Reduziert von 200ms auf 100ms für bessere Reaktivität
+    if (timeSinceLastUpdate < 50) { // Reduziert von 100ms auf 50ms für maximale Reaktivität
       return;
     }
     
     // OPTIMIERT: Empfindlichere Reaktion für visuellen Impact
-    if (energy < 0.01 && !beatDetected) { // Noch empfindlicher: ab 0.01
+    if (energy < 0.005 && !beatDetected) { // Noch empfindlicher: ab 0.005
       return;
     }
     
@@ -512,8 +517,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       effectsTriggered++;
     }
     
-    // Tile-Effekte - Nur bei sehr deutlichen Beats oder höherer Energy
-    if ((beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || energy > 0.03) {
+    // Tile-Effekte - REAKTIVER: Bei jedem Beat oder höherer Energy
+    if (beatDetected || energy > 0.02) { // Empfindlicher: ab 0.02 statt 0.03
+      // NEU: Entferne alte Tiles sofort für neue Reaktivität
+      if (currentTilesRef.current.length > 0) {
+        throttledLog(`Removing old tiles for new generation (${currentTilesRef.current.length} tiles)`);
+        currentTilesRef.current = [];
+        setColoredTiles([]);
+        if (tileTimeoutRef.current) {
+          clearTimeout(tileTimeoutRef.current);
+          tileTimeoutRef.current = null;
+        }
+      }
+      
       const tempIntensity = { ...colorEffectIntensity };
       for (const level in tempIntensity) {
         if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
@@ -524,23 +540,45 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       
       const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity);
       
+      throttledLog(`Generating tiles: ${generatedTiles.length} tiles, energy: ${energy.toFixed(3)}, beat: ${beatDetected}`);
+      
+      // NEU: Speichere Tiles im Ref und setze State
+      currentTilesRef.current = generatedTiles;
+      tileBirthTimeRef.current = now; // Setze Geburtszeit
       setColoredTiles(generatedTiles);
       effectsTriggered++;
       
-      // VARIABLE DARSTELLUNGSDAUER: 1000ms Minimum, 3000ms Maximum
-      // Bei hoher Intensität (hohe Energie/Beat) kürzere Dauer, bei niedriger Intensität längere Dauer
-      const intensity = Math.min(1, (energy * 2) + (beatDetected ? 0.5 : 0));
-      const minDuration = 50; // Minimum 50ms (0,1 Sekunde) - erhöht von 20ms
-      const maxDuration = 3000; // Maximum 3000ms (3 Sekunden)
+      // REAKTIVE DARSTELLUNGSDAUER: 50ms Minimum, 800ms Maximum
+      // Bei hoher Intensität sehr kurz, bei niedriger Intensität länger
+      const intensity = Math.min(1, (energy * 3) + (beatDetected ? 0.8 : 0)); // Stärkere Reaktion
+      const minDuration = 50; // Minimum 50ms (0,05 Sekunde) - sehr reaktiv
+      const maxDuration = 800; // Maximum 800ms (0,8 Sekunde) - nicht zu lang
       const duration = maxDuration - (intensity * (maxDuration - minDuration));
       
+      throttledLog(`PUNCHY TILES: ${generatedTiles.length} tiles, ${duration}ms duration (intensity: ${intensity.toFixed(2)}, energy: ${energy.toFixed(3)}, beat: ${beatDetected})`);
+      
+      // NEU: Clear previous timeout
+      if (tileTimeoutRef.current) {
+        clearTimeout(tileTimeoutRef.current);
+        throttledLog(`Cleared previous timeout`);
+      }
+      
       const timeout = setTimeout(() => {
+        throttledLog(`Removing tiles after ${duration}ms - current tiles: ${currentTilesRef.current.length}`);
+        currentTilesRef.current = []; // Clear Ref
+        tileBirthTimeRef.current = 0; // Reset birth time
         setColoredTiles([]); // Nach Ablauf werden die Tiles entfernt
+        tileTimeoutRef.current = null;
       }, duration);
+      
+      tileTimeoutRef.current = timeout;
       cleanupTimeoutsRef.current.add(timeout);
+      throttledLog(`Timeout set for ${duration}ms`);
     } else {
-      setColoredTiles([]); // Wenn keine Bedingungen erfüllt, Tiles sofort entfernen
+      throttledLog(`No tile generation: energy=${energy.toFixed(3)}, beat=${beatDetected}, effectsTriggered=${effectsTriggered}, currentTiles=${currentTilesRef.current.length}`);
     }
+    // ENTFERNT: Sofortiges Entfernen der Tiles wenn keine Bedingungen erfüllt sind
+    // Tiles leben jetzt bis zu 3 Sekunden, auch wenn keine neuen Effekte ausgelöst werden
     
     // OPTIMIERT: Reduzierte Unicode-Glitch-Effekte für bessere Performance
     if (beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) {
@@ -619,9 +657,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     
   }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions, setColoredVeins]);
   
-  // OPTIMIERT: Separater useEffect für Idle-Animation
+  // OPTIMIERT: Separater useEffect für Idle-Animation (nur wenn Musik NICHT spielt)
   useEffect(() => {
     if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) {
+      // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
+      if (isMusicPlaying) {
+        return;
+      }
+      
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
@@ -645,7 +688,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
     }
-  }, [beatDetected, getBackgroundDimensions]);
+  }, [beatDetected, getBackgroundDimensions, isMusicPlaying]);
   
   // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
   useEffect(() => {
@@ -670,44 +713,44 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       
       const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}, rotation?: number}> = [];
       
-      // CHARGE-LEVEL BASIERTE EFFEKTE
+      // CHARGE-LEVEL BASIERTE EFFEKTE (um 20% erhöht)
       let vibrationChance, glitchChance, colorChance, rotationChance, patternSwapChance;
       
       switch (chargeLevel) {
         case 1:
-          // CHARGE LVL1: Dünne Außenlinien, minimal vibrieren, selten Pattern-Tausch
-          vibrationChance = 0.1 + (energy * 0.2); // Minimal, reaktiv auf Musik-Intensität
-          glitchChance = 0.05; // Sehr selten
-          colorChance = 0.08; // Selten
-          rotationChance = 0.15; // Dünne Linien können sich drehen
-          patternSwapChance = 0.02; // Sehr selten mit Hintergrund-Pattern tauschen
+          // CHARGE LVL1: Dünne Außenlinien, minimal vibrieren, selten Pattern-Tausch (um 20% erhöht)
+          vibrationChance = 0.12 + (energy * 0.24); // Minimal, reaktiv auf Musik-Intensität (erhöht von 0.1+0.2)
+          glitchChance = 0.06; // Sehr selten (erhöht von 0.05)
+          colorChance = 0.096; // Selten (erhöht von 0.08)
+          rotationChance = 0.18; // Dünne Linien können sich drehen (erhöht von 0.15)
+          patternSwapChance = 0.024; // Sehr selten mit Hintergrund-Pattern tauschen (erhöht von 0.02)
           break;
           
         case 2:
-          // CHARGE LVL2: Stärkere Vibrationen, stärkerer Glow
-          vibrationChance = 0.3 + (energy * 0.4); // Sichtbarer und stärker
-          glitchChance = 0.15; // Häufiger
-          colorChance = 0.25; // Häufiger
-          rotationChance = 0.25; // Häufigere Rotation
-          patternSwapChance = 0.08; // Häufigerer Pattern-Tausch
+          // CHARGE LVL2: Stärkere Vibrationen, stärkerer Glow (um 20% erhöht)
+          vibrationChance = 0.36 + (energy * 0.48); // Sichtbarer und stärker (erhöht von 0.3+0.4)
+          glitchChance = 0.18; // Häufiger (erhöht von 0.15)
+          colorChance = 0.3; // Häufiger (erhöht von 0.25)
+          rotationChance = 0.3; // Häufigere Rotation (erhöht von 0.25)
+          patternSwapChance = 0.096; // Häufigerer Pattern-Tausch (erhöht von 0.08)
           break;
           
         case 3:
-          // CHARGE LVL3: Von allem noch mehr
-          vibrationChance = 0.5 + (energy * 0.6); // Sehr stark
-          glitchChance = 0.3; // Sehr häufig
-          colorChance = 0.4; // Sehr häufig
-          rotationChance = 0.4; // Sehr häufige Rotation
-          patternSwapChance = 0.15; // Häufiger Pattern-Tausch
+          // CHARGE LVL3: Von allem noch mehr (um 20% erhöht)
+          vibrationChance = 0.6 + (energy * 0.72); // Sehr stark (erhöht von 0.5+0.6)
+          glitchChance = 0.36; // Sehr häufig (erhöht von 0.3)
+          colorChance = 0.48; // Sehr häufig (erhöht von 0.4)
+          rotationChance = 0.48; // Sehr häufige Rotation (erhöht von 0.4)
+          patternSwapChance = 0.18; // Häufiger Pattern-Tausch (erhöht von 0.15)
           break;
           
         default:
-          // Fallback für Level 0 oder undefined
-          vibrationChance = 0.05;
-          glitchChance = 0.02;
-          colorChance = 0.05;
-          rotationChance = 0.05;
-          patternSwapChance = 0.01;
+          // Fallback für Level 0 oder undefined (um 20% erhöht)
+          vibrationChance = 0.06;
+          glitchChance = 0.024;
+          colorChance = 0.06;
+          rotationChance = 0.06;
+          patternSwapChance = 0.012;
       }
       
       // Energie-Multiplikator für reaktive Intensität
@@ -796,6 +839,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // --- IDLE TILE COLOR CYCLE ---
   useEffect(() => {
     if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) {
+      // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
+      if (isMusicPlaying) {
+        // ENTFERNT: Sofortiges Entfernen der Tiles - Musik-Effekte sollen leben bleiben
+        return;
+      }
+      
       // Im Idle: Alle Animationen stoppen
       setGlowIntensity(0);
       setGlitchChars([]);
@@ -806,20 +855,40 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setFadedChars([]);
       // Starte sanften Farbwechsel für Tiles
       let colorIndex = 0;
-      setColoredTiles(swordPositions.map(pos => ({ ...pos, color: accentColors[colorIndex] })));
+      
+      // NEU: Nur Idle-Tiles setzen wenn keine Musik-Tiles leben
+      if (currentTilesRef.current.length === 0) {
+        const idleTiles = swordPositions.map(pos => ({ ...pos, color: accentColors[colorIndex] }));
+        currentTilesRef.current = idleTiles;
+        tileBirthTimeRef.current = Date.now(); // Setze Geburtszeit für Idle-Tiles
+        setColoredTiles(idleTiles);
+      }
+      
       const interval = setInterval(() => {
-        colorIndex = (colorIndex + 1) % accentColors.length;
-        setColoredTiles(swordPositions.map(pos => ({ ...pos, color: accentColors[colorIndex] })));
-      }, 2000); // alle 7 Sekunden
+        // Prüfe nochmal, ob Musik läuft
+        if (isMusicPlaying) {
+          clearInterval(interval);
+          // ENTFERNT: Sofortiges Entfernen der Tiles - Musik-Effekte sollen leben bleiben
+          return;
+        }
+        
+        // NEU: Nur Idle-Tiles setzen wenn keine Musik-Tiles leben
+        if (currentTilesRef.current.length === 0) {
+          colorIndex = (colorIndex + 1) % accentColors.length;
+          const idleTiles = swordPositions.map(pos => ({ ...pos, color: accentColors[colorIndex] }));
+          currentTilesRef.current = idleTiles;
+          tileBirthTimeRef.current = Date.now(); // Setze Geburtszeit für Idle-Tiles
+          setColoredTiles(idleTiles);
+        }
+      }, 2000); // alle 2 Sekunden
       return () => {
         clearInterval(interval);
-        setColoredTiles([]);
+        // ENTFERNT: Sofortiges Entfernen der Tiles beim Cleanup
       };
-    } else {
-      // Wenn Idle verlassen wird, Tiles zurücksetzen (Musik übernimmt wieder)
-      setColoredTiles([]);
     }
-  }, [swordPositions]);
+    // ENTFERNT: Sofortiges Entfernen der Tiles wenn Idle verlassen wird
+    // Musik-Effekte sollen ihre natürliche Lebensdauer haben
+  }, [swordPositions, isMusicPlaying]);
 
   // --- ALLE ANIMATIONEN NUR WENN NICHT IDLE ---
   useEffect(() => {
@@ -871,9 +940,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     
   }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions, isIdleActive]);
   
-  // OPTIMIERT: Separater useEffect für Idle-Animation
+  // OPTIMIERT: Separater useEffect für Idle-Animation (nur wenn Musik NICHT spielt)
   useEffect(() => {
     if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) {
+      // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
+      if (isMusicPlaying) {
+        return;
+      }
+      
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
@@ -897,7 +971,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
     }
-  }, [isIdleActive, beatDetected, getBackgroundDimensions]);
+  }, [isIdleActive, beatDetected, getBackgroundDimensions, isMusicPlaying]);
   
   // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
   useEffect(() => {
@@ -926,44 +1000,44 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       
       const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}, rotation?: number}> = [];
       
-      // CHARGE-LEVEL BASIERTE EFFEKTE
+      // CHARGE-LEVEL BASIERTE EFFEKTE (um 20% erhöht)
       let vibrationChance, glitchChance, colorChance, rotationChance, patternSwapChance;
       
       switch (chargeLevel) {
         case 1:
-          // CHARGE LVL1: Dünne Außenlinien, minimal vibrieren, selten Pattern-Tausch
-          vibrationChance = 0.1 + (energy * 0.2); // Minimal, reaktiv auf Musik-Intensität
-          glitchChance = 0.05; // Sehr selten
-          colorChance = 0.08; // Selten
-          rotationChance = 0.15; // Dünne Linien können sich drehen
-          patternSwapChance = 0.02; // Sehr selten mit Hintergrund-Pattern tauschen
+          // CHARGE LVL1: Dünne Außenlinien, minimal vibrieren, selten Pattern-Tausch (um 20% erhöht)
+          vibrationChance = 0.12 + (energy * 0.24); // Minimal, reaktiv auf Musik-Intensität (erhöht von 0.1+0.2)
+          glitchChance = 0.06; // Sehr selten (erhöht von 0.05)
+          colorChance = 0.096; // Selten (erhöht von 0.08)
+          rotationChance = 0.18; // Dünne Linien können sich drehen (erhöht von 0.15)
+          patternSwapChance = 0.024; // Sehr selten mit Hintergrund-Pattern tauschen (erhöht von 0.02)
           break;
           
         case 2:
-          // CHARGE LVL2: Stärkere Vibrationen, stärkerer Glow
-          vibrationChance = 0.3 + (energy * 0.4); // Sichtbarer und stärker
-          glitchChance = 0.15; // Häufiger
-          colorChance = 0.25; // Häufiger
-          rotationChance = 0.25; // Häufigere Rotation
-          patternSwapChance = 0.08; // Häufigerer Pattern-Tausch
+          // CHARGE LVL2: Stärkere Vibrationen, stärkerer Glow (um 20% erhöht)
+          vibrationChance = 0.36 + (energy * 0.48); // Sichtbarer und stärker (erhöht von 0.3+0.4)
+          glitchChance = 0.18; // Häufiger (erhöht von 0.15)
+          colorChance = 0.3; // Häufiger (erhöht von 0.25)
+          rotationChance = 0.3; // Häufigere Rotation (erhöht von 0.25)
+          patternSwapChance = 0.096; // Häufigerer Pattern-Tausch (erhöht von 0.08)
           break;
           
         case 3:
-          // CHARGE LVL3: Von allem noch mehr
-          vibrationChance = 0.5 + (energy * 0.6); // Sehr stark
-          glitchChance = 0.3; // Sehr häufig
-          colorChance = 0.4; // Sehr häufig
-          rotationChance = 0.4; // Sehr häufige Rotation
-          patternSwapChance = 0.15; // Häufiger Pattern-Tausch
+          // CHARGE LVL3: Von allem noch mehr (um 20% erhöht)
+          vibrationChance = 0.6 + (energy * 0.72); // Sehr stark (erhöht von 0.5+0.6)
+          glitchChance = 0.36; // Sehr häufig (erhöht von 0.3)
+          colorChance = 0.48; // Sehr häufig (erhöht von 0.4)
+          rotationChance = 0.48; // Sehr häufige Rotation (erhöht von 0.4)
+          patternSwapChance = 0.18; // Häufiger Pattern-Tausch (erhöht von 0.15)
           break;
           
         default:
-          // Fallback für Level 0 oder undefined
-          vibrationChance = 0.05;
-          glitchChance = 0.02;
-          colorChance = 0.05;
-          rotationChance = 0.05;
-          patternSwapChance = 0.01;
+          // Fallback für Level 0 oder undefined (um 20% erhöht)
+          vibrationChance = 0.06;
+          glitchChance = 0.024;
+          colorChance = 0.06;
+          rotationChance = 0.06;
+          patternSwapChance = 0.012;
       }
       
       // Energie-Multiplikator für reaktive Intensität

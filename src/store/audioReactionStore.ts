@@ -77,11 +77,18 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     }
     lastEnergyUpdate = now;
     const currentState = get();
+    
+    // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt und Energy > 0
+    if (currentState.isMusicPlaying && energy > 0.02 && idleActive) {
+      get().stopIdle();
+    }
+    
     // Nur forceIdle-Updates blockieren, wenn Musik läuft
     if (opts.forceIdle && currentState.isMusicPlaying) {
       // Idle-Energy darf Musik-Energy nicht überschreiben
       return;
     }
+    
     set((state) => ({ 
       energy,
       isAudioActive: energy > 0.02 ? true : state.isAudioActive // Reduziert von 0.05 auf 0.02 für empfindlichere Reaktionen
@@ -90,12 +97,17 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   
   triggerBeat: () => {
     const currentState = get();
-    // OPTIMIERT: Setze isAudioActive nur wenn keine Idle-Animation läuft
+    // OPTIMIERT: Setze isAudioActive nur wenn keine Idle-Animation läuft oder Musik spielt
     set({ 
       beatDetected: true,
       lastBeatTime: Date.now(),
       isAudioActive: !idleActive || currentState.isMusicPlaying
     });
+    
+    // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
+    if (currentState.isMusicPlaying && idleActive) {
+      get().stopIdle();
+    }
   },
   
   resetBeat: () => set({ beatDetected: false }),
@@ -135,14 +147,14 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     const store = get();
     if (!store.idleEnabled) return;
     
-    // OPTIMIERT: Starte Idle NICHT wenn Musik spielt
+    // WICHTIG: Starte Idle NICHT wenn Musik spielt
     if (store.isMusicPlaying) {
       throttledLog("Cannot start idle animation while music is playing", true);
       return;
     }
     
-    // OPTIMIERT: Starte Idle NICHT wenn bereits Audio-Aktivität vorhanden ist
-    if (store.isAudioActive && store.energy > 0.05) {
+    // WICHTIG: Starte Idle NICHT wenn bereits Audio-Aktivität vorhanden ist
+    if (store.isAudioActive && store.energy > 0.02) {
       throttledLog("Cannot start idle animation while audio is active", true);
       return;
     }
@@ -167,6 +179,13 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     // OPTIMIERT: Einfache Schritt-für-Schritt Animation
     idleInterval = setInterval(() => {
       if (!idleActive) return;
+      
+      // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
+      const currentState = useAudioReactionStore.getState();
+      if (currentState.isMusicPlaying) {
+        get().stopIdle();
+        return;
+      }
       
       // Erhöhe den Schritt
       idleStep = (idleStep + 1) % IDLE_STEPS;
@@ -247,7 +266,7 @@ export function useIdleAnimation() {
       return () => clearTimeout(timer);
     }
     // OPTIMIERT: Stoppe Idle sofort wenn Musik spielt
-    else if (isMusicPlaying && idleActive) {
+    else if (isMusicPlaying) {
       const { stopIdle } = useAudioReactionStore.getState();
       stopIdle();
     }
