@@ -118,21 +118,21 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   //   performanceOptimizer.setCallbacks({
   //     onEmergencyMode: (enabled) => {
   //       if (enabled) {
-  //         console.log('🚨 Notfall-Modus aktiviert - Alle Effekte deaktiviert');
+  //         // console.log('🚨 Notfall-Modus aktiviert - Alle Effekte deaktiviert');
   //         setGlowIntensity(0);
   //         setColoredTiles([]);
   //         setUnicodeGlitches([]);
   //         // clearAllIntervals wird später definiert
   //       } else {
-  //         console.log('✅ Notfall-Modus deaktiviert - Effekte wieder aktiviert');
+  //         // console.log('✅ Notfall-Modus deaktiviert - Effekte wieder aktiviert');
   //       }
   //     },
   //     onEffectReduction: (level) => {
-  //       console.log(`🔧 Effekt-Reduktion Level ${level} aktiviert`);
+  //       // console.log(`🔧 Effekt-Reduktion Level ${level} aktiviert`);
   //       // Implementiere Effekt-Reduktion basierend auf Level
   //     },
   //     onUpdateThrottle: (level) => {
-  //       console.log(`🔧 Update-Throttling Level ${level} aktiviert`);
+  //       // console.log(`🔧 Update-Throttling Level ${level} aktiviert`);
   //       // Implementiere Update-Throttling basierend auf Level
   //     }
   //   });
@@ -148,6 +148,18 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const veinGenerationIntervalRef = useRef<number>(12000); // Erhöht von 8000ms auf 12000ms für bessere Performance
   const lastVeinLogTimeRef = useRef<number>(0);
   const idleStepRef = useRef<number>(0); // Für Idle-Animation Schritte
+
+  // OPTIMIERT: Log-Throttling für bessere Performance
+  const lastLogTimeRef = useRef<number>(0);
+  const logThrottleInterval = 1000; // 1 Sekunde zwischen Logs
+
+  const throttledLog = (message: string, force: boolean = false) => {
+    const now = Date.now();
+    if (force || now - lastLogTimeRef.current > logThrottleInterval) {
+      console.log(`[AsciiSword] ${message}`);
+      lastLogTimeRef.current = now;
+    }
+  };
 
   // Vein-Handling als Map
   const veinsMapRef = useRef(new Map<string, {vein: {x: number, y: number, color: string}, birth: number}>());
@@ -308,11 +320,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       if (changed) {
         setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
       }
-      // Debug-Log
+      // Debug-Log nur bei signifikanten Änderungen
       if (newVeins > 0) {
         const now = Date.now();
         if (now - lastVeinLogTimeRef.current > 10000) {
-          console.log(`[Veins] Aktiv: ${veinsMapRef.current.size}, Neu: ${newVeins}, Energie: ${energy}, Beat: ${beatDetected}`);
+          throttledLog(`Veins active: ${veinsMapRef.current.size}, new: ${newVeins}, energy: ${energy.toFixed(2)}`);
           lastVeinLogTimeRef.current = now;
         }
       }
@@ -491,7 +503,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
       setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-      console.log('[Pattern] Hintergrund-Pattern gewechselt');
+      throttledLog('Background pattern changed');
     }, 10000);
     return () => clearInterval(interval);
   }, [getBackgroundDimensions]);
@@ -538,8 +550,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     
     // Tile-Effekte - Nur bei sehr deutlichen Beats oder höherer Energy
     if ((beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || energy > 0.03) {
-      console.log(`[Tiles] Bedingung erfüllt: beatDetected=${beatDetected}, energy=${energy.toFixed(3)}, effectsTriggered=${effectsTriggered}`);
-      
       const tempIntensity = { ...colorEffectIntensity };
       for (const level in tempIntensity) {
         if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
@@ -549,7 +559,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       }
       
       const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity);
-      console.log(`[Tiles] Generiert: ${generatedTiles.length} Tiles`);
       
       setColoredTiles(generatedTiles);
       // performanceMonitor.trackEffect(); // Entfernt
@@ -562,15 +571,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const maxDuration = 3000; // Maximum 3000ms (3 Sekunden)
       const duration = maxDuration - (intensity * (maxDuration - minDuration));
       
-      console.log(`[Tiles] Dauer: ${duration}ms (Intensität: ${intensity.toFixed(3)})`);
-      
       const timeout = setTimeout(() => {
         setColoredTiles([]); // Nach Ablauf werden die Tiles entfernt
-        console.log(`[Tiles] Tiles entfernt nach ${duration}ms`);
       }, duration);
       cleanupTimeoutsRef.current.add(timeout);
     } else {
-      console.log(`[Tiles] Bedingung NICHT erfüllt: beatDetected=${beatDetected}, energy=${energy.toFixed(3)}, effectsTriggered=${effectsTriggered}`);
       setColoredTiles([]); // Wenn keine Bedingungen erfüllt, Tiles sofort entfernen
     }
     
@@ -652,7 +657,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // OPTIMIERT: Separater useEffect für Idle-Animation
   useEffect(() => {
-    if (isIdleActive()) {
+    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) {
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
@@ -676,7 +681,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
     }
-  }, [isIdleActive, beatDetected, getBackgroundDimensions]);
+  }, [beatDetected, getBackgroundDimensions]);
   
   // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
   useEffect(() => {
@@ -826,22 +831,273 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     }
   }, [beatDetected, energy, chargeLevel, edgePositions]);
   
+  // --- IDLE TILE COLOR CYCLE ---
+  useEffect(() => {
+    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) {
+      // Im Idle: Alle Animationen stoppen
+      setGlowIntensity(0);
+      setGlitchChars([]);
+      setUnicodeGlitches([]);
+      setEdgeEffects([]);
+      setBlurredChars([]);
+      setSkewedChars([]);
+      setFadedChars([]);
+      // Starte sanften Farbwechsel für Tiles
+      let colorIndex = 0;
+      setColoredTiles(swordPositions.map(pos => ({ ...pos, color: accentColors[colorIndex] })));
+      const interval = setInterval(() => {
+        colorIndex = (colorIndex + 1) % accentColors.length;
+        setColoredTiles(swordPositions.map(pos => ({ ...pos, color: accentColors[colorIndex] })));
+      }, 2000); // alle 7 Sekunden
+      return () => {
+        clearInterval(interval);
+        setColoredTiles([]);
+      };
+    } else {
+      // Wenn Idle verlassen wird, Tiles zurücksetzen (Musik übernimmt wieder)
+      setColoredTiles([]);
+    }
+  }, [swordPositions]);
+
+  // --- ALLE ANIMATIONEN NUR WENN NICHT IDLE ---
+  useEffect(() => {
+    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) return;
+    // OPTIMIERT: Dynamische Beat-Vein-Generierung für bessere Visualisierung
+    if (beatDetected || energy > 0.05) { // Empfindlicher: ab 0.05 Energy
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
+      
+      // OPTIMIERT: Verwende neue Beat-Vein-Funktion für bessere Performance
+      const currentTime = Date.now();
+      
+      // Generiere Beat-Veins basierend auf Energy und Beat
+      const beatVeins = generateBeatVeins(bgWidth, bgHeight, energy, beatDetected, viewportWidth, viewportHeight);
+      
+      // Ersetze alle bestehenden Veins mit den neuen Beat-Veins
+      veinsMapRef.current.clear();
+      beatVeins.forEach(vein => {
+        const key = `${vein.x}-${vein.y}`;
+        veinsMapRef.current.set(key, { vein, birth: currentTime });
+      });
+      
+      // Setze das State-Array für das Rendering
+      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+      
+      // OPTIMIERT: Kürzere Lebensdauer für Beat-Veins (3-8 Sekunden)
+      const veinLifetime = beatDetected ? 3000 : Math.max(3000, Math.min(8000, Math.floor(energy * 10000)));
+      
+      // Cleanup nach der Lebensdauer
+      const timeout = setTimeout(() => {
+        const now = Date.now();
+        let changed = false;
+        
+        Array.from(veinsMapRef.current.entries()).forEach(([key, value]) => {
+          if (now - value.birth > veinLifetime) {
+            veinsMapRef.current.delete(key);
+            changed = true;
+          }
+        });
+        
+        if (changed) {
+          setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+        }
+      }, veinLifetime);
+      
+      cleanupTimeoutsRef.current.add(timeout);
+    }
+    
+  }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions, isIdleActive]);
+  
+  // OPTIMIERT: Separater useEffect für Idle-Animation
+  useEffect(() => {
+    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) {
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
+      
+      // Erhöhe den Idle-Schritt bei jedem Beat
+      if (beatDetected) {
+        idleStepRef.current = (idleStepRef.current + 1) % 10; // 10 Schritte pro Loop
+      }
+      
+      // Generiere vordefinierte Vein-Sequenz für den aktuellen Schritt
+      const idleVeins = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
+      
+      // Ersetze alle bestehenden Veins mit der Idle-Sequenz
+      veinsMapRef.current.clear();
+      const currentTime = Date.now();
+      idleVeins.forEach(vein => {
+        const key = `${vein.x}-${vein.y}`;
+        veinsMapRef.current.set(key, { vein, birth: currentTime });
+      });
+      
+      // Setze das State-Array für das Rendering
+      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+    }
+  }, [isIdleActive, beatDetected, getBackgroundDimensions]);
+  
+  // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
+  useEffect(() => {
+    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) return;
+    if ((energy > 0.05 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) { // Noch empfindlicher: ab 0.05
+      const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
+      
+      const newStability = energy > 0.8 // Erhöht von 0.7 auf 0.8 für längere Stabilität
+        ? Math.max(800, Math.floor(1500 - (energy * 300))) // Erhöht von 500/1200 auf 800/1500
+        : Math.floor(2000 + Math.random() * 2500); // Erhöht von 1500+2000 auf 2000+2500
+      
+      setBaseColor(swordColor);
+      setBgColor(newBgColor);
+      setLastColorChangeTime(Date.now());
+      setColorStability(newStability);
+      
+      // performanceMonitor.trackColorChange(); // Entfernt
+    }
+  }, [beatDetected, energy, lastColorChangeTime, colorStability]);
+  
+  // OPTIMIERT: Verbesserte Audio-reaktive Edge-Effekte basierend auf Charge-Level
+  useEffect(() => {
+    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) return;
+    if (beatDetected || energy > 0.03) { // Noch empfindlicher: ab 0.03
+      if (edgePositions.length === 0) return;
+      
+      const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}, rotation?: number}> = [];
+      
+      // CHARGE-LEVEL BASIERTE EFFEKTE
+      let vibrationChance, glitchChance, colorChance, rotationChance, patternSwapChance;
+      
+      switch (chargeLevel) {
+        case 1:
+          // CHARGE LVL1: Dünne Außenlinien, minimal vibrieren, selten Pattern-Tausch
+          vibrationChance = 0.1 + (energy * 0.2); // Minimal, reaktiv auf Musik-Intensität
+          glitchChance = 0.05; // Sehr selten
+          colorChance = 0.08; // Selten
+          rotationChance = 0.15; // Dünne Linien können sich drehen
+          patternSwapChance = 0.02; // Sehr selten mit Hintergrund-Pattern tauschen
+          break;
+          
+        case 2:
+          // CHARGE LVL2: Stärkere Vibrationen, stärkerer Glow
+          vibrationChance = 0.3 + (energy * 0.4); // Sichtbarer und stärker
+          glitchChance = 0.15; // Häufiger
+          colorChance = 0.25; // Häufiger
+          rotationChance = 0.25; // Häufigere Rotation
+          patternSwapChance = 0.08; // Häufigerer Pattern-Tausch
+          break;
+          
+        case 3:
+          // CHARGE LVL3: Von allem noch mehr
+          vibrationChance = 0.5 + (energy * 0.6); // Sehr stark
+          glitchChance = 0.3; // Sehr häufig
+          colorChance = 0.4; // Sehr häufig
+          rotationChance = 0.4; // Sehr häufige Rotation
+          patternSwapChance = 0.15; // Häufiger Pattern-Tausch
+          break;
+          
+        default:
+          // Fallback für Level 0 oder undefined
+          vibrationChance = 0.05;
+          glitchChance = 0.02;
+          colorChance = 0.05;
+          rotationChance = 0.05;
+          patternSwapChance = 0.01;
+      }
+      
+      // Energie-Multiplikator für reaktive Intensität
+      const energyMultiplier = 1 + (energy * 1.5);
+      
+      // Effektive Chancen mit Energie-Multiplikator
+      const effectiveVibrationChance = Math.min(0.8, vibrationChance * energyMultiplier);
+      const effectiveGlitchChance = Math.min(0.7, glitchChance * energyMultiplier);
+      const effectiveColorChance = Math.min(0.7, colorChance * energyMultiplier);
+      const effectiveRotationChance = Math.min(0.6, rotationChance * energyMultiplier);
+      const effectivePatternSwapChance = Math.min(0.3, patternSwapChance * energyMultiplier);
+      
+      edgePositions.forEach(pos => {
+        // VIBRATION (reaktiv auf Musik-Intensität)
+        if (Math.random() < effectiveVibrationChance) {
+          const intensity = energy * (chargeLevel * 0.5 + 0.5); // Stärkere Vibration bei höherem Level
+          const offsetX = (Math.random() - 0.5) * intensity * 2;
+          const offsetY = (Math.random() - 0.5) * intensity * 2;
+          
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            offset: { x: offsetX, y: offsetY }
+          });
+        }
+        
+        // ROTATION (dünne Linien drehen sich)
+        if (Math.random() < effectiveRotationChance) {
+          const rotationAngle = (Math.random() - 0.5) * 30; // ±15 Grad Rotation
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            rotation: rotationAngle
+          });
+        }
+        
+        // GLITCH-ZEICHEN
+        if (Math.random() < effectiveGlitchChance) {
+          const glitchCharSet = Math.floor(Math.random() * edgeGlitchChars[chargeLevel as keyof typeof edgeGlitchChars]?.length || edgeGlitchChars[1].length);
+          const glitchChar = edgeGlitchChars[chargeLevel as keyof typeof edgeGlitchChars]?.[glitchCharSet] || edgeGlitchChars[1][glitchCharSet];
+          
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            char: glitchChar
+          });
+        }
+        
+        // FARB-EFFEKTE
+        if (Math.random() < effectiveColorChance) {
+          const colorIndex = Math.floor(Math.random() * accentColors.length);
+          const edgeColor = accentColors[colorIndex];
+          
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            color: edgeColor
+          });
+        }
+        
+        // PATTERN-SWAP (mit Hintergrund-Elementen tauschen)
+        if (Math.random() < effectivePatternSwapChance) {
+          // Wähle ein zufälliges Hintergrund-Zeichen
+          const backgroundChars = ['░', '▒', '▓', '█', '▄', '▀', '▌', '▐'];
+          const randomBgChar = backgroundChars[Math.floor(Math.random() * backgroundChars.length)];
+          
+          newEdgeEffects.push({
+            x: pos.x,
+            y: pos.y,
+            char: randomBgChar
+          });
+        }
+      });
+      
+      setEdgeEffects(newEdgeEffects);
+      
+      // Cleanup für Edge-Effekte - Längere Dauer für sanftere Übergänge
+      const duration = beatDetected ? 250 : Math.max(200, Math.min(300, Math.floor(energy * 150)));
+      const timeout = setTimeout(() => {
+        setEdgeEffects([]);
+      }, duration);
+      cleanupTimeoutsRef.current.add(timeout);
+    }
+  }, [beatDetected, energy, chargeLevel, edgePositions]);
+  
   // OPTIMIERT: Memoisierte Berechnungen für Rendering
   const shadowSize = useMemo(() => Math.floor(glowIntensity * 20), [glowIntensity]);
   const textShadow = useMemo(() => `0 0 ${shadowSize + (glitchLevel * 2)}px ${baseColor}`, [shadowSize, glitchLevel, baseColor]);
   const backgroundColor = useMemo(() => getDarkerColor(bgColor), [bgColor]);
   const lighterBgColor = useMemo(() => getLighterColor(bgColor), [bgColor]);
 
-  // Entferne Beat-Detector-States, -UI und -useEffects
-  // Entferne performanceMonitor und getPerformanceMonitor
-  // Entferne alle Importe, die nur für Beat-Detector oder Performance Monitor benötigt wurden
-
   return (
     <div 
       className="relative flex items-center justify-center w-full h-full overflow-hidden"
       style={{ 
         backgroundColor,
-        transition: 'background-color 0.03s ease',
         position: 'absolute',
         top: 0,
         left: 0,
@@ -928,7 +1184,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           textAlign: 'center',
           width: '100%',
           lineHeight: '1.2',
-          transition: 'color 0.05s ease'
+          transition: (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) ? 'color 2s linear' : undefined
         }}
       >
         {centeredSwordLines.map((line, y) => (
@@ -985,7 +1241,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               return (
                 <span 
                   key={`sword-${x}-${y}`}
-                  style={style}
+                  style={{ ...style, transition: (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) ? 'color 2s linear' : undefined }}
                 >
                   {displayChar}
                 </span>
