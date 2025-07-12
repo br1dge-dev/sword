@@ -9,6 +9,7 @@
 import { useEffect } from 'react';
 import { Inter, Press_Start_2P } from 'next/font/google';
 import { useAudioReactionStore, useIdleAnimation } from '@/store/audioReactionStore';
+import { AudioProvider } from '@/lib/audio/AudioProvider';
 import '../styles/globals.css';
 
 // Initialize the Inter font with Latin subset
@@ -54,7 +55,9 @@ export default function RootLayout({
         backgroundImage: 'radial-gradient(circle at 50% 50%, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%)',
       }}>
         <div className="crt-effect crt-curve-strong vignette min-h-screen overflow-hidden">
-          {children}
+          <AudioProvider>
+            {children}
+          </AudioProvider>
         </div>
       </body>
     </html>

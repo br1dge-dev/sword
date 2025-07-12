@@ -1,3 +1,12 @@
+/**
+ * VERALTET: Diese Datei wird durch den AudioProvider ersetzt.
+ * 
+ * useAudioAnalyzer - Hook für Audio-Analyse
+ * 
+ * Dieser Hook wird aus Kompatibilitätsgründen beibehalten, sollte aber nicht mehr verwendet werden.
+ * Bitte verwende stattdessen den AudioProvider aus src/lib/audio/AudioProvider.tsx.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import { AudioAnalyzer, AudioAnalyzerOptions, BeatDetectionResult } from '../lib/audio/audioAnalyzer';
 import { useAudioReactionStore } from '@/store/audioReactionStore';
@@ -22,22 +31,8 @@ interface UseAudioAnalyzerReturn {
   error: Error | null;
 }
 
-// Globaler Analyzer für die gesamte Anwendung
-export let globalAnalyzer: AudioAnalyzer | null = null;
-
 // Flag, um zu verfolgen, ob eine Initialisierung im Gange ist
 let isGlobalInitializing = false;
-
-// ENTFERNT: Logging-Variablen (lastLogTimeRef, logThrottleInterval)
-
-// DEAKTIVIERT: Logging-Funktion
-// const throttledLog = (message: string, force: boolean = false) => {
-//   const now = Date.now();
-//   if (force || now - lastLogTimeRef.current > logThrottleInterval) {
-//     console.log(`[useAudioAnalyzer] ${message}`);
-//     lastLogTimeRef.current = now;
-//   }
-// };
 
 export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAnalyzerReturn {
   const analyzerRef = useRef<AudioAnalyzer | null>(null);
@@ -82,56 +77,44 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       ...options
     };
     
-    // Prüfen, ob bereits ein globaler Analyzer existiert
-    if (!globalAnalyzer) {
-      // Immer einen neuen Analyzer erstellen
-      const analyzerOptions: AudioAnalyzerOptions = {
-        onBeat: (time) => {
-          setBeatDetected(true);
-          triggerBeat(); // Aktualisiere den globalen Store
-          
-          // Audio als aktiv markieren
+    // Immer einen neuen Analyzer erstellen
+    const analyzerOptions: AudioAnalyzerOptions = {
+      onBeat: (time) => {
+        setBeatDetected(true);
+        triggerBeat(); // Aktualisiere den globalen Store
+        
+        // Audio als aktiv markieren
+        setAudioActive(true);
+      },
+      onEnergy: (e) => {
+        setEnergy(e);
+        updateEnergy(e); // Aktualisiere den globalen Store
+        
+        // NEU: Empfindlichere Audio-Aktivierung
+        if (e > 0.015) { // Reduziert von 0.03 für empfindlichere Reaktion
           setAudioActive(true);
-        },
-        onEnergy: (e) => {
-          setEnergy(e);
-          updateEnergy(e); // Aktualisiere den globalen Store
+        }
+        
+        // NEU: Verbesserte Beat-Erkennung mit niedrigeren Schwellenwerten
+        if (e > (analyzerOptions.energyThreshold || 0.02)) { // Reduziert von 0.05 für empfindlichere Reaktion
+          const now = Date.now();
+          const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
           
-          // NEU: Empfindlichere Audio-Aktivierung
-          if (e > 0.015) { // Reduziert von 0.03 für empfindlichere Reaktion
-            setAudioActive(true);
+          // Mindestens 80ms zwischen Beats (reduziert von 100ms für schnellere Beats)
+          if (timeSinceLastBeat > 80) {
+            setBeatDetected(true);
+            triggerBeat();
           }
-          
-          // NEU: Verbesserte Beat-Erkennung mit niedrigeren Schwellenwerten
-          if (e > (analyzerOptions.energyThreshold || 0.02)) { // Reduziert von 0.05 für empfindlichere Reaktion
-            const now = Date.now();
-            const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
-            
-            // Mindestens 80ms zwischen Beats (reduziert von 100ms für schnellere Beats)
-            if (timeSinceLastBeat > 80) {
-              setBeatDetected(true);
-              triggerBeat();
-            }
-          }
-        },
-        ...defaultOptions
-      };
-      
-      const newAnalyzer = new AudioAnalyzer(analyzerOptions);
-      analyzerRef.current = newAnalyzer;
-      globalAnalyzer = newAnalyzer; // Aktualisiere den globalen Analyzer
-      // throttledLog('Created new audio analyzer', true);
-    } else {
-      // Verwende den existierenden globalen Analyzer
-      analyzerRef.current = globalAnalyzer;
-    }
+        }
+      },
+      ...defaultOptions
+    };
+    
+    const newAnalyzer = new AudioAnalyzer(analyzerOptions);
+    analyzerRef.current = newAnalyzer;
     
     return () => {
-      // Wir räumen den Analyzer nur auf, wenn die Komponente unmounted wird und es keine anderen Nutzer gibt
-      if (analyzerRef.current === globalAnalyzer) {
-        // Hier könnten wir prüfen, ob andere Komponenten den Analyzer noch verwenden
-        // Für jetzt lassen wir den globalen Analyzer bestehen
-      } else if (analyzerRef.current) {
+      if (analyzerRef.current) {
         analyzerRef.current.dispose();
         analyzerRef.current = null;
       }
@@ -157,7 +140,6 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       try {
         await analyzerRef.current.initialize(audioElement);
         setIsInitialized(true);
-        // throttledLog('Audio analyzer initialized successfully', true);
         
         // Audio als aktiv markieren
         setAudioActive(true);
@@ -168,11 +150,9 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
         
         if (options?.autoDetectBeat) {
           try {
-            const result = await guessBeat();
-            // throttledLog('Auto beat detection completed', true);
+            await guessBeat();
           } catch (err) {
-            // DEAKTIVIERT: Logging
-            // console.error('Auto beat detection failed:', err);
+            // Fehler ignorieren
           }
         }
       } finally {
@@ -182,16 +162,12 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
       setError(error);
-      // DEAKTIVIERT: Logging
-      // console.error('Failed to initialize audio analyzer:', error);
       throw error;
     }
   };
   
   const start = () => {
     if (!analyzerRef.current) {
-      // DEAKTIVIERT: Logging
-      // console.warn('Cannot start: analyzer not initialized');
       return;
     }
     
@@ -201,7 +177,6 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     
     analyzerRef.current.start();
     setIsAnalyzing(true);
-    // throttledLog('Audio analysis started', true);
     
     // Audio als aktiv markieren, wenn Analyse startet
     setAudioActive(true);
@@ -214,7 +189,6 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     
     analyzerRef.current.stop();
     setIsAnalyzing(false);
-    // throttledLog('Audio analysis stopped', true);
   };
   
   const detectTempo = async (): Promise<number> => {
@@ -225,13 +199,10 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       
       const detectedTempo = await analyzerRef.current.detectTempo();
       setTempo(detectedTempo);
-      // throttledLog(`Detected tempo: ${detectedTempo} BPM`, true);
       return detectedTempo;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
       setError(error);
-      // DEAKTIVIERT: Logging
-      // console.error('Tempo detection failed:', error);
       throw error;
     }
   };
@@ -244,13 +215,10 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       
       const result = await analyzerRef.current.guessBeat();
       setBeatInfo(result);
-      // throttledLog(`Guessed beat: ${result.bpm} BPM`, true);
       return result;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
       setError(error);
-      // DEAKTIVIERT: Logging
-      // console.error('Beat guessing failed:', error);
       throw error;
     }
   };

@@ -500,6 +500,16 @@ export class AudioAnalyzer {
     // this.throttledLog(`Track analysis complete - Threshold: ${this.adaptiveThreshold.toFixed(4)}, Sensitivity: ${this.adaptiveSensitivity.toFixed(2)}, AvgEnergy: ${avgEnergy.toFixed(4)}, PeakEnergy: ${peakEnergy.toFixed(4)}`, true);
   }
 
+  // Gibt den AudioContext zurück
+  public getAudioContext(): AudioContext | null {
+    return this.audioContext;
+  }
+  
+  // Gibt die Zeit des letzten erkannten Beats zurück
+  public getLastBeatTime(): number {
+    return this.lastBeatTime;
+  }
+
   public resetTrackAnalysis(): void {
     this.trackAnalysisComplete = false;
     this.trackAnalysisStartTime = 0;
@@ -591,13 +601,5 @@ export class AudioAnalyzer {
 
   public getAnalyzingState(): boolean {
     return this.isAnalyzing;
-  }
-
-  public getAudioContext(): AudioContext | null {
-    return this.audioContext;
-  }
-
-  public getLastBeatTime(): number {
-    return this.lastBeatTime;
   }
 } 

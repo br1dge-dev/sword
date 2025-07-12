@@ -6,7 +6,7 @@
  */
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAudioReactionStore } from '@/store/audioReactionStore';
 import AsciiSword from '@/components/ascii/AsciiSword';
 import AudioControlPanel from '@/components/ui/AudioControlPanel';
@@ -18,82 +18,57 @@ export default function HomePage() {
   const baseSwordLevel = 1;
   
   const [isClient, setIsClient] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const { energy, beatDetected, setMusicPlaying } = useAudioReactionStore();
+  const { energy, beatDetected } = useAudioReactionStore();
   
   // Client-Side Rendering aktivieren
   useEffect(() => {
     setIsClient(true);
-    
-    // Prüfe, ob es ein mobiles Gerät ist
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 640);
-    };
-    
-    // Initial check
-    checkMobile();
-    
-    // Event-Listener für Resize
-    window.addEventListener('resize', checkMobile);
-    
-    // Musik als nicht spielend markieren, damit Idle aktiviert wird
-    setMusicPlaying(false);
-    
-    return () => {
-      window.removeEventListener('resize', checkMobile);
-    };
-  }, [setMusicPlaying]);
+  }, []);
   
-  // Handle beat detection
+  // Mobile-Erkennung
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  
+  // Beat-Handler für Komponenten
   const handleBeat = () => {
-    // Aktualisiere den Audio-Reaction-Store direkt
-    const { triggerBeat } = useAudioReactionStore.getState();
-    triggerBeat();
+    // Beat-Reaktionen können hier implementiert werden
   };
   
-  // Handle energy changes
+  // Energy-Handler für Komponenten
   const handleEnergyChange = (energy: number) => {
-    // Aktualisiere den Audio-Reaction-Store direkt
-    const { updateEnergy, setAudioActive } = useAudioReactionStore.getState();
-    updateEnergy(energy);
-    setAudioActive(true);
+    // Energy-Reaktionen können hier implementiert werden
   };
-
+  
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
-      <div className="relative w-full h-screen flex flex-col items-center justify-center overflow-hidden">
-        {/* Hauptbereich mit dem ASCII-Schwert */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <AsciiSword 
-            level={baseSwordLevel} 
-            directEnergy={energy} 
-            directBeat={beatDetected} 
-          />
-        </div>
-        
-        {/* Gemeinsamer Audio-Player (immer aktiv, aber nur auf Desktop sichtbar) */}
-        <div className={`absolute top-1/2 left-[75vw] transform -translate-x-1/2 -translate-y-1/2 z-10 ${isMobile ? 'hidden' : 'flex'}`}>
-          <AudioControlPanel 
-            onBeat={handleBeat} 
-            onEnergyChange={handleEnergyChange} 
-            alwaysActive={true}
-          />
-        </div>
-        
-        {/* SideButtons auf der linken Seite */}
-        <div className="hidden sm:flex absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10">
-          <SideButtons />
-        </div>
-        
-        {/* Mobile Steuerelemente */}
-        <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20">
-          <MobileControlsOverlay
-            onBeat={handleBeat}
-            onEnergyChange={handleEnergyChange}
-          />
-        </div>
-        
-      </div>
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 relative">
+      {isClient && (
+        <>
+          {/* Hauptinhalt */}
+          <div className="flex-1 flex flex-col items-center justify-center w-full">
+            <AsciiSword level={baseSwordLevel} />
+          </div>
+          
+          {/* Desktop-Steuerelemente */}
+          <div className="hidden md:block fixed bottom-8 right-8">
+            <AudioControlPanel 
+              onBeat={handleBeat}
+              onEnergyChange={handleEnergyChange}
+            />
+          </div>
+          
+          {/* Seitliche Buttons (nur Desktop) */}
+          <div className="hidden md:block fixed top-1/2 right-8 transform -translate-y-1/2">
+            <SideButtons />
+          </div>
+          
+          {/* Mobile-Steuerelemente */}
+          <div className="md:hidden">
+            <MobileControlsOverlay 
+              onBeat={handleBeat}
+              onEnergyChange={handleEnergyChange}
+            />
+          </div>
+        </>
+      )}
     </main>
   );
 } 
