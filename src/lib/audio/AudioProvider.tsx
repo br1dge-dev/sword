@@ -253,6 +253,24 @@ export function AudioProvider({ children }: AudioProviderProps) {
     }
     
     throttledLog('Starting audio analysis', true);
+    
+    // Stelle sicher, dass der AudioContext aktiv ist
+    if (analyzerRef.current.getAudioContext) {
+      const audioContext = analyzerRef.current.getAudioContext();
+      if (audioContext && audioContext.state === 'suspended') {
+        throttledLog('AudioContext is suspended, resuming before starting analysis', true);
+        audioContext.resume().then(() => {
+          throttledLog('AudioContext resumed, now starting analysis', true);
+          analyzerRef.current?.start();
+          setIsAnalyzing(true);
+          setAudioActive(true);
+        }).catch(err => {
+          throttledLog(`Failed to resume AudioContext: ${err}`, true);
+        });
+        return;
+      }
+    }
+    
     analyzerRef.current.start();
     setIsAnalyzing(true);
     setAudioActive(true);
@@ -292,14 +310,24 @@ export function AudioProvider({ children }: AudioProviderProps) {
       } else {
         throttledLog('Starting playback', true);
         try {
+          // Initialisiere den Analyzer, falls noch nicht geschehen
+          if (!isInitialized) {
+            throttledLog('Analyzer not initialized, initializing before play', true);
+            await initialize();
+            // Kurze Pause, um sicherzustellen, dass die Initialisierung abgeschlossen ist
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          
           await audioRef.current.play();
           setIsPlaying(true);
           
-          if (isInitialized && !isAnalyzing) {
-            start();
-          } else if (!isInitialized) {
-            await initialize();
-          }
+          // Verzögerung vor dem Start der Analyse
+          setTimeout(() => {
+            if (isInitialized && !isAnalyzing) {
+              throttledLog('Starting analysis after play', true);
+              start();
+            }
+          }, 300);
           
           setMusicPlaying(true);
         } catch (err) {

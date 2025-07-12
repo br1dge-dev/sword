@@ -94,17 +94,36 @@ export class AudioAnalyzer {
           }
         } else {
           this.log('Creating new AudioContext', true);
-          // Immer einen neuen AudioContext erstellen, um Probleme mit der Wiederverwendung zu vermeiden
-          this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-          
-          // Speichere die Referenz
-          connectedAudioElements.set(audioElement, this.audioContext);
-          
-          // Create audio source from audio element
-          this.audioSource = this.audioContext.createMediaElementSource(audioElement);
-          
-          // Setup analyzer nodes
-          this.setupAnalyzerNodes();
+          // Erstelle einen neuen AudioContext
+          try {
+            this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            
+            // Speichere die Referenz
+            connectedAudioElements.set(audioElement, this.audioContext);
+            
+            // Erstelle Audio-Source
+            this.audioSource = this.audioContext.createMediaElementSource(audioElement);
+            
+            // Setup analyzer nodes
+            this.setupAnalyzerNodes();
+            
+            this.log('New AudioContext and nodes created successfully', true);
+          } catch (err) {
+            this.log(`Error creating AudioContext: ${err}`, true);
+            throw err;
+          }
+        }
+        
+        // Stelle sicher, dass der AudioContext aktiv ist
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+          this.log('AudioContext is suspended, attempting to resume', true);
+          try {
+            await this.audioContext.resume();
+            this.log('AudioContext resumed successfully', true);
+          } catch (err) {
+            this.log(`Warning: Failed to resume AudioContext: ${err}`, true);
+            // Wir werfen keinen Fehler, da wir später erneut versuchen können
+          }
         }
         
         // Initialize frequency data array
@@ -115,6 +134,7 @@ export class AudioAnalyzer {
           this.log('Warning: Analyzer not available after setup', true);
         }
         
+        this.log('Audio analyzer initialization complete', true);
         resolve();
       } catch (error) {
         this.log(`Initialization failed: ${error}`, true);
@@ -148,16 +168,23 @@ export class AudioAnalyzer {
       
       // Connect nodes
       if (this.audioSource) {
+        // Verbindung: audioSource -> gainNode -> analyser -> destination
         this.audioSource.connect(this.gainNode);
         this.gainNode.connect(this.analyser);
         this.analyser.connect(this.audioContext.destination);
         this.log('Audio nodes connected successfully', true);
       } else {
         this.log('Cannot connect nodes: audioSource is null', true);
+        throw new Error('AudioSource is null, cannot setup analyzer nodes');
       }
+      
+      // Initialisiere Frequenzdaten
+      this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
+      
     } catch (error) {
       this.log(`Error setting up analyzer nodes: ${error}`, true);
       console.error('Error setting up analyzer nodes:', error);
+      throw error;
     }
   }
 
@@ -167,9 +194,36 @@ export class AudioAnalyzer {
       return;
     }
     
-    if (!this.audioContext || !this.analyser || !this.frequencyData) {
+    if (!this.audioContext || !this.analyser) {
       this.log('Cannot start: analyzer not fully initialized', true);
       return;
+    }
+    
+    // Stelle sicher, dass der AudioContext aktiv ist
+    if (this.audioContext.state === 'suspended') {
+      this.log('AudioContext is suspended, attempting to resume', true);
+      this.audioContext.resume().then(() => {
+        this.log('AudioContext resumed, now starting analysis', true);
+        this.startAnalysis();
+      }).catch(err => {
+        this.log(`Failed to resume AudioContext: ${err}`, true);
+      });
+      return;
+    }
+    
+    this.startAnalysis();
+  }
+  
+  private startAnalysis(): void {
+    if (!this.analyser || !this.audioContext) {
+      this.log('Cannot start analysis: analyzer or context not available', true);
+      return;
+    }
+    
+    // Stelle sicher, dass wir Frequenzdaten haben
+    if (!this.frequencyData) {
+      this.log('Initializing frequency data', true);
+      this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
     }
     
     this.log('Starting audio analysis', true);
