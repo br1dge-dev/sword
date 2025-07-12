@@ -8,11 +8,14 @@
  */
 import { AsciiSwordProps } from './sword-modules/types/swordTypes';
 import AsciiSwordModular from './sword-modules/AsciiSwordModular';
+import { useAudioReactionStore } from '@/store/audioReactionStore';
 
-export default function AsciiSword({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
+export default function AsciiSword({ level = 1 }: Omit<AsciiSwordProps, 'directEnergy' | 'directBeat'>) {
+  const { energy, beatDetected } = useAudioReactionStore();
+  
   return <AsciiSwordModular 
     level={level} 
-    directEnergy={directEnergy} 
-    directBeat={directBeat}
+    directEnergy={energy} 
+    directBeat={beatDetected}
   />;
 } 

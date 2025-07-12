@@ -58,29 +58,23 @@ export class AudioAnalyzer {
     if (options) {
       this.options = { ...this.options, ...options };
     }
-    
-    // DEAKTIVIERT: Logging
-    // console.log('AudioAnalyzer initialized');
+    this.log('AudioAnalyzer instance created', true);
   }
 
-  // DEAKTIVIERT: Logging-Methode
-  // private throttledLog(message: string, force: boolean = false): void {
-  //   const now = Date.now();
-  //   if (force || now - this.lastLogTime > this.logThrottleInterval) {
-  //     console.log(`[AudioAnalyzer] ${message}`);
-  //     this.lastLogTime = now;
-  //   }
-  // }
+  private log(message: string, force: boolean = false): void {
+    const now = Date.now();
+    if (force || now - this.lastLogTime > this.logThrottleInterval) {
+      console.log(`[AudioAnalyzer] ${message}`);
+      this.lastLogTime = now;
+    }
+  }
 
   public async initialize(audioElement: HTMLAudioElement): Promise<void> {
-    // Wenn bereits eine Initialisierung läuft, gib diese zurück
-    if (this.initializationPromise) {
-      return this.initializationPromise;
-    }
+    this.log(`Initializing with audio element: ${audioElement ? 'available' : 'null'}`, true);
     
-    // Prüfe, ob das Audio-Element bereits initialisiert wurde
-    if (this.audioElement === audioElement && this.audioContext) {
-      return Promise.resolve();
+    if (this.initializationPromise) {
+      this.log('Initialization already in progress, returning existing promise', true);
+      return this.initializationPromise;
     }
     
     this.initializationPromise = new Promise<void>(async (resolve, reject) => {
@@ -91,6 +85,7 @@ export class AudioAnalyzer {
         
         // Prüfe, ob bereits ein AudioContext für dieses Element existiert
         if (connectedAudioElements.has(audioElement)) {
+          this.log('Using existing AudioContext for this element', true);
           this.audioContext = connectedAudioElements.get(audioElement)!;
           
           // Prüfe, ob wir einen neuen Analyzer erstellen müssen
@@ -98,6 +93,7 @@ export class AudioAnalyzer {
             this.setupAnalyzerNodes();
           }
         } else {
+          this.log('Creating new AudioContext', true);
           // Immer einen neuen AudioContext erstellen, um Probleme mit der Wiederverwendung zu vermeiden
           this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
           
@@ -114,14 +110,15 @@ export class AudioAnalyzer {
         // Initialize frequency data array
         if (this.analyser) {
           this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
+          this.log('Frequency data initialized', true);
+        } else {
+          this.log('Warning: Analyzer not available after setup', true);
         }
         
-        // DEAKTIVIERT: Logging
-        // this.throttledLog('Audio analyzer setup complete', true);
         resolve();
       } catch (error) {
-        // DEAKTIVIERT: Logging
-        // console.error('Failed to initialize audio analyzer:', error);
+        this.log(`Initialization failed: ${error}`, true);
+        console.error('Failed to initialize audio analyzer:', error);
         reject(error);
       } finally {
         this.initializationPromise = null;
@@ -132,69 +129,52 @@ export class AudioAnalyzer {
   }
 
   private setupAnalyzerNodes(): void {
-    if (!this.audioContext || !this.audioSource) {
-      // DEAKTIVIERT: Logging
-      // console.error('Cannot setup analyzer nodes: audioContext or audioSource is null');
+    if (!this.audioContext) {
+      this.log('Cannot setup analyzer nodes: audioContext is null', true);
       return;
     }
     
     try {
+      this.log('Setting up analyzer nodes', true);
+      
       // Create analyzer node
       this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 1024;
-      this.analyser.smoothingTimeConstant = 0.8;
+      this.analyser.fftSize = 2048;
+      this.analyser.smoothingTimeConstant = 0.85;
       
       // Create gain node
       this.gainNode = this.audioContext.createGain();
+      this.gainNode.gain.value = 1.0;
       
       // Connect nodes
-      this.audioSource.connect(this.analyser);
-      this.analyser.connect(this.gainNode);
-      this.gainNode.connect(this.audioContext.destination);
+      if (this.audioSource) {
+        this.audioSource.connect(this.gainNode);
+        this.gainNode.connect(this.analyser);
+        this.analyser.connect(this.audioContext.destination);
+        this.log('Audio nodes connected successfully', true);
+      } else {
+        this.log('Cannot connect nodes: audioSource is null', true);
+      }
     } catch (error) {
-      // DEAKTIVIERT: Logging
-      // console.error('Error setting up analyzer nodes:', error);
-      throw error;
+      this.log(`Error setting up analyzer nodes: ${error}`, true);
+      console.error('Error setting up analyzer nodes:', error);
     }
   }
 
   public start(): void {
-    if (!this.audioContext || !this.analyser) {
-      // DEAKTIVIERT: Logging
-      // console.warn('Cannot start analysis: analyzer not initialized');
-      return;
-    }
-    
-    // Wenn die Analyse bereits läuft, nicht erneut starten
     if (this.isAnalyzing) {
+      this.log('Already analyzing, ignoring start request', false);
       return;
     }
-
-    this.isAnalyzing = true;
-    this.noDataCount = 0;
-    // DEAKTIVIERT: Logging
-    // this.throttledLog('Audio analysis started', true);
     
-    // Resume audio context if it's suspended
-    if (this.audioContext.state === 'suspended') {
-      // Versuche den AudioContext zu starten
-      this.audioContext.resume().then(() => {
-        this.lastAnalyzeTime = performance.now();
-        this.analyze();
-      }).catch(err => {
-        // DEAKTIVIERT: Logging
-        // console.error('Failed to resume AudioContext:', err);
-        this.isAnalyzing = false;
-        
-        // Zeige einen Hinweis, dass eine Benutzerinteraktion erforderlich ist
-        // DEAKTIVIERT: Logging
-        // console.warn('The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio');
-      });
-    } else {
-      // AudioContext ist bereits aktiv
-      this.lastAnalyzeTime = performance.now();
-      this.analyze();
+    if (!this.audioContext || !this.analyser || !this.frequencyData) {
+      this.log('Cannot start: analyzer not fully initialized', true);
+      return;
     }
+    
+    this.log('Starting audio analysis', true);
+    this.isAnalyzing = true;
+    this.analyzeAudio();
   }
 
   public stop(): void {
@@ -202,15 +182,13 @@ export class AudioAnalyzer {
       return;
     }
     
+    this.log('Stopping audio analysis', true);
     this.isAnalyzing = false;
     
-    if (this.animationFrameId) {
+    if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
-    
-    // DEAKTIVIERT: Logging
-    // this.throttledLog('Audio analysis stopped', true);
   }
 
   public setVolume(volume: number): void {
@@ -227,117 +205,103 @@ export class AudioAnalyzer {
     this.options.energyThreshold = Math.max(0.01, Math.min(1.0, threshold));
   }
 
-  private analyze(): void {
+  private analyzeAudio(): void {
     if (!this.isAnalyzing || !this.analyser || !this.frequencyData) {
       return;
     }
-
-    const now = performance.now();
     
-    // OPTIMIERT: Niedrige Latenz für visuellen Impact, aber mit optimierten Schwellenwerten
-    if (now - this.lastAnalyzeTime < 50) { // 50ms = 20fps (zurück von 200ms für bessere Reaktivität)
-      this.animationFrameId = requestAnimationFrame(() => this.analyze());
-      return;
-    }
-
-    try {
-      // Hole Frequenzdaten
+    const now = Date.now();
+    const timeSinceLastAnalyze = now - this.lastAnalyzeTime;
+    
+    // Nur analysieren, wenn genug Zeit vergangen ist
+    if (timeSinceLastAnalyze >= (this.options.analyzeInterval || 50)) {
+      this.lastAnalyzeTime = now;
+      
+      // Get frequency data
       this.analyser.getByteFrequencyData(this.frequencyData);
       
-      // NEU: Verbesserte Energie-Berechnung mit Frequenzgewichtung
+      // Calculate energy (normalized sum of frequency values)
       let sum = 0;
       let count = 0;
       
-      // NEU: Frequenzgewichtung für bessere Beat-Erkennung
-      const bassWeight = 2.0; // Bass stärker gewichten
-      const midWeight = 1.5;  // Mitten mittel gewichten
-      const highWeight = 0.8; // Höhen weniger gewichten
-      
-      // Bass-Bereich (0-20% der Frequenzen)
-      const bassEnd = Math.floor(this.frequencyData.length * 0.2);
-      for (let i = 0; i < bassEnd; i++) {
-        sum += this.frequencyData[i] * bassWeight;
-        count += bassWeight;
-      }
-      
-      // Mid-Bereich (20-60% der Frequenzen)
-      const midStart = bassEnd;
-      const midEnd = Math.floor(this.frequencyData.length * 0.6);
-      for (let i = midStart; i < midEnd; i++) {
-        sum += this.frequencyData[i] * midWeight;
-        count += midWeight;
-      }
-      
-      // High-Bereich (60-100% der Frequenzen, jeden 2. Wert für Performance)
-      const highStart = midEnd;
-      for (let i = highStart; i < this.frequencyData.length; i += 2) {
-        sum += this.frequencyData[i] * highWeight;
-        count += highWeight;
-      }
-      
-      const average = count > 0 ? sum / count : 0;
-      const energy = (average / 255) * 1.5; // NEU: Verstärkung um 50% für bessere Werte
-      
-      // NEU: Dynamische Track-Analyse für adaptive Sensitivität
-      this.updateTrackAnalysis(energy, now);
-      
-      // NEU: Empfindlichere Reaktion für bessere Beat-Erkennung
-      if (energy < 0.002) { // Noch empfindlicher für bessere Reaktivität
-        this.noDataCount++;
-        if (this.noDataCount > this.maxNoDataCount) {
-          if (this.options.onEnergy) {
-            this.options.onEnergy(0);
-          }
+      for (let i = 0; i < this.frequencyData.length; i++) {
+        if (this.frequencyData[i] > 0) {
+          sum += this.frequencyData[i];
+          count++;
         }
-        this.lastAnalyzeTime = now;
-        this.animationFrameId = requestAnimationFrame(() => this.analyze());
+      }
+      
+      // Prüfe, ob wir überhaupt Daten haben
+      if (count === 0) {
+        this.noDataCount++;
+        
+        if (this.noDataCount > this.maxNoDataCount) {
+          this.log('No audio data detected for too long, checking connection', true);
+          this.reconnectIfNeeded();
+          this.noDataCount = 0;
+        }
+        
+        this.animationFrameId = requestAnimationFrame(() => this.analyzeAudio());
         return;
       }
       
+      // Reset no-data counter
       this.noDataCount = 0;
       
-      // NEU: Reaktive Energy-Updates für bessere Beat-Erkennung
-      if (Math.abs(energy - this.lastEnergy) > 0.005 || energy > 0.02) { // Noch empfindlicher für bessere Reaktivität
-        this.lastEnergy = energy;
+      // Calculate energy (0-1 range)
+      const energy = sum / (count * 255);
+      
+      // Speichere für Track-Analyse
+      if (this.energyHistory.length < this.maxEnergyHistoryLength) {
+        this.energyHistory.push(energy);
         
-        if (this.options.onEnergy) {
-          this.options.onEnergy(energy);
+        // Starte Track-Analyse-Timer, wenn wir den ersten Wert bekommen
+        if (this.energyHistory.length === 1) {
+          this.trackAnalysisStartTime = now;
+          this.log('Starting track analysis', true);
         }
       }
-
-      // NEU: Verbesserte Beat-Erkennung mit adaptiven Schwellenwerten
-      const currentThreshold = this.trackAnalysisComplete ? this.adaptiveThreshold : this.options.energyThreshold!;
-      const currentSensitivity = this.trackAnalysisComplete ? this.adaptiveSensitivity : this.options.beatSensitivity!;
       
-      // NEU: Empfindlichere Beat-Erkennung für bessere Reaktivität
-      if (energy > currentThreshold) {
+      // Führe Track-Analyse durch, wenn genug Daten gesammelt wurden
+      if (!this.trackAnalysisComplete && 
+          this.trackAnalysisStartTime > 0 && 
+          now - this.trackAnalysisStartTime >= this.trackAnalysisDuration && 
+          this.energyHistory.length > 0) {
+        this.analyzeTrack();
+      }
+      
+      // Detect beats based on energy and threshold
+      if (energy > (this.options.energyThreshold || 0.02) * (this.adaptiveSensitivity || 1.0)) {
         const timeSinceLastBeat = now - this.lastBeatTime;
-        if (timeSinceLastBeat > 120) { // Reduziert von 180ms auf 120ms für schnellere Beats
-          const beatIntensity = energy / currentThreshold;
-          const minSensitivity = 0.3; // Reduziert von 0.5 für empfindlichere Reaktion
-          const maxSensitivity = 2.5; // Reduziert von 3.0 für realistischere Werte
-          const effectiveThreshold = 3 + (maxSensitivity - currentSensitivity) * 3; // Reduziert von 5+5 auf 3+3
+        
+        // Ensure minimum time between beats (avoid rapid triggers)
+        if (timeSinceLastBeat > 100) {
+          this.lastBeatTime = now;
+          this.log(`Beat detected! Energy: ${energy.toFixed(4)}, Threshold: ${(this.options.energyThreshold || 0.02).toFixed(4)}`, false);
           
-          if (beatIntensity > effectiveThreshold && Math.random() < 0.85) { // Erhöht von 0.75 auf 0.85 für mehr Beats
-            this.lastBeatTime = now;
-            // DEAKTIVIERT: Logging
-            // this.throttledLog(`Beat detected - Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}`);
-            if (this.options.onBeat) {
-              this.options.onBeat(now);
-            }
+          if (this.options.onBeat) {
+            this.options.onBeat(now);
           }
         }
       }
-      // Die High-Energy-Beat-Detection ist entfernt!
-
-      this.lastAnalyzeTime = now;
-      this.animationFrameId = requestAnimationFrame(() => this.analyze());
       
-    } catch (error) {
-      // DEAKTIVIERT: Logging
-      // console.error('Audio analysis error:', error);
-      this.animationFrameId = requestAnimationFrame(() => this.analyze());
+      // Call energy callback
+      if (this.options.onEnergy) {
+        // Nur wenn sich die Energie signifikant geändert hat
+        if (Math.abs(energy - this.lastEnergy) > 0.01) {
+          this.options.onEnergy(energy);
+          this.lastEnergy = energy;
+        }
+      }
+      
+      // Call frequency callback
+      if (this.options.onFrequency) {
+        this.options.onFrequency(this.frequencyData);
+      }
     }
+    
+    // Continue analyzing
+    this.animationFrameId = requestAnimationFrame(() => this.analyzeAudio());
   }
 
   private attemptReconnect(): void {
@@ -392,6 +356,74 @@ export class AudioAnalyzer {
       // console.error('Failed to reconnect audio analyzer:', error);
       this.reconnectAttempts++;
     }
+  }
+
+  private reconnectIfNeeded(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.log('Max reconnect attempts reached, giving up', true);
+      return;
+    }
+    
+    this.reconnectAttempts++;
+    this.log(`Attempting to reconnect (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`, true);
+    
+    // Versuche, die Verbindung wiederherzustellen
+    if (this.audioElement && this.audioContext) {
+      try {
+        // Versuche, den AudioContext neu zu starten
+        this.audioContext.resume().then(() => {
+          this.log('AudioContext resumed successfully', true);
+        }).catch(err => {
+          this.log(`Failed to resume AudioContext: ${err}`, true);
+        });
+      } catch (error) {
+        this.log(`Error during reconnect: ${error}`, true);
+      }
+    }
+  }
+  
+  private analyzeTrack(): void {
+    if (this.energyHistory.length === 0) {
+      return;
+    }
+    
+    this.log('Analyzing track characteristics', true);
+    
+    // Berechne Durchschnitt und Maximum der Energy-Werte
+    let sum = 0;
+    let max = 0;
+    
+    for (const energy of this.energyHistory) {
+      sum += energy;
+      if (energy > max) {
+        max = energy;
+      }
+    }
+    
+    const avgEnergy = sum / this.energyHistory.length;
+    const peakEnergy = max;
+    
+    // Passe die Schwellenwerte basierend auf den Charakteristiken des Tracks an
+    if (avgEnergy > 0) {
+      // Für Tracks mit hoher Durchschnittsenergie: niedrigere Schwellenwerte
+      if (avgEnergy > 0.1) {
+        this.adaptiveThreshold = Math.max(0.02, avgEnergy * 0.5);
+        this.adaptiveSensitivity = 0.8;
+      }
+      // Für Tracks mit mittlerer Durchschnittsenergie: mittlere Schwellenwerte
+      else if (avgEnergy > 0.05) {
+        this.adaptiveThreshold = Math.max(0.015, avgEnergy * 0.6);
+        this.adaptiveSensitivity = 1.0;
+      }
+      // Für Tracks mit niedriger Durchschnittsenergie: höhere Schwellenwerte
+      else {
+        this.adaptiveThreshold = Math.max(0.01, avgEnergy * 0.7);
+        this.adaptiveSensitivity = 1.2;
+      }
+    }
+    
+    this.trackAnalysisComplete = true;
+    this.log(`Track analysis complete - Threshold: ${this.adaptiveThreshold.toFixed(4)}, Sensitivity: ${this.adaptiveSensitivity.toFixed(2)}, AvgEnergy: ${avgEnergy.toFixed(4)}, PeakEnergy: ${peakEnergy.toFixed(4)}`, true);
   }
 
   private calculateEnergy(frequencies: Uint8Array): number {
@@ -510,12 +542,13 @@ export class AudioAnalyzer {
     return this.lastBeatTime;
   }
 
+  // Setzt die Track-Analyse zurück
   public resetTrackAnalysis(): void {
     this.trackAnalysisComplete = false;
     this.trackAnalysisStartTime = 0;
     this.energyHistory = [];
-    this.adaptiveThreshold = this.options.energyThreshold!;
-    this.adaptiveSensitivity = this.options.beatSensitivity!;
+    this.adaptiveThreshold = 0.04;
+    this.adaptiveSensitivity = 1.0;
   }
 
   public async detectTempo(): Promise<number> {

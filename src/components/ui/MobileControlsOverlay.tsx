@@ -18,6 +18,11 @@ export default function MobileControlsOverlay({
 
   return (
     <>
+      {/* AudioControlPanel bleibt immer im DOM, aber außerhalb des Overlays (unsichtbar) */}
+      <div style={{ display: 'none' }}>
+        <AudioControlPanel onBeat={onBeat} onEnergyChange={onEnergyChange} />
+      </div>
+      
       {/* Overlay-Button (immer sichtbar) */}
       <button
         onClick={() => setIsOpen(prev => !prev)}

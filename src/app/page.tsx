@@ -18,15 +18,15 @@ export default function HomePage() {
   const baseSwordLevel = 1;
   
   const [isClient, setIsClient] = useState(false);
-  const { energy, beatDetected } = useAudioReactionStore();
+  const { energy, beatDetected, setMusicPlaying } = useAudioReactionStore();
   
   // Client-Side Rendering aktivieren
   useEffect(() => {
     setIsClient(true);
-  }, []);
-  
-  // Mobile-Erkennung
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    
+    // Musik als nicht spielend markieren, damit Idle aktiviert wird
+    setMusicPlaying(false);
+  }, [setMusicPlaying]);
   
   // Beat-Handler für Komponenten
   const handleBeat = () => {
@@ -39,35 +39,35 @@ export default function HomePage() {
   };
   
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 relative">
+    <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
       {isClient && (
-        <>
-          {/* Hauptinhalt */}
-          <div className="flex-1 flex flex-col items-center justify-center w-full">
+        <div className="relative w-full h-screen flex flex-col items-center justify-center overflow-hidden">
+          {/* Hauptbereich mit dem ASCII-Schwert */}
+          <div className="absolute inset-0 flex items-center justify-center">
             <AsciiSword level={baseSwordLevel} />
           </div>
           
-          {/* Desktop-Steuerelemente */}
-          <div className="hidden md:block fixed bottom-8 right-8">
+          {/* UI-Elemente auf der rechten Seite */}
+          <div className="hidden sm:flex absolute top-1/2 right-8 transform -translate-y-1/2 z-10">
             <AudioControlPanel 
-              onBeat={handleBeat}
-              onEnergyChange={handleEnergyChange}
+              onBeat={handleBeat} 
+              onEnergyChange={handleEnergyChange} 
             />
           </div>
           
-          {/* Seitliche Buttons (nur Desktop) */}
-          <div className="hidden md:block fixed top-1/2 right-8 transform -translate-y-1/2">
+          {/* SideButtons auf der linken Seite */}
+          <div className="hidden sm:flex absolute top-1/2 left-8 transform -translate-y-1/2 z-10">
             <SideButtons />
           </div>
           
-          {/* Mobile-Steuerelemente */}
-          <div className="md:hidden">
-            <MobileControlsOverlay 
+          {/* Mobile Steuerelemente */}
+          <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20">
+            <MobileControlsOverlay
               onBeat={handleBeat}
               onEnergyChange={handleEnergyChange}
             />
           </div>
-        </>
+        </div>
       )}
     </main>
   );

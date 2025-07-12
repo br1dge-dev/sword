@@ -69,6 +69,18 @@ export function AudioProvider({ children }: AudioProviderProps) {
   const analyzerRef = useRef<AudioAnalyzer | null>(null);
   const initializationAttemptedRef = useRef<boolean>(false);
   
+  // Debug-Logging
+  const logRef = useRef<number>(0);
+  const logThrottle = 1000; // 1 Sekunde zwischen Logs
+  
+  const throttledLog = (message: string, force: boolean = false) => {
+    const now = Date.now();
+    if (force || now - logRef.current > logThrottle) {
+      console.log(`[AudioProvider] ${message}`);
+      logRef.current = now;
+    }
+  };
+  
   // Audio-Reaction-Store
   const { 
     updateEnergy, 
@@ -80,7 +92,12 @@ export function AudioProvider({ children }: AudioProviderProps) {
   // Audio-Element Event Handler
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio) {
+      throttledLog('Audio element not available', true);
+      return;
+    }
+    
+    throttledLog('Setting up audio element event handlers', true);
     
     const updateProgress = () => {
       if (audio.duration) {
@@ -89,6 +106,7 @@ export function AudioProvider({ children }: AudioProviderProps) {
     };
     
     const handleEnded = () => {
+      throttledLog('Track ended, playing next track', true);
       nextTrack(true);
     };
     
@@ -96,9 +114,17 @@ export function AudioProvider({ children }: AudioProviderProps) {
     audio.addEventListener('ended', handleEnded);
     audio.volume = 0.5; // Feste Lautstärke
     
+    // Füge Error-Handler hinzu
+    const handleError = (e: Event) => {
+      throttledLog(`Audio error: ${(e as ErrorEvent).message || 'Unknown error'}`, true);
+    };
+    
+    audio.addEventListener('error', handleError);
+    
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
     };
   }, []);
   
@@ -123,12 +149,15 @@ export function AudioProvider({ children }: AudioProviderProps) {
   useEffect(() => {
     if (analyzerRef.current) return;
     
+    throttledLog('Creating audio analyzer', true);
+    
     // Optimierte Standard-Optionen für bessere Beat-Erkennung
     const analyzerOptions: AudioAnalyzerOptions = {
       analyzeInterval: 50, // 50ms für schnelle Reaktion
       energyThreshold: 0.015, // Empfindlichere Reaktion
       beatSensitivity: 1.2, // Bessere Beat-Erkennung
       onBeat: (time) => {
+        throttledLog(`Beat detected at ${time}`, false);
         setBeatDetected(true);
         triggerBeat(); // Aktualisiere den globalen Store
         setAudioActive(true);
@@ -150,6 +179,7 @@ export function AudioProvider({ children }: AudioProviderProps) {
     
     return () => {
       if (analyzerRef.current) {
+        throttledLog('Disposing audio analyzer', true);
         analyzerRef.current.dispose();
         analyzerRef.current = null;
       }
@@ -161,6 +191,7 @@ export function AudioProvider({ children }: AudioProviderProps) {
     if (analyzerRef.current && analyzerRef.current.getAudioContext) {
       const audioContext = analyzerRef.current.getAudioContext();
       if (audioContext && audioContext.state === 'suspended') {
+        throttledLog('Resuming suspended AudioContext', true);
         try {
           await audioContext.resume();
           
@@ -184,17 +215,21 @@ export function AudioProvider({ children }: AudioProviderProps) {
   // Initialisiere Audio-Analyzer
   const initialize = async (): Promise<void> => {
     if (!audioRef.current || isInitialized || initializationAttemptedRef.current) {
+      throttledLog(`Cannot initialize: audioRef=${!!audioRef.current}, isInitialized=${isInitialized}, attempted=${initializationAttemptedRef.current}`, true);
       return;
     }
     
     initializationAttemptedRef.current = true;
+    throttledLog('Initializing audio analyzer', true);
     
     try {
       if (!analyzerRef.current) {
+        throttledLog('Analyzer not created yet', true);
         throw new Error('Analyzer not initialized');
       }
       
       await analyzerRef.current.initialize(audioRef.current);
+      throttledLog('Audio analyzer initialized successfully', true);
       setIsInitialized(true);
       setAudioActive(true);
       
@@ -209,6 +244,7 @@ export function AudioProvider({ children }: AudioProviderProps) {
   // Starte Audio-Analyse
   const start = (): void => {
     if (!analyzerRef.current || !isInitialized) {
+      throttledLog(`Cannot start analysis: analyzerRef=${!!analyzerRef.current}, isInitialized=${isInitialized}`, true);
       return;
     }
     
@@ -216,6 +252,7 @@ export function AudioProvider({ children }: AudioProviderProps) {
       return;
     }
     
+    throttledLog('Starting audio analysis', true);
     analyzerRef.current.start();
     setIsAnalyzing(true);
     setAudioActive(true);
@@ -227,18 +264,23 @@ export function AudioProvider({ children }: AudioProviderProps) {
       return;
     }
     
+    throttledLog('Stopping audio analysis', true);
     analyzerRef.current.stop();
     setIsAnalyzing(false);
   };
   
   // Wiedergabe starten/pausieren
   const togglePlay = async (): Promise<void> => {
-    if (!audioRef.current) return;
+    if (!audioRef.current) {
+      throttledLog('Cannot toggle play: audio element not available', true);
+      return;
+    }
     
     try {
       await resumeAudioContext();
       
       if (isPlaying) {
+        throttledLog('Pausing playback', true);
         audioRef.current.pause();
         setIsPlaying(false);
         
@@ -248,16 +290,22 @@ export function AudioProvider({ children }: AudioProviderProps) {
         
         setMusicPlaying(false);
       } else {
-        await audioRef.current.play();
-        setIsPlaying(true);
-        
-        if (isInitialized && !isAnalyzing) {
-          start();
-        } else if (!isInitialized) {
-          await initialize();
+        throttledLog('Starting playback', true);
+        try {
+          await audioRef.current.play();
+          setIsPlaying(true);
+          
+          if (isInitialized && !isAnalyzing) {
+            start();
+          } else if (!isInitialized) {
+            await initialize();
+          }
+          
+          setMusicPlaying(true);
+        } catch (err) {
+          throttledLog(`Play failed: ${err}`, true);
+          console.error('Error playing audio:', err);
         }
-        
-        setMusicPlaying(true);
       }
     } catch (err) {
       console.error('Error toggling playback:', err);
@@ -267,9 +315,11 @@ export function AudioProvider({ children }: AudioProviderProps) {
   // Nächster Track
   const nextTrack = (autoPlay = false): void => {
     const newIndex = (currentTrackIndex + 1) % tracks.length;
+    throttledLog(`Switching to next track: ${tracks[newIndex].name}`, true);
     setCurrentTrackIndex(newIndex);
     
     if (autoPlay && audioRef.current) {
+      throttledLog('Auto-playing next track', true);
       audioRef.current.play().catch(err => {
         console.error('Failed to auto-play next track:', err);
       });
@@ -279,24 +329,33 @@ export function AudioProvider({ children }: AudioProviderProps) {
   // Vorheriger Track
   const prevTrack = (): void => {
     const newIndex = (currentTrackIndex - 1 + tracks.length) % tracks.length;
+    throttledLog(`Switching to previous track: ${tracks[newIndex].name}`, true);
     setCurrentTrackIndex(newIndex);
   };
   
   // Initialisiere Analyzer, wenn Audio-Element verfügbar ist
   useEffect(() => {
     if (audioRef.current && !isInitialized && !initializationAttemptedRef.current) {
+      throttledLog('Audio element available, initializing analyzer', true);
       initialize();
     }
-  }, [audioRef.current, isInitialized]);
+  }, []);
   
   // Starte/Stoppe Analyzer basierend auf Wiedergabestatus
   useEffect(() => {
     if (isInitialized && !isAnalyzing && isPlaying) {
+      throttledLog('Auto-starting analysis based on play state', true);
       start();
     } else if (isInitialized && isAnalyzing && !isPlaying) {
+      throttledLog('Auto-stopping analysis based on play state', true);
       stop();
     }
   }, [isInitialized, isAnalyzing, isPlaying]);
+  
+  // Debug-Logging
+  useEffect(() => {
+    throttledLog(`Provider state: playing=${isPlaying}, initialized=${isInitialized}, analyzing=${isAnalyzing}, energy=${energy.toFixed(4)}`, true);
+  }, [isPlaying, isInitialized, isAnalyzing, energy]);
   
   const value = {
     audioRef,
