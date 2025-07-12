@@ -61,6 +61,7 @@ import {
 } from './effects/glitchEffects';
 import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects';
 import React from 'react'; // Added missing import for React
+import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
 
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
@@ -375,16 +376,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // OPTIMIERT: Hintergrund initialisieren mit Lazy-Rendering
   useEffect(() => {
     const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-    
-    // OPTIMIERT: Verwende Viewport-Dimensionen für Lazy-Rendering
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
     const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-    
     setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-    
-    // OPTIMIERT: Statischen Hintergrund zurücksetzen, damit er neu generiert wird
     setBackgroundGenerated(false);
-    
     // Initialisiere Lebensdauer-Tracking für alle initialen Veins
     const currentTime = Date.now();
     const baseVeins = Math.floor(10 + (glitchLevel * 5));
@@ -397,12 +392,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       }
     });
     // KEIN setColoredVeins mehr hier!
-
     return () => {
       clearAllIntervals();
       clearBackgroundCache();
     };
-  }, [glitchLevel, getBackgroundDimensions, clearAllIntervals, clearBackgroundCache]);
+  }, [getBackgroundDimensions, clearAllIntervals, clearBackgroundCache]);
   
   // OPTIMIERT: Resize-Handler mit besserer Performance
   useEffect(() => {
@@ -525,21 +519,18 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const now = Date.now();
       // Wenn Tiles gelockt sind, keine neue Generierung zulassen
       if (tileLockedRef.current) {
-        throttledLog(`Tile-Lock aktiv, keine neue Generierung erlaubt.`);
         return;
       }
       // Wenn Tiles existieren, entferne sie (nach Ablauf des Locks)
       if (currentTilesRef.current.length > 0) {
         const removeAge = now - tileBirthTimeRef.current;
         if (removeAge < TILE_LOCK_MS) {
-          throttledLog(`Tile-Lock: Tiles erst ${removeAge}ms alt, warte auf Ablauf von ${TILE_LOCK_MS - removeAge}ms.`);
           if (tileTimeoutRef.current) {
             clearTimeout(tileTimeoutRef.current);
             tileTimeoutRef.current = null;
           }
           tileLockedRef.current = true;
           tileTimeoutRef.current = setTimeout(() => {
-            console.log(`[TILE-LIFETIME-LOG] Entferne Tiles nach Tile-Lock, tatsächliche Lebensdauer: ${Date.now() - tileBirthTimeRef.current}ms`);
             currentTilesRef.current = [];
             setColoredTiles([]);
             tileBirthTimeRef.current = 0;
@@ -555,7 +546,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                 }
               }
               const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity, energy);
-              throttledLog(`(Tile-Lock) Generating tiles: ${generatedTiles.length} tiles, energy: ${energy.toFixed(3)}, beat: ${beatDetected}`);
               currentTilesRef.current = generatedTiles;
               tileBirthTimeRef.current = Date.now();
               setColoredTiles(generatedTiles);
@@ -566,7 +556,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               }
               tileTimeoutRef.current = setTimeout(() => {
                 const removeAge2 = Date.now() - tileBirthTimeRef.current;
-                console.log(`[TILE-LIFETIME-LOG] Entferne Tiles nach regulärem Timeout (Tile-Lock), tatsächliche Lebensdauer: ${removeAge2}ms`);
                 currentTilesRef.current = [];
                 tileBirthTimeRef.current = 0;
                 setColoredTiles([]);
@@ -578,7 +567,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           return;
         }
         // Tiles sind alt genug, können entfernt werden
-        console.log(`[TILE-LIFETIME-LOG] Entferne Tiles für neue Generation (Tile-Lock), tatsächliche Lebensdauer: ${removeAge}ms`);
         currentTilesRef.current = [];
         setColoredTiles([]);
         tileBirthTimeRef.current = 0;
@@ -597,7 +585,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         }
       }
       const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity, energy);
-      throttledLog(`Generating tiles: ${generatedTiles.length} tiles, energy: ${energy.toFixed(3)}, beat: ${beatDetected}`);
       currentTilesRef.current = generatedTiles;
       tileBirthTimeRef.current = now;
       setColoredTiles(generatedTiles);
@@ -606,20 +593,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       tileLockedRef.current = true;
       if (tileTimeoutRef.current) {
         clearTimeout(tileTimeoutRef.current);
-        throttledLog(`Cleared previous timeout`);
       }
       tileTimeoutRef.current = setTimeout(() => {
         const removeAge = Date.now() - tileBirthTimeRef.current;
-        console.log(`[TILE-LIFETIME-LOG] Entferne Tiles nach regulärem Timeout (Tile-Lock), tatsächliche Lebensdauer: ${removeAge}ms`);
         currentTilesRef.current = [];
         tileBirthTimeRef.current = 0;
         setColoredTiles([]);
         tileTimeoutRef.current = null;
         tileLockedRef.current = false;
       }, TILE_LOCK_MS);
-      throttledLog(`Timeout set for ${TILE_LOCK_MS}ms (Tile-Lock)`);
     } else {
-      throttledLog(`No tile generation: energy=${energy.toFixed(3)}, beat=${beatDetected}, effectsTriggered=${effectsTriggered}, currentTiles=${currentTilesRef.current.length}`);
     }
     // ENTFERNT: Sofortiges Entfernen der Tiles wenn keine Bedingungen erfüllt sind
     // Tiles leben jetzt bis zu 3 Sekunden, auch wenn keine neuen Effekte ausgelöst werden
@@ -753,7 +736,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setLastColorChangeTime(Date.now());
       setColorStability(newStability);
       
-      throttledLog(`Color change: energy=${energy.toFixed(3)}, stability=${newStability}ms, beat=${beatDetected}`);
     }
   }, [beatDetected, energy, lastColorChangeTime, colorStability]);
   
@@ -1174,6 +1156,50 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     }
   }, [beatDetected, energy, chargeLevel, edgePositions]);
   
+  // Frequenzdaten aus dem Store holen
+  const frequencyData = useAudioReactionStore((s) => s.frequencyData);
+
+  // In der useEffect für die Vein-Generierung:
+  useEffect(() => {
+    if (!frequencyData) return;
+    const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+    const now = Date.now();
+    // Frequenzbereiche bestimmen
+    const bassEnd = Math.floor(frequencyData.length * 0.2);
+    const midEnd = Math.floor(frequencyData.length * 0.6);
+    // Mittelwerte für Bass, Mid, High
+    const bass = frequencyData.slice(0, bassEnd).reduce((a, b) => a + b, 0) / bassEnd;
+    const mid = frequencyData.slice(bassEnd, midEnd).reduce((a, b) => a + b, 0) / (midEnd - bassEnd);
+    const high = frequencyData.slice(midEnd).reduce((a, b) => a + b, 0) / (frequencyData.length - midEnd);
+    // Cluster-Parameter
+    const clusterBase = 8;
+    const bassCluster = Math.floor(clusterBase + (bass / 255) * 18);
+    const midCluster = Math.floor(clusterBase + (mid / 255) * 18);
+    const highCluster = Math.floor(clusterBase + (high / 255) * 18);
+    // Beat-Pulsieren
+    const pulse = beatDetected ? 1.5 : 1.0;
+    // Cluster-Positionen (unten, mitte, oben)
+    const clusters = [
+      { y: Math.floor(bgHeight * 0.8), count: bassCluster, color: '#3EE6FF' },
+      { y: Math.floor(bgHeight * 0.5), count: midCluster, color: '#FFD600' },
+      { y: Math.floor(bgHeight * 0.2), count: highCluster, color: '#FF3EC9' },
+    ];
+    // Generiere Veins für jede Cluster-Gruppe
+    let veins: Array<{x: number, y: number, color: string}> = [];
+    clusters.forEach((cluster, i) => {
+      for (let c = 0; c < cluster.count; c++) {
+        const spread = Math.floor(bgWidth * 0.3 + Math.sin(now/600 + i) * 10);
+        const centerX = Math.floor(bgWidth / 2 + Math.sin(now/1000 + i*2) * (bgWidth/4));
+        const angle = (c / cluster.count) * Math.PI * 2;
+        const radius = (pulse * 8) + Math.sin(now/400 + c) * 4;
+        const x = Math.floor(centerX + Math.cos(angle) * spread + Math.random() * 2);
+        const y = Math.floor(cluster.y + Math.sin(angle) * radius + Math.random() * 2);
+        veins.push({ x, y, color: cluster.color });
+      }
+    });
+    setColoredVeins(veins);
+  }, [frequencyData, beatDetected, getBackgroundDimensions]);
+  
   // OPTIMIERT: Memoisierte Berechnungen für Rendering
   const shadowSize = useMemo(() => Math.floor(glowIntensity * 20), [glowIntensity]);
   const textShadow = useMemo(() => `0 0 ${shadowSize + (glitchLevel * 2)}px ${baseColor}`, [shadowSize, glitchLevel, baseColor]);
@@ -1219,51 +1245,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             overflow: 'hidden'
           }}
         >
-          <pre className="font-mono text-sm sm:text-base leading-[0.9] whitespace-pre select-none" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {(staticBackground.length > 0 ? staticBackground : caveBackground).map((row, y) => {
-              // Map für Vein-Farben in dieser Zeile
-              const veinMap = new Map<number, string>();
-              coloredVeins.forEach(vein => {
-                if (vein.y === y) {
-                  veinMap.set(vein.x, vein.color);
-                }
-              });
-              // DOM-Optimierung: Nur animierte Zeichen als <span>, Rest als String
-              const elements = [];
-              let buffer = '';
-              for (let x = 0; x < row.length; x++) {
-                const char = row[x];
-                const veinColor = veinMap.get(x);
-                if (veinColor) {
-                  if (buffer) {
-                    elements.push(buffer);
-                    buffer = '';
-                  }
-                  elements.push(
-                    <span
-                      key={x}
-                      style={{
-                        color: veinColor,
-                        textShadow: `0 0 ${2 + glitchLevel}px ${veinColor}`,
-                        display: 'inline-block',
-                        filter: `contrast(${0.65 + (glitchLevel * 0.05)})`
-                      }}
-                    >
-                      {char}
-                    </span>
-                  );
-                } else {
-                  buffer += char;
-                }
-              }
-              if (buffer) elements.push(buffer);
-              return (
-                <div key={y} style={{ lineHeight: '0.9', width: '100%', textAlign: 'center', whiteSpace: 'pre' }}>
-                  {elements}
-                </div>
-              );
-            })}
-          </pre>
+          <AsciiBackgroundCanvas
+            pattern={staticBackground.length > 0 ? staticBackground : caveBackground}
+            veins={coloredVeins}
+            width={((staticBackground.length > 0 ? staticBackground[0].length : caveBackground[0]?.length) || 160) * 10}
+            height={((staticBackground.length > 0 ? staticBackground.length : caveBackground.length) || 100) * 14}
+            fontSize={12}
+            fontFamily={'monospace'}
+          />
         </div>
       </div>
       {/* Schwert im Vordergrund */}

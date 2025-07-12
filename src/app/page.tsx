@@ -83,7 +83,7 @@ export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
-        isModalOpen ? 'blur-sm' : ''
+        isModalOpen ? '' : ''
       }`}>
         {/* Hauptbereich mit dem ASCII-Schwert */}
         <div className="absolute inset-0 flex items-center justify-center">

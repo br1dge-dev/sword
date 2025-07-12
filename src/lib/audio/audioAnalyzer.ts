@@ -276,7 +276,7 @@ export class AudioAnalyzer {
       }
       
       const average = count > 0 ? sum / count : 0;
-      const energy = (average / 255) * 1.5; // NEU: Verstärkung um 50% für bessere Werte
+      const energy = (average / 255) * 1.1; // Reduzierte Verstärkung für realistischere Werte
       
       // NEU: Dynamische Track-Analyse für adaptive Sensitivität
       this.updateTrackAnalysis(energy, now);

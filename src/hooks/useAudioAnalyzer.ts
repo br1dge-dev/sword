@@ -53,7 +53,10 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   const initializingRef = useRef<boolean>(false);
   
   // Audio-Reaction-Store
-  const { updateEnergy, triggerBeat, setAudioActive } = useAudioReactionStore();
+  const updateEnergy = useAudioReactionStore((s) => s.updateEnergy);
+  const triggerBeat = useAudioReactionStore((s) => s.triggerBeat);
+  const setAudioActive = useAudioReactionStore((s) => s.setAudioActive);
+  const setFrequencyData = useAudioReactionStore((s) => s.setFrequencyData);
   
   // Reset beat detection after a short delay
   useEffect(() => {
@@ -79,7 +82,10 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       analyzeInterval: 50, // 50ms für schnelle Reaktion
       energyThreshold: 0.015, // Reduziert von 0.03 für empfindlichere Reaktion
       beatSensitivity: 1.2, // Erhöht von 0.8 für bessere Beat-Erkennung
-      ...options
+      ...options,
+      onFrequency: (frequencies: Uint8Array) => {
+        setFrequencyData(frequencies);
+      }
     };
     
     // Prüfen, ob bereits ein globaler Analyzer existiert
@@ -136,7 +142,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
         analyzerRef.current = null;
       }
     };
-  }, [updateEnergy, triggerBeat, setAudioActive, options]);
+  }, [updateEnergy, triggerBeat, setAudioActive, setFrequencyData, options]);
   
   const initialize = async (audioElement: HTMLAudioElement) => {
     try {
