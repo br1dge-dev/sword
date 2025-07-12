@@ -295,7 +295,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const activeBars = Math.max(1, Math.floor(Math.min(1, lastEnergy * 1.8) * 8));
 
   return (
-    <div className={`flex flex-col ${className}`} style={{ width: '100%', maxWidth: '280px' }}>
+    <div className={`flex flex-col ${className}`} style={{ width: '100%', maxWidth: '240px' }}>
       {/* Audio-Element */}
       <audio
         ref={audioRef}
@@ -306,7 +306,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       
       {/* Header mit Titel */}
       <div className="flex flex-col mb-3">
-        <div className="mb-1 text-xs font-bold font-press-start-2p text-left text-[#3EE6FF]" 
+        <div className="mb-1 text-xs font-bold font-press-start-2p text-left text-[#3EE6FF] sm:text-sm" 
              style={{ 
                textShadow: '0 0 1px #3EE6FF',
                letterSpacing: '0.05em'
@@ -352,7 +352,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       
       {/* Track Info */}
       <div className="mb-3">
-        <div className="text-xs font-bold font-press-start-2p text-left track-label-style">
+        <div className="text-xs font-bold font-press-start-2p text-left track-label-style sm:text-sm">
           {tracks[currentTrackIndex].name.split("").map((char, i) => {
             const { idx, color } = highlightPattern[highlightStep];
             return (
@@ -379,7 +379,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
             style={{ width: `${progress}%` }}
           />
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xs font-press-start-2p text-[#F8E16C]" style={{textShadow: '0 0 1px #F8E16C', letterSpacing: '0.05em'}}>
+            <span className="text-xs font-press-start-2p text-[#F8E16C] sm:text-sm" style={{textShadow: '0 0 1px #F8E16C', letterSpacing: '0.05em'}}>
               {Math.round(progress)}%
             </span>
           </div>
@@ -390,7 +390,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       <div className="flex items-center justify-center gap-2 mb-3">
         <button
           onClick={() => prevTrack()}
-          className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF] transition-colors"
+          className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF] transition-colors sm:w-8 sm:h-8"
           style={{ 
             boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(62,230,255,0.3)',
             imageRendering: 'pixelated',
@@ -398,25 +398,25 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
             backgroundSize: '4px 4px'
           }}
         >
-          <span className="text-xs text-[#3EE6FF]">◀</span>
+          <span className="text-xs text-[#3EE6FF] sm:text-sm">◀</span>
         </button>
         
         <button
           onClick={togglePlay}
-          className="w-8 h-8 flex items-center justify-center border border-[#3EE6FF] bg-[#3EE6FF] hover:border-[#2DD5E5] hover:bg-[#2DD5E5] transition-colors"
+          className="w-8 h-8 flex items-center justify-center border border-[#3EE6FF] bg-[#3EE6FF] hover:border-[#2DD5E5] hover:bg-[#2DD5E5] transition-colors sm:w-10 sm:h-10"
           style={{ 
             boxShadow: 'inset 0 0 3px rgba(0,0,0,0.3), 0 0 5px rgba(62,230,255,0.5)',
             imageRendering: 'pixelated'
           }}
         >
-          <span className="text-sm text-black font-bold font-press-start-2p">
+          <span className="text-sm text-black font-bold font-press-start-2p sm:text-base">
             {isPlaying ? '⏸' : '▶'}
           </span>
         </button>
         
         <button
           onClick={() => nextTrack()}
-          className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF] transition-colors"
+          className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF] transition-colors sm:w-8 sm:h-8"
           style={{ 
             boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(62,230,255,0.3)',
             imageRendering: 'pixelated',
@@ -424,7 +424,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
             backgroundSize: '4px 4px'
           }}
         >
-          <span className="text-xs text-[#3EE6FF]">▶</span>
+          <span className="text-xs text-[#3EE6FF] sm:text-sm">▶</span>
         </button>
       </div>
       

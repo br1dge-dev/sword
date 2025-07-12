@@ -3,6 +3,7 @@
  * 
  * Diese Komponente enthält das ASCII-Schwert und alle UI-Elemente.
  * OPTIMIERT: Reduzierte Logs, bessere Performance
+ * NEU: AudioControlPanel immer sichtbar, Modal nur für SideButtons
  */
 "use client";
 
@@ -18,6 +19,7 @@ export default function HomePage() {
   const baseSwordLevel = 1;
   
   const [isClient, setIsClient] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { energy, beatDetected, setMusicPlaying } = useAudioReactionStore();
   
   // OPTIMIERT: Throttled Logging für bessere Performance
@@ -80,7 +82,9 @@ export default function HomePage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
-      <div className="relative w-full h-screen flex flex-col items-center justify-center overflow-hidden">
+      <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
+        isModalOpen ? 'blur-sm' : ''
+      }`}>
         {/* Hauptbereich mit dem ASCII-Schwert */}
         <div className="absolute inset-0 flex items-center justify-center">
           <AsciiSword 
@@ -90,24 +94,24 @@ export default function HomePage() {
           />
         </div>
         
-        {/* UI-Elemente auf der rechten Seite */}
-        <div className="hidden sm:flex absolute top-1/2 left-[75vw] transform -translate-x-1/2 -translate-y-1/2 z-10">
+        {/* NEU: AudioControlPanel immer sichtbar - Desktop: rechts, Mobile: unten */}
+        <div className="absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 bottom-4 left-1/2 transform -translate-x-1/2">
           <AudioControlPanel 
             onBeat={handleBeat} 
             onEnergyChange={handleEnergyChange} 
           />
         </div>
         
-        {/* SideButtons auf der linken Seite */}
+        {/* SideButtons - Desktop: links, Mobile: im Modal */}
         <div className="hidden sm:flex absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10">
           <SideButtons />
         </div>
         
-        {/* Mobile Steuerelemente */}
+        {/* Mobile Steuerelemente - nur noch für SideButtons */}
         <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20">
-          <MobileControlsOverlay
-            onBeat={handleBeat}
-            onEnergyChange={handleEnergyChange}
+          <MobileControlsOverlay 
+            isOpen={isModalOpen}
+            onToggle={(open: boolean) => setIsModalOpen(open)}
           />
         </div>
         
