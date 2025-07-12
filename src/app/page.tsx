@@ -4,6 +4,7 @@
  * Diese Komponente enthält das ASCII-Schwert und alle UI-Elemente.
  * OPTIMIERT: Reduzierte Logs, bessere Performance
  * NEU: AudioControlPanel immer sichtbar, Modal nur für SideButtons
+ * NEU: HIDE Button zum Ausblenden des kompletten UI
  */
 "use client";
 
@@ -13,6 +14,7 @@ import AsciiSword from '@/components/ascii/AsciiSword';
 import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
+import { IoMdEye, IoMdEyeOff, IoMdTrophy } from 'react-icons/io';
 
 export default function HomePage() {
   // Base level setting (will be overridden by PowerUp)
@@ -20,6 +22,8 @@ export default function HomePage() {
   
   const [isClient, setIsClient] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isUIVisible, setIsUIVisible] = useState(true);
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const { energy, beatDetected, setMusicPlaying } = useAudioReactionStore();
   
   // OPTIMIERT: Throttled Logging für bessere Performance
@@ -80,6 +84,31 @@ export default function HomePage() {
     setAudioActive(true);
   };
 
+  // Pseudo-Leaderboard Daten
+  const leaderboardData = [
+    { address: '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6', points: 2847, rank: 1 },
+    { address: '0x8ba1f109551bD432803012645Hac136c772c3c3', points: 2156, rank: 2 },
+    { address: '0x1234567890abcdef1234567890abcdef12345678', points: 1892, rank: 3 },
+    { address: '0xabcdef1234567890abcdef1234567890abcdef12', points: 1456, rank: 4 },
+    { address: '0x9876543210fedcba9876543210fedcba98765432', points: 1234, rank: 5 },
+    { address: '0xfedcba0987654321fedcba0987654321fedcba09', points: 987, rank: 6 },
+    { address: '0x1111111111111111111111111111111111111111', points: 756, rank: 7 },
+    { address: '0x2222222222222222222222222222222222222222', points: 543, rank: 8 },
+  ];
+
+  const formatAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const getRankColor = (rank: number) => {
+    switch (rank) {
+      case 1: return 'text-yellow-400 border-yellow-400';
+      case 2: return 'text-gray-300 border-gray-300';
+      case 3: return 'text-amber-600 border-amber-600';
+      default: return 'text-grifter-blue border-grifter-blue';
+    }
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
@@ -95,7 +124,9 @@ export default function HomePage() {
         </div>
         
         {/* NEU: AudioControlPanel immer sichtbar - Desktop: rechts, Mobile: oben */}
-        <div className="absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 top-4 left-1/2 -translate-x-1/2 sm:bottom-auto">
+        <div className={`absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 top-4 left-1/2 -translate-x-1/2 sm:bottom-auto transition-opacity duration-300 ${
+          isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}>
           <AudioControlPanel 
             onBeat={handleBeat} 
             onEnergyChange={handleEnergyChange} 
@@ -103,17 +134,109 @@ export default function HomePage() {
         </div>
         
         {/* SideButtons - Desktop: links, Mobile: im Modal */}
-        <div className="hidden sm:flex absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10">
+        <div className={`hidden sm:flex absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10 transition-opacity duration-300 ${
+          isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}>
           <SideButtons />
         </div>
         
         {/* Mobile Steuerelemente - nur noch für SideButtons */}
-        <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20">
+        <div className={`sm:hidden absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-300 ${
+          isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}>
           <MobileControlsOverlay 
             isOpen={isModalOpen}
             onToggle={(open: boolean) => setIsModalOpen(open)}
           />
         </div>
+
+        {/* Bottom Buttons - HIDE, Config, Leaderboard */}
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0">
+          {/* HIDE Button */}
+          <button
+            onClick={() => setIsUIVisible(!isUIVisible)}
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            style={{
+              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+            }}
+          >
+            {isUIVisible ? (
+              <IoMdEyeOff className="text-grifter-blue text-2xl" />
+            ) : (
+              <IoMdEye className="text-grifter-blue text-2xl" />
+            )}
+          </button>
+
+          {/* Config Button (MobileControlsOverlay Trigger) */}
+          <button
+            onClick={() => setIsModalOpen(!isModalOpen)}
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue sm:hidden"
+            style={{
+              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+            }}
+            aria-label="Config"
+          >
+            <svg className={`text-grifter-blue text-2xl transition-transform duration-300 ${isModalOpen ? 'rotate-90' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5C13.933 15.5 15.5 13.933 15.5 12C15.5 10.067 13.933 8.5 12 8.5C10.067 8.5 8.5 10.067 8.5 12C8.5 13.933 10.067 15.5 12 15.5Z" stroke="#3EE6FF" strokeWidth="2"/><path d="M19.4 15A1.65 1.65 0 0 0 21 13.35V10.65A1.65 1.65 0 0 0 19.4 9L18.13 7.13A1.65 1.65 0 0 0 16.35 6.6L13.65 6.6A1.65 1.65 0 0 0 12 5A1.65 1.65 0 0 0 10.35 6.6L7.65 6.6A1.65 1.65 0 0 0 5.87 7.13L4.6 9A1.65 1.65 0 0 0 3 10.65V13.35A1.65 1.65 0 0 0 4.6 15L5.87 16.87A1.65 1.65 0 0 0 7.65 17.4L10.35 17.4A1.65 1.65 0 0 0 12 19A1.65 1.65 0 0 0 13.65 17.4L16.35 17.4A1.65 1.65 0 0 0 18.13 16.87L19.4 15Z" stroke="#3EE6FF" strokeWidth="2"/></svg>
+          </button>
+
+          {/* Leaderboard Button */}
+          <button
+            onClick={() => setIsLeaderboardOpen(!isLeaderboardOpen)}
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            style={{
+              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+            }}
+          >
+            <IoMdTrophy className="text-grifter-blue text-2xl" />
+          </button>
+        </div>
+
+        {/* Leaderboard Modal */}
+        {isLeaderboardOpen && (
+          <div className="fixed inset-0 z-40 bg-black bg-opacity-90 flex items-center justify-center p-4">
+            <div className="bg-black border border-grifter-blue rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-press-start-2p text-grifter-blue mb-2">LEADERBOARD</h2>
+                <div className="text-sm text-grifter-blue opacity-80">TOP SWORD WARRIORS</div>
+              </div>
+              
+              <div className="space-y-3">
+                {leaderboardData.map((entry) => (
+                  <div 
+                    key={entry.address}
+                    className={`flex items-center justify-between p-3 rounded border ${
+                      getRankColor(entry.rank)
+                    } ${entry.rank <= 3 ? 'bg-opacity-10' : 'bg-transparent'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`text-lg font-press-start-2p ${
+                        entry.rank <= 3 ? 'text-2xl' : 'text-lg'
+                      }`}>
+                        #{entry.rank}
+                      </div>
+                      <div className="font-mono text-sm">
+                        {formatAddress(entry.address)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-press-start-2p">{entry.points}</span>
+                      <span className="text-xs opacity-80">⚡</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => setIsLeaderboardOpen(false)}
+                  className="px-4 py-2 bg-grifter-blue text-black font-press-start-2p text-sm rounded border border-grifter-blue hover:bg-transparent hover:text-grifter-blue transition-colors"
+                >
+                  CLOSE
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         
       </div>
     </main>

@@ -295,7 +295,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const activeBars = Math.max(1, Math.floor(Math.min(1, lastEnergy * 1.8) * 8));
 
   return (
-    <div className={`flex flex-col ${className}`} style={{ width: '100%', maxWidth: '240px' }}>
+    <div className={`flex flex-col items-center ${className}`} style={{ width: '100%', maxWidth: '240px' }}>
       {/* Audio-Element */}
       <audio
         ref={audioRef}
@@ -303,19 +303,104 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         preload="metadata"
         className="hidden"
       />
-      
-      {/* Header mit Titel */}
-      <div className="flex flex-col mb-3">
-        <div className="mb-1 text-xs font-bold font-press-start-2p text-left text-[#3EE6FF] sm:text-sm" 
+
+      {/* Player Buttons ganz oben */}
+      <div className="flex items-center justify-center gap-3 mb-3 w-full">
+        <button
+          onClick={() => prevTrack()}
+          className="w-10 h-10 flex items-center justify-center rounded-[4px] border-2 border-grifter-blue font-press-start-2p bg-black relative pixel-btn transition-all duration-150 hover:bg-[#1a1a1a] hover:border-cyan-300 hover:shadow-[0_0_8px_#3EE6FF] hover:scale-105"
+          style={{
+            imageRendering: 'pixelated',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='6' height='6' fill='%23000000'/%3E%3Crect x='0' y='0' width='2' height='2' fill='%233EE6FF' fill-opacity='0.08'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23FF3EC8' fill-opacity='0.08'/%3E%3C/svg%3E")`,
+            backgroundSize: '6px 6px',
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="mx-auto my-auto block" style={{display:'block'}} xmlns="http://www.w3.org/2000/svg">
+            <polygon points="16,6 8,12 16,18" fill="#3EE6FF" stroke="#3EE6FF" strokeWidth="2"/>
+          </svg>
+        </button>
+        <button
+          onClick={togglePlay}
+          className={`w-12 h-12 flex items-center justify-center rounded-[4px] border-2 border-grifter-blue font-press-start-2p bg-grifter-blue relative pixel-btn transition-all duration-150 hover:bg-[#5ffbf1] hover:border-cyan-300 hover:shadow-[0_0_12px_#3EE6FF] hover:scale-105 ${!isPlaying ? 'animate-glitch3' : ''}`}
+          style={{
+            imageRendering: 'pixelated',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='6' height='6' fill='%2300FCA6' fill-opacity='0.12'/%3E%3Crect x='0' y='0' width='2' height='2' fill='%233EE6FF' fill-opacity='0.12'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23FF3EC8' fill-opacity='0.12'/%3E%3C/svg%3E")`,
+            backgroundSize: '6px 6px',
+          }}
+        >
+          {isPlaying ? (
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" className="mx-auto my-auto block" style={{display:'block'}} xmlns="http://www.w3.org/2000/svg">
+              <rect x="6" y="6" width="5" height="16" fill="#181818" stroke="#181818" strokeWidth="2"/>
+              <rect x="17" y="6" width="5" height="16" fill="#181818" stroke="#181818" strokeWidth="2"/>
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" className="mx-auto my-auto block" style={{display:'block'}} xmlns="http://www.w3.org/2000/svg">
+              <polygon points="8,6 22,14 8,22" fill="#181818" stroke="#181818" strokeWidth="2"/>
+            </svg>
+          )}
+        </button>
+        <button
+          onClick={() => nextTrack()}
+          className="w-10 h-10 flex items-center justify-center rounded-[4px] border-2 border-grifter-blue font-press-start-2p bg-black relative pixel-btn transition-all duration-150 hover:bg-[#1a1a1a] hover:border-cyan-300 hover:shadow-[0_0_8px_#3EE6FF] hover:scale-105"
+          style={{
+            imageRendering: 'pixelated',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='6' height='6' fill='%23000000'/%3E%3Crect x='0' y='0' width='2' height='2' fill='%233EE6FF' fill-opacity='0.08'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23FF3EC8' fill-opacity='0.08'/%3E%3C/svg%3E")`,
+            backgroundSize: '6px 6px',
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="mx-auto my-auto block" style={{display:'block'}} xmlns="http://www.w3.org/2000/svg">
+            <polygon points="8,6 16,12 8,18" fill="#3EE6FF" stroke="#3EE6FF" strokeWidth="2"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* Track Info */}
+      <div className="mb-2 w-full flex justify-center">
+        <div className="text-xs font-bold font-press-start-2p track-label-style sm:text-sm text-center">
+          {tracks[currentTrackIndex].name.split("").map((char, i) => {
+            const { idx, color } = highlightPattern[highlightStep];
+            return (
+              <span
+                key={i}
+                style={i === idx ? { color, textShadow: `0 0 2px ${color}` } : { color: swordColor, textShadow: `0 0 1px ${swordColor}` }}
+              >
+                {char}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Progress Bar direkt unter Trackname */}
+      <div className="mb-3 w-full flex justify-center">
+        <div className="relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden"
+             style={{ 
+               boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
+               imageRendering: 'pixelated'
+             }}>
+          <div 
+            className="h-full bg-gradient-to-r from-[#3EE6FF] to-[#00FCA6] transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xs font-press-start-2p text-[#F8E16C] sm:text-sm" style={{textShadow: '0 0 1px #F8E16C', letterSpacing: '0.05em'}}>
+              {Math.round(progress)}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Header mit Titel und Dankness */}
+      <div className="flex flex-col items-center mb-3 w-full">
+        <div className="mb-1 text-xs font-bold font-press-start-2p text-[#3EE6FF] sm:text-sm text-center" 
              style={{ 
                textShadow: '0 0 1px #3EE6FF',
                letterSpacing: '0.05em'
              }}>
           DANKNESS
         </div>
-        
         {/* Audio Visualizer */}
-        <div className="relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex"
+        <div className="relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex justify-center"
              style={{ 
                boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
                imageRendering: 'pixelated'
@@ -330,7 +415,6 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
               const tileColor = isActive ? 
                 (lastEnergy > 0.7 ? 'bg-[#FF3EC8]' : lastEnergy > 0.4 ? 'bg-[#F8E16C]' : 'bg-[#3EE6FF]') : 
                 'bg-gray-800';
-              
               return (
                 <div
                   key={index}
@@ -349,90 +433,24 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
           )}
         </div>
       </div>
-      
-      {/* Track Info */}
-      <div className="mb-3">
-        <div className="text-xs font-bold font-press-start-2p text-left track-label-style sm:text-sm">
-          {tracks[currentTrackIndex].name.split("").map((char, i) => {
-            const { idx, color } = highlightPattern[highlightStep];
-            return (
-              <span
-                key={i}
-                style={i === idx ? { color, textShadow: `0 0 2px ${color}` } : { color: swordColor, textShadow: `0 0 1px ${swordColor}` }}
-              >
-                {char}
-              </span>
-            );
-          })}
-        </div>
-      </div>
-      
-      {/* Progress Bar */}
-      <div className="mb-3">
-        <div className="relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden"
-             style={{ 
-               boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
-               imageRendering: 'pixelated'
-             }}>
-          <div 
-            className="h-full bg-gradient-to-r from-[#3EE6FF] to-[#00FCA6] transition-all duration-300"
-            style={{ width: `${progress}%` }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xs font-press-start-2p text-[#F8E16C] sm:text-sm" style={{textShadow: '0 0 1px #F8E16C', letterSpacing: '0.05em'}}>
-              {Math.round(progress)}%
-            </span>
-          </div>
-        </div>
-      </div>
-      
-      {/* Control Buttons */}
-      <div className="flex items-center justify-center gap-2 mb-3">
-        <button
-          onClick={() => prevTrack()}
-          className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF] transition-colors sm:w-8 sm:h-8"
-          style={{ 
-            boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(62,230,255,0.3)',
-            imageRendering: 'pixelated',
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
-            backgroundSize: '4px 4px'
-          }}
-        >
-          <span className="text-xs text-[#3EE6FF] sm:text-sm">◀</span>
-        </button>
-        
-        <button
-          onClick={togglePlay}
-          className="w-8 h-8 flex items-center justify-center border border-[#3EE6FF] bg-[#3EE6FF] hover:border-[#2DD5E5] hover:bg-[#2DD5E5] transition-colors sm:w-10 sm:h-10"
-          style={{ 
-            boxShadow: 'inset 0 0 3px rgba(0,0,0,0.3), 0 0 5px rgba(62,230,255,0.5)',
-            imageRendering: 'pixelated'
-          }}
-        >
-          <span className="text-sm text-black font-bold font-press-start-2p sm:text-base">
-            {isPlaying ? '⏸' : '▶'}
-          </span>
-        </button>
-        
-        <button
-          onClick={() => nextTrack()}
-          className="w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-800 hover:border-[#3EE6FF] transition-colors sm:w-8 sm:h-8"
-          style={{ 
-            boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(62,230,255,0.3)',
-            imageRendering: 'pixelated',
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
-            backgroundSize: '4px 4px'
-          }}
-        >
-          <span className="text-xs text-[#3EE6FF] sm:text-sm">▶</span>
-        </button>
-      </div>
-      
-      {/* Energy Display entfernt */}
+
       <style jsx>{`
         .track-label-style {
           text-shadow: 0 0 1px #3EE6FF;
           letter-spacing: 0.05em;
+        }
+        @keyframes glitch3 {
+          0% { filter: none; text-shadow: 0 0 2px #3EE6FF, 0 0 8px #FF3EC8; transform: none; }
+          8% { filter: brightness(1.3) contrast(1.2); text-shadow: 2px 0 #3EE6FF, -2px 0 #FF3EC8; transform: translateY(-1px) skewX(-2deg); }
+          15% { filter: hue-rotate(10deg) brightness(1.1); text-shadow: -2px 0 #3EE6FF, 2px 0 #FF3EC8; transform: translateX(1px) skewY(2deg); }
+          22% { filter: none; text-shadow: 0 0 2px #3EE6FF, 0 0 8px #FF3EC8; transform: none; }
+          30% { filter: brightness(1.2); text-shadow: 1px 1px #3EE6FF, -1px -1px #FF3EC8; transform: translateY(1px) skewX(2deg); }
+          38% { filter: hue-rotate(-10deg); text-shadow: -1px 1px #3EE6FF, 1px -1px #FF3EC8; transform: translateX(-1px) skewY(-2deg); }
+          45% { filter: none; text-shadow: 0 0 2px #3EE6FF, 0 0 8px #FF3EC8; transform: none; }
+          100% { filter: none; text-shadow: 0 0 2px #3EE6FF, 0 0 8px #FF3EC8; transform: none; }
+        }
+        .animate-glitch3 {
+          animation: glitch3 0.7s infinite steps(2, end);
         }
       `}</style>
     </div>
