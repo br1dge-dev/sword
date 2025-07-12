@@ -94,8 +94,8 @@ export default function HomePage() {
           />
         </div>
         
-        {/* NEU: AudioControlPanel immer sichtbar - Desktop: rechts, Mobile: unten */}
-        <div className="absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 bottom-4 left-1/2 transform -translate-x-1/2">
+        {/* NEU: AudioControlPanel immer sichtbar - Desktop: rechts, Mobile: oben */}
+        <div className="absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 top-4 left-1/2 -translate-x-1/2 sm:bottom-auto">
           <AudioControlPanel 
             onBeat={handleBeat} 
             onEnergyChange={handleEnergyChange} 
