@@ -1191,13 +1191,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       className="relative flex items-center justify-center w-full h-full overflow-hidden"
       style={{ 
         backgroundColor,
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100vw',
-        height: '100vh'
+        width: '100%',
+        height: '100%'
       }}
     >
       {/* Höhlen-Hintergrund */}
@@ -1207,12 +1202,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           opacity: 0.45 + (glitchLevel * 0.08),
           color: lighterBgColor,
           filter: `brightness(${0.35 + (glitchLevel * 0.075)}) contrast(${0.65 + (glitchLevel * 0.05)})`,
-          width: '100vw',
-          height: '100vh',
-          overflow: 'hidden',
-          position: 'fixed',
-          top: 0,
-          left: 0
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden'
         }}
       >
         <div 
@@ -1222,9 +1214,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             justifyContent: 'center',
             alignItems: 'center',
             transform: 'scale(1.65)',
-            position: 'absolute',
-            top: 0,
-            left: 0,
             width: '100%',
             height: '100%',
             overflow: 'hidden'

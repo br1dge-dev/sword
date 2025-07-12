@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from 'react';
-import { IoMdSettings } from 'react-icons/io';
-import AudioControlPanel from './AudioControlPanel';
+import React, { useState } from 'react';
 import SideButtons from './SideButtons';
+import AudioControlPanel from './AudioControlPanel';
+import { IoMdSettings } from 'react-icons/io';
 
 interface MobileControlsOverlayProps {
-  onBeat?: () => void;
-  onEnergyChange?: (energy: number) => void;
+  onBeat: () => void;
+  onEnergyChange: (energy: number) => void;
 }
 
 export default function MobileControlsOverlay({
@@ -16,13 +16,14 @@ export default function MobileControlsOverlay({
 }: MobileControlsOverlayProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  // AudioControlPanel bleibt immer im DOM, aber außerhalb des Overlays (unsichtbar)
+  // Sichtbare UI nur im Overlay
   return (
     <>
-      {/* AudioControlPanel bleibt immer im DOM, aber außerhalb des Overlays (unsichtbar) */}
+      {/* Immer im DOM, aber unsichtbar, wenn Overlay zu */}
       <div style={{ display: 'none' }}>
         <AudioControlPanel onBeat={onBeat} onEnergyChange={onEnergyChange} />
       </div>
-      
       {/* Overlay-Button (immer sichtbar) */}
       <button
         onClick={() => setIsOpen(prev => !prev)}

@@ -123,6 +123,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
           setAudioActive(false);
           updateEnergy(0);
           startIdle();
+          // throttledLog("Music paused, starting idle animation", true);
         }
       }, 5000); // Erhöht auf 5000ms um Track-Wechsel zu berücksichtigen
     }
@@ -139,11 +140,13 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     
     // WICHTIG: Starte Idle NICHT wenn Musik spielt
     if (store.isMusicPlaying) {
+      // throttledLog("Cannot start idle animation while music is playing", true);
       return;
     }
     
     // WICHTIG: Starte Idle NICHT wenn bereits Audio-Aktivität vorhanden ist
     if (store.isAudioActive && store.energy > 0.02) {
+      // throttledLog("Cannot start idle animation while audio is active", true);
       return;
     }
     
@@ -190,7 +193,14 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
           }
         }, 200);
       }
+      
+      // Log nur beim Start und alle 10 Schritte (ein kompletter Loop)
+      if (idleStep === 0) {
+        // throttledLog("Idle animation loop completed");
+      }
     }, IDLE_INTERVAL);
+    
+    // throttledLog("Idle animation started", true);
   },
   
   // OPTIMIERT: Verbesserte Idle-Beendigung
@@ -205,6 +215,8 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     
     // OPTIMIERT: Reset Energy auf 0 wenn Idle gestoppt wird
     set({ energy: 0 });
+    
+    // throttledLog("Idle animation stopped", true);
   },
   
   isIdleActive: () => idleActive
@@ -225,33 +237,33 @@ export function useBeatReset(delay: number = 500) {
   }, [beatDetected, resetBeat, delay]);
 }
 
-// OPTIMIERT: Hook für Idle-Animation mit AudioProvider-Integration
+// OPTIMIERT: Hook für Idle-Animation
 export function useIdleAnimation() {
   const { isMusicPlaying, idleEnabled, startIdle } = useAudioReactionStore();
   
   // Initialisiere Idle bei Komponentenladung und wenn Musik stoppt
   useEffect(() => {
-    // Starte Idle nur wenn Musik NICHT spielt und Idle aktiviert ist
+    // OPTIMIERT: Starte Idle nur wenn Musik NICHT spielt und Idle aktiviert ist
     if (!isMusicPlaying && idleEnabled) {
-      // Verzögerung für stabilere Animation und um Track-Wechsel zu berücksichtigen
+      // OPTIMIERT: Längere Verzögerung für stabilere Animation und um Track-Wechsel zu berücksichtigen
       const timer = setTimeout(() => {
         // Prüfe nochmal, ob Musik wirklich gestoppt ist (nicht nur Track-Wechsel)
-        const { isMusicPlaying } = useAudioReactionStore.getState();
-        if (!isMusicPlaying) {
+        const currentState = useAudioReactionStore.getState();
+        if (!currentState.isMusicPlaying && currentState.idleEnabled) {
           startIdle();
         }
-      }, 2000);
+      }, 5000); // Erhöht auf 5000ms um Track-Wechsel zu berücksichtigen
       
       return () => clearTimeout(timer);
     }
+    // OPTIMIERT: Stoppe Idle sofort wenn Musik spielt
+    else if (isMusicPlaying) {
+      const { stopIdle } = useAudioReactionStore.getState();
+      stopIdle();
+    }
   }, [isMusicPlaying, idleEnabled, startIdle]);
   
-  // Cleanup beim Unmount
-  useEffect(() => {
-    return () => {
-      cleanupAudioIntervals();
-    };
-  }, []);
+  return idleActive;
 }
 
 // OPTIMIERT: Cleanup-Funktion für globale Intervalle
@@ -263,4 +275,6 @@ export function cleanupAudioIntervals(): void {
   
   idleActive = false;
   idleStep = 0;
+  
+  // throttledLog('Audio intervals cleaned up', true);
 } 

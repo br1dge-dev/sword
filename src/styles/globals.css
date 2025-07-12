@@ -25,6 +25,8 @@
   --grifter-blue: #3EE6FF;
   --grifter-yellow: #F8E16C;
   --grifter-dark: #181A1B;
+  /* Font-Variablen */
+  --font-press-start-2p: 'Press Start 2P', monospace;
 }
 
 /* Cooldown-Animation für Buttons */
