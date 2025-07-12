@@ -158,90 +158,42 @@ function generateBackgroundRegion(
   // OPTIMIERT: Generiere nur den sichtbaren Bereich
   for (let y = region.startY; y < region.endY; y++) {
     if (!background[y]) background[y] = [];
-    
     for (let x = region.startX; x < region.endX; x++) {
-      const distFromCenter = Math.abs(x - centerX);
-      
-      // OPTIMIERT: Früher Exit für unsichtbare Bereiche
-      let emptyProbability = 0;
-      if (isLargeViewport && distFromCenter > fadeStart) {
-        emptyProbability = Math.min(0.95, (distFromCenter - fadeStart) / fadeWidth);
-        emptyProbability = Math.pow(emptyProbability, 1.2);
-        if (distFromCenter > centerX * 0.85) {
-          emptyProbability = Math.min(0.98, emptyProbability * 1.2);
+      // --- NEU: chaotisch-konzentrische Muster ---
+      const dx = x - centerX;
+      const dy = y - adjustedHeight / 2;
+      // Ringbreite pro Feld leicht variieren
+      const ringWidth = 6 + Math.floor(pseudoRandom(x, y, patternType + 8888) * 3); // 6 bis 8
+      // Zufälliger Offset für den Abstand
+      const noisyDist = Math.sqrt(dx * dx + dy * dy) + (pseudoRandom(x, y, patternType + 9999) - 0.5) * 6;
+      const ring = Math.floor(noisyDist / ringWidth);
+
+      // Dichte pro Ring: innen dichter, außen lockerer
+      let emptyProbability = 0.18 + 0.07 * ring;
+      if (isLargeViewport && Math.abs(dx) > fadeStart) {
+        emptyProbability = Math.min(0.995, emptyProbability + ((Math.abs(dx) - fadeStart) / fadeWidth) * 1.25);
+        emptyProbability = Math.pow(emptyProbability, 1.25);
+        if (Math.abs(dx) > centerX * 0.85) {
+          emptyProbability = Math.min(0.998, emptyProbability * 1.2);
         }
       }
-      emptyProbability = Math.max(emptyProbability, 0.10);
-      
-      // Ersetze Math.random() durch deterministische Variante
+      emptyProbability = Math.max(emptyProbability, 0.25);
       if (pseudoRandom(x, y, patternType) < emptyProbability) {
         background[y][x] = ' ';
         continue;
       }
-      
-      // OPTIMIERT: Vereinfachte Muster-Generierung für bessere Performance
-      const noiseValue = Math.abs(Math.sin(x * 0.07) * Math.cos(y * 0.07));
-      const regionValue = noiseValue;
-      
+
+      // Zeichenwahl pro Ring: zyklisch durch die Sets
       let charSet;
-      if (regionValue < 0.35) {
+      if (ring % 3 === 0) {
         charSet = selectedCharSet.light;
-      } else if (regionValue < 0.75) {
+      } else if (ring % 3 === 1) {
         charSet = selectedCharSet.medium;
       } else {
         charSet = selectedCharSet.dense;
       }
-      
-      if (isLargeViewport && distFromCenter > fadeStart) {
-        const lightCharProbability = Math.min(0.85, (distFromCenter - fadeStart) / fadeWidth);
-        if (pseudoRandom(x + 1000, y + 1000, patternType) < lightCharProbability) {
-          charSet = selectedCharSet.light;
-        }
-      }
-      
-      // OPTIMIERT: Reduzierte rhythmische Variationen für bessere Performance
-      // Ersetze Math.random() durch deterministische Variante für Zeichenwahl
-      if ((x + y) % 7 === 0 || pseudoRandom(x + 2000, y + 2000, patternType) < 0.1) {
-        background[y][x] = charSet[Math.floor(pseudoRandom(x, y, patternType) * charSet.length)];
-      } else if (pseudoRandom(x + 3000, y + 3000, patternType) < 0.7) {
-        const patternY = y % caveBgPatterns.length;
-        const patternX = x % caveBgPatterns[patternY].length;
-        const baseChar = caveBgPatterns[patternY][patternX];
-        
-        if (baseChar === '█' || baseChar === '▓') {
-          background[y][x] = selectedCharSet.dense[Math.floor(pseudoRandom(x, y, patternType) * selectedCharSet.dense.length)];
-        } else if (baseChar === '▒') {
-          background[y][x] = selectedCharSet.medium[Math.floor(pseudoRandom(x, y, patternType) * selectedCharSet.medium.length)];
-        } else if (baseChar === '░') {
-          background[y][x] = selectedCharSet.light[Math.floor(pseudoRandom(x, y, patternType) * selectedCharSet.light.length)];
-        } else {
-          background[y][x] = baseChar;
-        }
-      } else {
-        background[y][x] = charSet[Math.floor(pseudoRandom(x + 4000, y + 4000, patternType) * charSet.length)];
-      }
-
-      // --- NEU: Vertikale Linien konsistenter fortsetzen ---
-      // Prüfe, ob das aktuelle charSet ein vertikales Zeichen enthält
-      const verticalChars = ['│', '┃'];
-      let isVerticalAbove = false;
-      if (y > 0 && background[y - 1] && verticalChars.includes(background[y - 1][x])) {
-        isVerticalAbove = true;
-      }
-      // Wenn oben ein vertikaler Strich ist, erhöhe die Wahrscheinlichkeit, dass hier auch einer ist
-      if (isVerticalAbove && charSet.includes('│')) {
-        if (pseudoRandom(x, y, patternType + 5000) < 0.7) {
-          background[y][x] = '│';
-          continue;
-        }
-      }
-      if (isVerticalAbove && charSet.includes('┃')) {
-        if (pseudoRandom(x, y, patternType + 6000) < 0.7) {
-          background[y][x] = '┃';
-          continue;
-        }
-      }
-      // --- ENDE NEU ---
+      // Innerhalb des Sets weiterhin zufällig
+      background[y][x] = charSet[Math.floor(pseudoRandom(x, y, patternType) * charSet.length)];
     }
   }
 }
