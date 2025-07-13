@@ -54,12 +54,12 @@ export default function RootLayout({
         <meta property="og:title" content="GR1FTSWORD – ASCII Art & Music Experience" />
         <meta property="og:description" content="GR1FTSWORD brings ASCII art and music together. Created by br1dge, with a lot of help from Cursor AI and Suno." />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="/og-image.jpg" />
-        <meta property="og:url" content="https://gr1ftsword.xyz/" />
+        <meta property="og:image" content="https://sword.br1dge.xyz/og-image.jpg" />
+        <meta property="og:url" content="https://sword.br1dge.xyz/" />
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:title" content="GR1FTSWORD – ASCII Art & Music Experience" />
         <meta name="twitter:description" content="GR1FTSWORD brings ASCII art and music together. Created by br1dge, with a lot of help from Cursor AI and Suno." />
-        <meta name="twitter:image" content="/og-image.jpg" />
+        <meta name="twitter:image" content="https://sword.br1dge.xyz/og-image.jpg" />
         <link rel="icon" href="/icons/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
