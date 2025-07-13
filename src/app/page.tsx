@@ -24,7 +24,20 @@ export default function HomePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUIVisible, setIsUIVisible] = useState(true);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
-  const { energy, beatDetected, setMusicPlaying } = useAudioReactionStore();
+  const { energy, beatDetected, setMusicPlaying, swordColor = '#00FCA6' } = useAudioReactionStore();
+  
+  // Für den Titel: Random Highlight
+  const leaderboardTitle = 'L3ADERBOARD';
+  const highlightColors = ['#F8E16C', '#FF3EC8', '#3EE6FF'];
+  const [highlightIdx, setHighlightIdx] = useState(Math.floor(Math.random() * leaderboardTitle.length));
+  const [highlightColor, setHighlightColor] = useState(highlightColors[Math.floor(Math.random() * highlightColors.length)]);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHighlightIdx(Math.floor(Math.random() * leaderboardTitle.length));
+      setHighlightColor(highlightColors[Math.floor(Math.random() * highlightColors.length)]);
+    }, 1800);
+    return () => clearInterval(interval);
+  }, []);
   
   // OPTIMIERT: Throttled Logging für bessere Performance
   // const lastLogTimeRef = useRef<number>(0);
@@ -94,6 +107,8 @@ export default function HomePage() {
     { address: '0xfedcba0987654321fedcba0987654321fedcba09', points: 987, rank: 6 },
     { address: '0x1111111111111111111111111111111111111111', points: 756, rank: 7 },
     { address: '0x2222222222222222222222222222222222222222', points: 543, rank: 8 },
+    { address: '0x3333333333333333333333333333333333333333', points: 321, rank: 9 },
+    { address: '0x4444444444444444444444444444444444444444', points: 123, rank: 10 },
   ];
 
   const formatAddress = (address: string) => {
@@ -102,17 +117,17 @@ export default function HomePage() {
 
   const getRankColor = (rank: number) => {
     switch (rank) {
-      case 1: return 'text-yellow-400 border-yellow-400';
-      case 2: return 'text-gray-300 border-gray-300';
-      case 3: return 'text-amber-600 border-amber-600';
-      default: return 'text-grifter-blue border-grifter-blue';
+      case 1: return 'text-grifter-green';
+      case 2: return 'text-grifter-pink';
+      case 3: return 'text-grifter-blue';
+      default: return 'text-grifter-blue';
     }
   };
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
-        isModalOpen ? '' : ''
+        isModalOpen || isLeaderboardOpen ? 'backdrop-blur-modal' : ''
       }`}>
         {/* Hauptbereich mit dem ASCII-Schwert */}
         <div className="absolute inset-0 flex items-center justify-center">
@@ -193,43 +208,83 @@ export default function HomePage() {
 
         {/* Leaderboard Modal */}
         {isLeaderboardOpen && (
-          <div className="fixed inset-0 z-40 bg-black bg-opacity-90 flex items-center justify-center p-4">
-            <div className="bg-black border border-grifter-blue rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 z-40 bg-black bg-opacity-90 backdrop-blur-modal flex items-center justify-center p-4">
+            <div className="bg-black border border-grifter-blue rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto relative leaderboard-scrollbar">
+              {/* X-Button oben rechts */}
+              <button
+                onClick={() => setIsLeaderboardOpen(false)}
+                className="absolute top-3 right-3 text-grifter-blue text-xl font-bold hover:text-pink-400 transition-colors"
+                aria-label="Schließen"
+                style={{ zIndex: 10 }}
+              >
+                ×
+              </button>
               <div className="text-center mb-6">
-                <h2 className="text-2xl font-press-start-2p text-grifter-blue mb-2">LEADERBOARD</h2>
-                <div className="text-sm text-grifter-blue opacity-80">TOP SWORD WARRIORS</div>
+                {/* Titel wie Track-Title */}
+                <h2 className="text-2xl font-press-start-2p mb-2 select-none" style={{ color: swordColor, letterSpacing: '0.05em' }}>
+                  {leaderboardTitle.split('').map((char, i) => (
+                    <span key={i} style={i === highlightIdx ? { color: highlightColor } : {}}>{char}</span>
+                  ))}
+                </h2>
               </div>
               
               <div className="space-y-3">
-                {leaderboardData.map((entry) => (
-                  <div 
-                    key={entry.address}
-                    className={`flex items-center justify-between p-3 rounded border ${
-                      getRankColor(entry.rank)
-                    } ${entry.rank <= 3 ? 'bg-opacity-10' : 'bg-transparent'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`text-lg font-press-start-2p ${
-                        entry.rank <= 3 ? 'text-2xl' : 'text-lg'
-                      }`}>
-                        #{entry.rank}
+                {leaderboardData.map((entry) => {
+                  let rankClass = '';
+                  let numberColor = '';
+                  let pointsColor = '';
+                  let addressColor = '';
+                  let unitColor = '';
+                  if (entry.rank === 1) {
+                    rankClass = 'leaderboard-rank-1';
+                    numberColor = 'text-[#00FCA6]';
+                    pointsColor = 'text-[#00FCA6]';
+                    addressColor = 'text-[#00FCA6]';
+                    unitColor = '';
+                  } else if (entry.rank === 2) {
+                    rankClass = 'leaderboard-rank-2';
+                    numberColor = 'text-[#F8E16C]';
+                    pointsColor = 'text-[#F8E16C]';
+                    addressColor = 'text-[#F8E16C]';
+                    unitColor = '';
+                  } else if (entry.rank === 3) {
+                    rankClass = 'leaderboard-rank-3';
+                    numberColor = 'text-[#FF3EC8]';
+                    pointsColor = 'text-[#FF3EC8]';
+                    addressColor = 'text-[#FF3EC8]';
+                    unitColor = '';
+                  } else {
+                    numberColor = 'text-[#3EE6FF]';
+                    pointsColor = 'text-[#3EE6FF]';
+                    addressColor = 'text-[#3EE6FF]';
+                    unitColor = 'text-[#3EE6FF]';
+                  }
+                  return (
+                    <div
+                      key={entry.address}
+                      className={`flex items-center justify-between p-3 rounded ${rankClass || 'border border-grifter-blue'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`text-xs font-press-start-2p flex items-center ${numberColor}`}>
+                          #{entry.rank}
+                        </div>
+                        <div className={`font-mono text-xs ${addressColor}`}>
+                          {formatAddress(entry.address)}
+                        </div>
                       </div>
-                      <div className="font-mono text-sm">
-                        {formatAddress(entry.address)}
+                      <div className="leaderboard-points">
+                        <span className={`text-xs font-press-start-2p ${pointsColor}`}>{entry.points}</span>
+                        <span className={`leaderboard-points-unit ${unitColor}`}>͆</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-press-start-2p">{entry.points}</span>
-                      <span className="text-xs opacity-80">⚡</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               
               <div className="mt-6 text-center">
                 <button
                   onClick={() => setIsLeaderboardOpen(false)}
-                  className="px-4 py-2 bg-grifter-blue text-black font-press-start-2p text-sm rounded border border-grifter-blue hover:bg-transparent hover:text-grifter-blue transition-colors"
+                  className="px-4 py-2 bg-grifter-blue text-black font-press-start-2p text-xs rounded border border-grifter-blue hover:bg-transparent hover:text-grifter-blue transition-colors"
                 >
                   CLOSE
                 </button>
