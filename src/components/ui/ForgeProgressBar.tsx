@@ -75,9 +75,11 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
     const totalTiles = 10; // Genau 10 Tiles
     const tiles = [];
     
+    // Berechne wie viele Tiles aktiv sein sollen basierend auf dem Fortschritt
+    const activeTiles = Math.floor((forgeProgress / 100) * totalTiles);
+    
     for (let i = 0; i < totalTiles; i++) {
-      const tileProgress = (i + 1) / totalTiles * 100;
-      const isActive = isMaxLevel || tileProgress <= forgeProgress;
+      const isActive = isMaxLevel || i < activeTiles;
       
       tiles.push(
         <div 
@@ -106,6 +108,8 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
              }}>
           FORGE - LVL {currentLevel}
         </div>
+        
+        {/* Prozentuale Anzeige */}
         
         <div className="flex items-center gap-2">
           {/* Fortschrittsbalken mit genau 10 Tiles */}

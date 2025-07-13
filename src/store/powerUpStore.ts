@@ -38,6 +38,11 @@ interface PowerUpState {
   increaseGlitchProgress: () => void;
   resetForgeProgress: () => void;
   
+  // Cheat-Aktionen für direkte Level-Ups
+  cheatForgeLevel: () => void;
+  cheatChargeLevel: () => void;
+  cheatGlitchLevel: () => void;
+  
   // Hilfsfunktion zum Zurücksetzen aller Effekte
   resetAllEffects: () => void;
 }
@@ -118,8 +123,8 @@ export const usePowerUpStore = create<PowerUpState>()(
       
       increaseForgeProgress: () => {
         set((state) => {
-          // Fortschritt um 10% erhöhen, maximal 100%
-          const newProgress = Math.min(state.forgeProgress + 10, 100);
+          // Fortschritt um 1% erhöhen, maximal 100%
+          const newProgress = Math.min(state.forgeProgress + 1, 100);
           const isComplete = newProgress >= 100;
           
           return { 
@@ -131,8 +136,8 @@ export const usePowerUpStore = create<PowerUpState>()(
       
       increaseChargeProgress: () => {
         set((state) => {
-          // Fortschritt um 10% erhöhen, maximal 100%
-          const newProgress = Math.min(state.chargeProgress + 10, 100);
+          // Fortschritt um 1% erhöhen, maximal 100%
+          const newProgress = Math.min(state.chargeProgress + 1, 100);
           const isComplete = newProgress >= 100;
           
           return { 
@@ -144,8 +149,8 @@ export const usePowerUpStore = create<PowerUpState>()(
       
       increaseGlitchProgress: () => {
         set((state) => {
-          // Fortschritt um 10% erhöhen, maximal 100%
-          const newProgress = Math.min(state.glitchProgress + 10, 100);
+          // Fortschritt um 1% erhöhen, maximal 100%
+          const newProgress = Math.min(state.glitchProgress + 1, 100);
           const isComplete = newProgress >= 100;
           
           return { 
@@ -160,6 +165,29 @@ export const usePowerUpStore = create<PowerUpState>()(
           forgeProgress: 0,
           isForgeComplete: false 
         });
+      },
+      
+      // Cheat-Aktionen für direkte Level-Ups
+      cheatForgeLevel: () => {
+        set((state) => ({
+          currentLevel: Math.min(state.currentLevel + 1, state.maxLevel),
+          forgeProgress: 0,
+          isForgeComplete: false
+        }));
+      },
+      cheatChargeLevel: () => {
+        set((state) => ({
+          chargeLevel: Math.min(state.chargeLevel + 1, state.maxChargeLevel),
+          chargeProgress: 0,
+          isChargeComplete: false
+        }));
+      },
+      cheatGlitchLevel: () => {
+        set((state) => ({
+          glitchLevel: Math.min(state.glitchLevel + 1, state.maxGlitchLevel),
+          glitchProgress: 0,
+          isGlitchComplete: false
+        }));
       },
       
       // Hilfsfunktion zum Zurücksetzen aller Effekte

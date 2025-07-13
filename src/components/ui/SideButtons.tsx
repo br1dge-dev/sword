@@ -10,6 +10,7 @@ import CleanseButton from './CleanseButton';
 import ForgeProgressBar from './ForgeProgressBar';
 import ChargeProgressBar from './ChargeProgressBar';
 import GlitchProgressBar from './GlitchProgressBar';
+import CheatButtons from './CheatButtons';
 import { usePowerUpStore } from '@/store/powerUpStore';
 
 interface SideButtonsProps {
@@ -75,6 +76,8 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
         onClick={handleCleanse}
         cooldown={3000}
       />
+      
+      <CheatButtons className="mt-4" />
       
       <div className="flex flex-col gap-4 mt-4">
         <ForgeProgressBar />
