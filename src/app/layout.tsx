@@ -48,6 +48,13 @@ export default function RootLayout({
     <html lang="en" className={`dark overflow-hidden ${pressStart2P.variable}`}>
       <head>
         <meta name="description" content="Real-time Ethereum blockchain visualization in ASCII art" />
+        <link rel="icon" href="/icons/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+        <link rel="manifest" href="/icons/site.webmanifest" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icons/android-chrome-192x192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icons/android-chrome-512x512.png" />
       </head>
       <body className={`${inter.className} min-h-screen overflow-hidden horizontal-scanlines`} style={{
         backgroundColor: 'var(--color-bg-primary)',
