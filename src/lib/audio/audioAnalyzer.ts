@@ -227,6 +227,40 @@ export class AudioAnalyzer {
     this.options.energyThreshold = Math.max(0.01, Math.min(1.0, threshold));
   }
 
+  public setAnalyzeInterval(interval: number): void {
+    this.options.analyzeInterval = Math.max(10, Math.min(500, interval));
+  }
+
+  public setSmoothingTimeConstant(val: number): void {
+    if (this.analyser) {
+      this.analyser.smoothingTimeConstant = Math.max(0.1, Math.min(0.99, val));
+    }
+  }
+
+  public setAdaptiveThreshold(val: number): void {
+    this.adaptiveThreshold = Math.max(0.001, Math.min(1.0, val));
+  }
+
+  public setAdaptiveSensitivity(val: number): void {
+    this.adaptiveSensitivity = Math.max(0.1, Math.min(5.0, val));
+  }
+
+  public setMinBeatInterval(val: number): void {
+    (this as any).minBeatInterval = Math.max(10, Math.min(1000, val));
+  }
+
+  public setBassWeight(val: number): void {
+    (this as any).bassWeight = Math.max(0.1, Math.min(5.0, val));
+  }
+
+  public setMidWeight(val: number): void {
+    (this as any).midWeight = Math.max(0.1, Math.min(5.0, val));
+  }
+
+  public setHighWeight(val: number): void {
+    (this as any).highWeight = Math.max(0.1, Math.min(5.0, val));
+  }
+
   private analyze(): void {
     if (!this.isAnalyzing || !this.analyser || !this.frequencyData) {
       return;

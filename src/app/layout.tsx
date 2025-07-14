@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { Inter, Press_Start_2P } from 'next/font/google';
 import { useAudioReactionStore, useIdleAnimation } from '@/store/audioReactionStore';
 import '../styles/globals.css';
+import DebugAudioPanel from '@/components/ui/DebugAudioPanel';
 
 // Initialize the Inter font with Latin subset
 const inter = Inter({ subsets: ['latin'] });
@@ -72,6 +73,7 @@ export default function RootLayout({
         backgroundColor: 'var(--color-bg-primary)',
         backgroundImage: 'radial-gradient(circle at 50% 50%, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%)',
       }}>
+        <DebugAudioPanel />
         <div className="crt-effect crt-curve-strong vignette min-h-screen overflow-hidden">
           {children}
         </div>
