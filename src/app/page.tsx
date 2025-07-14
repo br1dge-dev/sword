@@ -14,7 +14,7 @@ import AsciiSword from '@/components/ascii/AsciiSword';
 import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
-import { IoMdEye, IoMdEyeOff, IoMdTrophy } from 'react-icons/io';
+import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdBulb } from 'react-icons/io';
 
 export default function HomePage() {
   // Base level setting (will be overridden by PowerUp)
@@ -24,6 +24,7 @@ export default function HomePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUIVisible, setIsUIVisible] = useState(true);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isWtfModalOpen, setIsWtfModalOpen] = useState(false);
   const { energy, beatDetected, setMusicPlaying, swordColor = '#00FCA6' } = useAudioReactionStore();
   
   // Für den Titel: Random Highlight
@@ -127,7 +128,7 @@ export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
-        isModalOpen || isLeaderboardOpen ? 'backdrop-blur-modal' : ''
+        isModalOpen || isLeaderboardOpen || isWtfModalOpen ? 'backdrop-blur-modal' : ''
       }`}>
         {/* Hauptbereich mit dem ASCII-Schwert */}
         <div className="absolute inset-0 flex items-center justify-center">
@@ -167,7 +168,7 @@ export default function HomePage() {
 
 
 
-        {/* Bottom Buttons - HIDE, Config, Leaderboard */}
+        {/* Bottom Buttons - HIDE, Config, Leaderboard, WTF */}
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0">
           {/* HIDE Button */}
           <button
@@ -183,7 +184,6 @@ export default function HomePage() {
               <IoMdEye className="text-grifter-blue text-2xl" />
             )}
           </button>
-
           {/* Config Button (MobileControlsOverlay Trigger) */}
           <button
             onClick={() => setIsModalOpen(!isModalOpen)}
@@ -195,7 +195,6 @@ export default function HomePage() {
           >
             <svg className={`text-grifter-blue text-2xl transition-transform duration-300 ${isModalOpen ? 'rotate-90' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5C13.933 15.5 15.5 13.933 15.5 12C15.5 10.067 13.933 8.5 12 8.5C10.067 8.5 8.5 10.067 8.5 12C8.5 13.933 10.067 15.5 12 15.5Z" stroke="#3EE6FF" strokeWidth="2"/><path d="M19.4 15A1.65 1.65 0 0 0 21 13.35V10.65A1.65 1.65 0 0 0 19.4 9L18.13 7.13A1.65 1.65 0 0 0 16.35 6.6L13.65 6.6A1.65 1.65 0 0 0 12 5A1.65 1.65 0 0 0 10.35 6.6L7.65 6.6A1.65 1.65 0 0 0 5.87 7.13L4.6 9A1.65 1.65 0 0 0 3 10.65V13.35A1.65 1.65 0 0 0 4.6 15L5.87 16.87A1.65 1.65 0 0 0 7.65 17.4L10.35 17.4A1.65 1.65 0 0 0 12 19A1.65 1.65 0 0 0 13.65 17.4L16.35 17.4A1.65 1.65 0 0 0 18.13 16.87L19.4 15Z" stroke="#3EE6FF" strokeWidth="2"/></svg>
           </button>
-
           {/* Leaderboard Button */}
           <button
             onClick={() => setIsLeaderboardOpen(!isLeaderboardOpen)}
@@ -205,6 +204,17 @@ export default function HomePage() {
             }}
           >
             <IoMdTrophy className="text-grifter-blue text-2xl" />
+          </button>
+          {/* WTF IS THIS Button */}
+          <button
+            onClick={() => setIsWtfModalOpen(true)}
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            style={{
+              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+            }}
+            aria-label="WTF IS THIS"
+          >
+            <IoMdBulb className="text-grifter-blue text-2xl" />
           </button>
         </div>
 
@@ -221,14 +231,12 @@ export default function HomePage() {
               >
                 ×
               </button>
-              <div className="text-center mb-6">
-                {/* Titel wie Track-Title */}
-                <h2 className="text-2xl font-press-start-2p mb-2 select-none" style={{ color: swordColor, letterSpacing: '0.05em' }}>
-                  {leaderboardTitle.split('').map((char, i) => (
-                    <span key={i} style={i === highlightIdx ? { color: highlightColor } : {}}>{char}</span>
-                  ))}
-                </h2>
-              </div>
+              {/* Leaderboard Modal Headline Scanline */}
+              <h2 className="text-2xl font-press-start-2p mb-2 select-none relative scanlines-subtle" style={{ color: swordColor, letterSpacing: '0.05em' }}>
+                {leaderboardTitle.split('').map((char, i) => (
+                  <span key={i} style={i === highlightIdx ? { color: highlightColor } : {}}>{char}</span>
+                ))}
+              </h2>
               
               <div className="space-y-3">
                 {leaderboardData.map((entry) => {
@@ -295,7 +303,147 @@ export default function HomePage() {
           </div>
         )}
         
+        {/* WTF IS THIS Modal */}
+        {isWtfModalOpen && (
+          <div className="fixed inset-0 z-40 bg-black bg-opacity-90 backdrop-blur-modal flex items-center justify-center p-4">
+            <div className="bg-black border border-grifter-blue rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto relative leaderboard-scrollbar">
+              {/* X-Button oben rechts */}
+              <button
+                onClick={() => setIsWtfModalOpen(false)}
+                className="absolute top-3 right-3 text-grifter-blue text-xl font-bold hover:text-pink-400 transition-colors"
+                aria-label="Schließen"
+                style={{ textShadow: '0 0 10px currentColor' }}
+              >
+                ×
+              </button>
+
+              {/* Headline wie im Leaderboard */}
+              <h2
+                className="text-2xl font-press-start-2p uppercase mb-4 text-center select-none relative scanlines-subtle"
+                style={{
+                  color: swordColor,
+                  letterSpacing: '0.05em',
+                  zIndex: 1
+                }}
+              >
+                {"WTF IS THIS?".split('').map((char, i) => (
+                  <span key={i} style={i === highlightIdx ? { color: highlightColor } : {}}>{char}</span>
+                ))}
+              </h2>
+
+              {/* Einleitung */}
+              <p className="text-gray-300 mb-6 text-xs font-press-start-2p uppercase leading-relaxed text-center">
+                VIEWERS CAN HELP THE GR1FTSWORD EVOLVE BY MAKING A SMALL CONTRIBUTION.<br />
+                OF COURSE, YOU CAN ENJOY GREAT MUSIC AND RHYTHMIC ASCII ART 24/7 – COMPLETELY FREE OF CHARGE!
+              </p>
+
+              {/* Punkte-Tabelle im Leaderboard-Style */}
+              <div className="mb-4">
+                <h3 className="text-grifter-blue font-press-start-2p uppercase font-semibold mb-3 text-center text-sm">HOW DOES IT WORK?</h3>
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+                  {/* Upgrades */}
+                  <h4 className="text-pink-400 font-press-start-2p uppercase font-medium mb-2 text-xs">UPGRADES <span className='text-gray-400 font-normal'>(pro Level: 100x)</span></h4>
+                  <table className="w-full text-xs font-press-start-2p uppercase">
+                    <thead>
+                      <tr className="text-grifter-blue text-left">
+                        <th className="py-1 px-2 font-semibold">LEVEL</th>
+                        <th className="py-1 px-2 font-semibold text-right">POINTS</th>
+                        <th className="py-1 px-2 font-semibold text-right">COST</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="py-1 px-2 text-gray-200">LVL 1 → 2</td>
+                        <td className="py-1 px-2 text-grifter-blue text-right font-mono">10͆ × 100</td>
+                        <td className="py-1 px-2 text-pink-400 text-right font-mono">TBD × 100</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 px-2 text-gray-200">LVL 2 → 3</td>
+                        <td className="py-1 px-2 text-grifter-blue text-right font-mono">20͆ × 100</td>
+                        <td className="py-1 px-2 text-pink-400 text-right font-mono">TBD*2 × 100</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 px-2 text-gray-200">LVL 3 → 4</td>
+                        <td className="py-1 px-2 text-grifter-blue text-right font-mono">40͆ × 100</td>
+                        <td className="py-1 px-2 text-pink-400 text-right font-mono">... × 100</td>
+                      </tr>
+                      <tr className="opacity-50">
+                        <td className="py-1 px-2 text-gray-400">LVL 4 → 5</td>
+                        <td className="py-1 px-2 text-gray-500 text-right font-mono">80͆ × 100</td>
+                        <td className="py-1 px-2 text-pink-400 text-right font-mono">... × 100</td>
+                      </tr>
+                      <tr className="opacity-30">
+                        <td className="py-1 px-2 text-gray-400">LVL 5 → 6</td>
+                        <td className="py-1 px-2 text-gray-500 text-right font-mono">160͆ × 100</td>
+                        <td className="py-1 px-2 text-pink-400 text-right font-mono">... × 100</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {/* LVL-Ups */}
+                  <h4 className="text-pink-400 font-press-start-2p uppercase font-medium mb-2 text-xs mt-4">EVOLUTION <span className='text-gray-400 font-normal'>(nur 1x pro Level)</span></h4>
+                  <table className="w-full text-xs font-press-start-2p uppercase">
+                    <thead>
+                      <tr className="text-grifter-blue text-left">
+                        <th className="py-1 px-2 font-semibold">LEVEL</th>
+                        <th className="py-1 px-2 font-semibold text-right">POINTS</th>
+                        <th className="py-1 px-2 font-semibold text-right">COST</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="py-1 px-2 text-gray-200">LVL 1 → 2</td>
+                        <td className="py-1 px-2 text-grifter-blue text-right font-mono">200͆</td>
+                        <td className="py-1 px-2 text-pink-400 text-right font-mono">TBD</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 px-2 text-gray-200">LVL 2 → 3</td>
+                        <td className="py-1 px-2 text-grifter-blue text-right font-mono">400͆</td>
+                        <td className="py-1 px-2 text-pink-400 text-right font-mono">TBD*2</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 px-2 text-gray-200">LVL 3 → 4</td>
+                        <td className="py-1 px-2 text-grifter-blue text-right font-mono">800͆</td>
+                        <td className="py-1 px-2 text-pink-400 text-right font-mono">...</td>
+                      </tr>
+                      <tr className="opacity-50">
+                        <td className="py-1 px-2 text-gray-400">LVL 4 → 5</td>
+                        <td className="py-1 px-2 text-gray-500 text-right font-mono">1600͆</td>
+                        <td className="py-1 px-2 text-pink-400 text-right font-mono">...</td>
+                      </tr>
+                      <tr className="opacity-30">
+                        <td className="py-1 px-2 text-gray-400">LVL 5 → 6</td>
+                        <td className="py-1 px-2 text-gray-500 text-right font-mono">3200͆</td>
+                        <td className="py-1 px-2 text-pink-400 text-right font-mono">...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
       </div>
+      {/* Scanline-Effekt für Leaderboard-Headline */}
+      <style jsx global>{`
+        .scanlines-subtle::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: repeating-linear-gradient(
+            0deg,
+            rgba(0, 0, 0, 0.25),
+            rgba(0, 0, 0, 0.25) 1px,
+            transparent 1px,
+            transparent 2px
+          );
+          pointer-events: none;
+          z-index: 10;
+        }
+      `}</style>
     </main>
   );
 } 
