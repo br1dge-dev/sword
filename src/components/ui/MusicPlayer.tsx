@@ -245,10 +245,7 @@ export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: 
         if (isPlaying) {
           await audioRef.current.play();
           
-          // Reset Audio-Analyzer für neuen Track
-          if (globalAnalyzer && globalAnalyzer.resetTrackAnalysis) {
-            globalAnalyzer.resetTrackAnalysis();
-          }
+          // Track-Wechsel - AudioAnalyzer lädt automatisch neue Konfiguration
           
           // Starte Audio-Analyse nach Track-Wechsel
           const timer = setTimeout(() => {

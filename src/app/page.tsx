@@ -165,6 +165,8 @@ export default function HomePage() {
           />
         </div>
 
+
+
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0">
           {/* HIDE Button */}

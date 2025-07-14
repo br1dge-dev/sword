@@ -1,0 +1,33 @@
+{
+  "trackId": "gr1ftsword",
+  "trackPath": "/Users/christian/+CODING/sword/public/music/gr1ftsword.mp3",
+  "analysisDate": "2025-07-14T19:08:24.113Z",
+  "config": {
+    "energyThreshold": 0.020,
+    "beatSensitivity": 1.0,
+    "analyzeInterval": 50,
+    "smoothingTimeConstant": 0.8,
+    "minBeatInterval": 120,
+    "bassWeight": 2.0,
+    "midWeight": 1.5,
+    "highWeight": 0.8
+  },
+  "metadata": {
+    "energyStats": {
+      "min": 0.012,
+      "max": 0.18,
+      "avg": 0.065,
+      "stdDev": 0.035
+    },
+    "frequencyStats": {
+      "bass": 0.55,
+      "mid": 0.3,
+      "high": 0.15
+    },
+    "dynamicRange": 4.2,
+    "beatPattern": {
+      "avgInterval": 85,
+      "consistency": 0.95
+    }
+  }
+}

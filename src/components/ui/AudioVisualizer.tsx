@@ -96,7 +96,7 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
       </div>
       
       {/* Beat-Indikator */}
-      <div className="flex justify-between w-full mt-1">
+      <div className="flex justify-center w-full mt-1">
         <div 
           className={`w-2 h-2 rounded-full transition-all duration-150 ${visualBeatActive ? 'bg-[#3EE6FF]' : 'bg-gray-700'}`}
           style={{
@@ -105,9 +105,6 @@ export default function AudioVisualizer({ energy, beatDetected, className = '' }
               : 'none'
           }}
         />
-        <div className="text-[8px] font-mono text-gray-500">
-          {isIdleActive ? "IDLE" : `E: ${(lastEnergyRef.current * 1.8).toFixed(2)}`}
-        </div>
       </div>
     </div>
   );

@@ -1,0 +1,33 @@
+{
+  "trackId": "DANGERSWORD",
+  "trackPath": "/Users/christian/+CODING/sword/public/music/DANGERSWORD.mp3",
+  "analysisDate": "2025-07-14T19:08:24.110Z",
+  "config": {
+    "energyThreshold": 0.025,
+    "beatSensitivity": 0.8,
+    "analyzeInterval": 50,
+    "smoothingTimeConstant": 0.8,
+    "minBeatInterval": 120,
+    "bassWeight": 2.0,
+    "midWeight": 1.5,
+    "highWeight": 0.8
+  },
+  "metadata": {
+    "energyStats": {
+      "min": 0.01,
+      "max": 0.12,
+      "avg": 0.045,
+      "stdDev": 0.025
+    },
+    "frequencyStats": {
+      "bass": 0.5,
+      "mid": 0.3,
+      "high": 0.2
+    },
+    "dynamicRange": 3.2,
+    "beatPattern": {
+      "avgInterval": 100,
+      "consistency": 0.9
+    }
+  }
+}

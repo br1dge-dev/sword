@@ -426,8 +426,8 @@ export function generateBeatVeins(
   
   const veins: Array<{x: number, y: number, color: string}> = [];
   
-  // OPTIMIERT: Dynamische Vein-Anzahl basierend auf Energy und Beat (30% erhöht)
-  const baseVeinCount = Math.floor(156 + (energy * 624)); // 156-780 Veins basierend auf Energy (30% erhöht von 120-600)
+  // OPTIMIERT: Dynamische Vein-Anzahl basierend auf Energy und Beat (20% reduziert)
+  const baseVeinCount = Math.floor(125 + (energy * 499)); // 125-624 Veins basierend auf Energy (20% reduziert)
   const beatMultiplier = beatDetected ? 2.5 : 1; // 2.5x mehr Veins bei Beat
   const totalVeinCount = Math.floor(baseVeinCount * beatMultiplier);
   
@@ -568,6 +568,106 @@ export function generateBeatVeins(
   // Optional: Duplikate entfernen (nach x/y/color)
   const uniqueVeins = Array.from(new Map(allVeins.map((v: {x: number, y: number, color: string}) => [v.x + ',' + v.y + ',' + v.color, v])).values()) as Array<{x: number, y: number, color: string}>;
   return uniqueVeins;
+}
+
+/**
+ * NEU: Generiert zentrierte Energie-Veins die von der Mitte aus nach außen wachsen
+ * Wie ein Bargraph-Meter, aber innerhalb der bestehenden Patterns
+ */
+export function generateCenteredEnergyVeins(
+  width: number, 
+  height: number, 
+  energy: number,
+  beatDetected: boolean,
+  viewportWidth?: number,
+  viewportHeight?: number
+): Array<{x: number, y: number, color: string, intensity: number}> {
+  const adjustedWidth = Math.min(width, MAX_BG_WIDTH);
+  const adjustedHeight = Math.min(height, MAX_BG_HEIGHT);
+  const effectiveViewportWidth = viewportWidth || adjustedWidth;
+  const effectiveViewportHeight = viewportHeight || adjustedHeight;
+  
+  // Berechne sichtbaren Bereich
+  const viewportRegion = calculateViewportRegion(
+    adjustedWidth,
+    adjustedHeight,
+    effectiveViewportWidth,
+    effectiveViewportHeight
+  );
+  
+  const veins: Array<{x: number, y: number, color: string, intensity: number}> = [];
+  
+  // Zentrum des sichtbaren Bereichs
+  const centerX = Math.floor((viewportRegion.startX + viewportRegion.endX) / 2);
+  const centerY = Math.floor((viewportRegion.startY + viewportRegion.endY) / 2);
+  
+  // Maximale Ausbreitung basierend auf Viewport-Größe
+  const maxRadius = Math.min(
+    viewportRegion.endX - viewportRegion.startX,
+    viewportRegion.endY - viewportRegion.startY
+  ) / 2;
+  
+  // Energie-basierte Ausbreitung: 0-100% der maximalen Ausbreitung
+  // Bei niedriger Energie: konzentriert in der Mitte (20% Radius)
+  // Bei hoher Energie: volle Ausbreitung (100% Radius)
+  const energyRadius = maxRadius * Math.min(1, 0.2 + (energy * 1.6)); // 0.2-1.0 basierend auf Energy
+  
+  // Beat-Multiplikator für zusätzliche Intensität
+  const beatMultiplier = beatDetected ? 1.5 : 1;
+  
+  // Anzahl der Veins basierend auf Energie und Beat (20% reduziert)
+  // Bei niedriger Energie: weniger Veins in der Mitte
+  // Bei hoher Energie: mehr Veins überall
+  const baseVeinCount = Math.floor(24 + (energy * 240)); // 24-264 Veins (20% reduziert)
+  const totalVeinCount = Math.floor(baseVeinCount * beatMultiplier);
+  
+  // Farbverlauf von innen nach außen
+  const innerColors = ['#ff0000', '#ff6600', '#ffcc00']; // Rot -> Orange -> Gelb (innen)
+  const outerColors = ['#00ff00', '#00ccff', '#0066ff']; // Grün -> Cyan -> Blau (außen)
+  
+  for (let i = 0; i < totalVeinCount; i++) {
+    // Zufällige Position innerhalb des Energie-Radius
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * energyRadius;
+    
+    const x = Math.floor(centerX + Math.cos(angle) * distance);
+    const y = Math.floor(centerY + Math.sin(angle) * distance);
+    
+    // Prüfe ob Position im sichtbaren Bereich
+    if (x >= viewportRegion.startX && x < viewportRegion.endX && 
+        y >= viewportRegion.startY && y < viewportRegion.endY) {
+      
+      // Berechne Intensität basierend auf Entfernung vom Zentrum
+      const normalizedDistance = distance / energyRadius;
+      const intensity = Math.max(0.1, 1 - normalizedDistance);
+      
+      // Farbauswahl basierend auf Entfernung
+      let color;
+      if (normalizedDistance < 0.5) {
+        // Innere Hälfte: warme Farben
+        const colorIndex = Math.floor(normalizedDistance * 2 * innerColors.length);
+        color = innerColors[Math.min(colorIndex, innerColors.length - 1)];
+      } else {
+        // Äußere Hälfte: kalte Farben
+        const outerIndex = Math.floor((normalizedDistance - 0.5) * 2 * outerColors.length);
+        color = outerColors[Math.min(outerIndex, outerColors.length - 1)];
+      }
+      
+      // Beat-basierte Intensitätsmodulation
+      const beatIntensity = beatDetected ? 
+        intensity * (0.8 + Math.random() * 0.4) : // 0.8-1.2 bei Beat
+        intensity * (0.6 + Math.random() * 0.4);  // 0.6-1.0 normal
+      
+      veins.push({
+        x,
+        y,
+        color,
+        intensity: Math.min(1, beatIntensity)
+      });
+    }
+  }
+  
+  return veins;
 }
 
 // OPTIMIERT: Export-Funktion für Cache-Management

@@ -1,0 +1,33 @@
+{
+  "trackId": "atarisword",
+  "trackPath": "/Users/christian/+CODING/sword/public/music/atarisword.mp3",
+  "analysisDate": "2025-07-14T19:08:24.112Z",
+  "config": {
+    "energyThreshold": 0.015,
+    "beatSensitivity": 1.2,
+    "analyzeInterval": 50,
+    "smoothingTimeConstant": 0.8,
+    "minBeatInterval": 120,
+    "bassWeight": 2.0,
+    "midWeight": 1.5,
+    "highWeight": 0.8
+  },
+  "metadata": {
+    "energyStats": {
+      "min": 0.005,
+      "max": 0.08,
+      "avg": 0.025,
+      "stdDev": 0.015
+    },
+    "frequencyStats": {
+      "bass": 0.4,
+      "mid": 0.35,
+      "high": 0.25
+    },
+    "dynamicRange": 2.5,
+    "beatPattern": {
+      "avgInterval": 120,
+      "consistency": 0.8
+    }
+  }
+}

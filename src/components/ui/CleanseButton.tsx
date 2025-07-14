@@ -7,17 +7,20 @@
  * und den Invertierungseffekt auslöst.
  */
 import React, { useState } from 'react';
+import { FaBroom } from 'react-icons/fa';
 
 interface CleanseButtonProps {
   onClick: () => void;
   className?: string;
   cooldown?: number; // Cooldown-Zeit in ms
+  iconOnly?: boolean;
 }
 
 export default function CleanseButton({ 
   onClick, 
   className = '',
-  cooldown = 1500 // Standard-Cooldown: 1.5 Sekunden
+  cooldown = 1500, // Standard-Cooldown: 1.5 Sekunden
+  iconOnly = false
 }: CleanseButtonProps) {
   const [buttonCooldown, setButtonCooldown] = useState(false);
   
@@ -34,50 +37,20 @@ export default function CleanseButton({
     }, cooldown);
   };
 
-  return (
-    <div className={`flex flex-col ${className}`}>
-      <div className="flex flex-col">
-        {/* Überschrift "CLEANSE" im Pixel-Font-Stil, linksbündig */}
-        <div className="mb-1 text-xs font-bold font-press-start-2p text-left text-[#3EE6FF]" 
-             style={{ 
-               textShadow: '0 0 1px #3EE6FF',
-               letterSpacing: '0.05em'
-             }}>
-          CLEANSE
-        </div>
-        
-        <div className="flex items-center">
-          {/* Cleanse-Button im Stil der Fortschrittsbalken */}
-          <button
-            onClick={handleClick}
-            disabled={buttonCooldown}
-            className={`h-6 w-32 flex items-center justify-center 
-                      border border-gray-700 bg-gray-900
-                      ${buttonCooldown ? 'opacity-50 cursor-not-allowed' : 'hover:border-[#3EE6FF]'}`}
-            style={{ 
-              boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
-              imageRendering: 'pixelated'
-            }}
-          >
-            {/* Text im Inneren */}
-            <span className="text-xs font-press-start-2p text-[#3EE6FF]">
-              NOW
-            </span>
-            
-            {/* Cooldown-Overlay */}
-            {buttonCooldown && (
-              <div 
-                className="absolute bottom-0 left-0 h-1 bg-[#3EE6FF] bg-opacity-70"
-                style={{
-                  width: '100%',
-                  animation: `cooldown ${cooldown}ms linear forwards`,
-                  boxShadow: '0 0 5px #3EE6FF'
-                }}
-              />
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  if (iconOnly) {
+    return (
+      <button
+        onClick={handleClick}
+        disabled={buttonCooldown}
+        className={`w-6 h-6 flex items-center justify-center border border-gray-700 bg-gray-900 rounded hover:border-[#3EE6FF] ${buttonCooldown ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+        style={{ boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(62,230,255,0.2)', imageRendering: 'pixelated' }}
+        title="Cleanse"
+      >
+        <FaBroom className="text-[#3EE6FF] text-lg" />
+      </button>
+    );
+  }
+
+  // Standard-Button (nicht mehr benötigt, daher leer)
+  return null;
 } 

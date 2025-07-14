@@ -1,0 +1,33 @@
+{
+  "trackId": "DR4GONSWORD",
+  "trackPath": "/Users/christian/+CODING/sword/public/music/DR4GONSWORD.mp3",
+  "analysisDate": "2025-07-14T19:08:24.111Z",
+  "config": {
+    "energyThreshold": 0.020,
+    "beatSensitivity": 1.0,
+    "analyzeInterval": 50,
+    "smoothingTimeConstant": 0.8,
+    "minBeatInterval": 120,
+    "bassWeight": 2.0,
+    "midWeight": 1.5,
+    "highWeight": 0.8
+  },
+  "metadata": {
+    "energyStats": {
+      "min": 0.008,
+      "max": 0.15,
+      "avg": 0.055,
+      "stdDev": 0.03
+    },
+    "frequencyStats": {
+      "bass": 0.45,
+      "mid": 0.35,
+      "high": 0.2
+    },
+    "dynamicRange": 3.8,
+    "beatPattern": {
+      "avgInterval": 90,
+      "consistency": 0.85
+    }
+  }
+}

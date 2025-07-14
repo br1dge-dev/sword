@@ -1,0 +1,33 @@
+{
+  "trackId": "flashword",
+  "trackPath": "/Users/christian/+CODING/sword/public/music/flashword.mp3",
+  "analysisDate": "2025-07-14T19:08:24.112Z",
+  "config": {
+    "energyThreshold": 0.018,
+    "beatSensitivity": 1.1,
+    "analyzeInterval": 50,
+    "smoothingTimeConstant": 0.8,
+    "minBeatInterval": 120,
+    "bassWeight": 2.0,
+    "midWeight": 1.5,
+    "highWeight": 0.8
+  },
+  "metadata": {
+    "energyStats": {
+      "min": 0.003,
+      "max": 0.06,
+      "avg": 0.02,
+      "stdDev": 0.012
+    },
+    "frequencyStats": {
+      "bass": 0.3,
+      "mid": 0.4,
+      "high": 0.3
+    },
+    "dynamicRange": 2,
+    "beatPattern": {
+      "avgInterval": 140,
+      "consistency": 0.7
+    }
+  }
+}

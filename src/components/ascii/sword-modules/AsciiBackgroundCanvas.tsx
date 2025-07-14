@@ -3,6 +3,7 @@ import React, { useRef, useEffect } from 'react';
 interface AsciiBackgroundCanvasProps {
   pattern: string[][];
   veins: Array<{ x: number; y: number; color: string }>;
+  centeredVeins?: Array<{ x: number; y: number; color: string; intensity: number }>;
   width: number;
   height: number;
   fontSize?: number;
@@ -12,6 +13,7 @@ interface AsciiBackgroundCanvasProps {
 const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
   pattern,
   veins,
+  centeredVeins = [],
   width,
   height,
   fontSize = 16, // Größer für besseren Look
@@ -41,6 +43,10 @@ const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
     // Vein-Map für schnellen Zugriff
     const veinMap = new Map<string, string>();
     veins.forEach(v => veinMap.set(`${v.x},${v.y}`, v.color));
+    
+    // Zentrierte Vein-Map für Intensität
+    const centeredVeinMap = new Map<string, { color: string; intensity: number }>();
+    centeredVeins.forEach(v => centeredVeinMap.set(`${v.x},${v.y}`, { color: v.color, intensity: v.intensity }));
 
     // Zeichenbreite/Höhe exakt berechnen
     const charWidth = ctx.measureText('M').width;
@@ -59,11 +65,31 @@ const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
       for (let x = 0; x < pattern[y].length; x++) {
         const char = pattern[y][x];
         const veinColor = veinMap.get(`${x},${y}`);
-        ctx.fillStyle = veinColor || '#888';
+        const centeredVein = centeredVeinMap.get(`${x},${y}`);
+        
+        // Priorität: Zentrierte Veins > Normale Veins > Standard
+        if (centeredVein) {
+          // Zentrierte Veins mit Intensität
+          const alpha = centeredVein.intensity;
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = centeredVein.color;
+        } else if (veinColor) {
+          // Normale Veins
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = veinColor;
+        } else {
+          // Standard
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = '#888';
+        }
+        
         ctx.fillText(char, offsetX + x * charWidth, offsetY + y * charHeight);
       }
     }
-  }, [pattern, veins, width, height, fontSize, fontFamily]);
+    
+    // Reset globalAlpha
+    ctx.globalAlpha = 1;
+  }, [pattern, veins, centeredVeins, width, height, fontSize, fontFamily]);
 
   return (
     <canvas

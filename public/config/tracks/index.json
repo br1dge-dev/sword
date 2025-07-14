@@ -1,0 +1,336 @@
+{
+  "generatedAt": "2025-07-14T19:08:24.113Z",
+  "totalTracks": 10,
+  "tracks": [
+    {
+      "trackId": "DANGERSWORD",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/DANGERSWORD.mp3",
+      "analysisDate": "2025-07-14T19:08:24.110Z",
+      "config": {
+        "energyThreshold": 0.018,
+        "beatSensitivity": 1.44,
+        "analyzeInterval": 50,
+        "smoothingTimeConstant": 0.74,
+        "minBeatInterval": 70,
+        "bassWeight": 1.5,
+        "midWeight": 0.75,
+        "highWeight": 0.5
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.01,
+          "max": 0.12,
+          "avg": 0.045,
+          "stdDev": 0.025
+        },
+        "frequencyStats": {
+          "bass": 0.5,
+          "mid": 0.3,
+          "high": 0.2
+        },
+        "dynamicRange": 3.2,
+        "beatPattern": {
+          "avgInterval": 100,
+          "consistency": 0.9
+        }
+      }
+    },
+    {
+      "trackId": "DR4GONSWORD",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/DR4GONSWORD.mp3",
+      "analysisDate": "2025-07-14T19:08:24.111Z",
+      "config": {
+        "energyThreshold": 0.022000000000000002,
+        "beatSensitivity": 1.615,
+        "analyzeInterval": 45,
+        "smoothingTimeConstant": 0.7100000000000001,
+        "minBeatInterval": 62.99999999999999,
+        "bassWeight": 1.35,
+        "midWeight": 0.875,
+        "highWeight": 0.5
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.008,
+          "max": 0.15,
+          "avg": 0.055,
+          "stdDev": 0.03
+        },
+        "frequencyStats": {
+          "bass": 0.45,
+          "mid": 0.35,
+          "high": 0.2
+        },
+        "dynamicRange": 3.8,
+        "beatPattern": {
+          "avgInterval": 90,
+          "consistency": 0.85
+        }
+      }
+    },
+    {
+      "trackId": "NIGHTSWORD",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/NIGHTSWORD.mp3",
+      "analysisDate": "2025-07-14T19:08:24.111Z",
+      "config": {
+        "energyThreshold": 0.006,
+        "beatSensitivity": 0.54,
+        "analyzeInterval": 80,
+        "smoothingTimeConstant": 0.81,
+        "minBeatInterval": 112,
+        "bassWeight": 0.75,
+        "midWeight": 0.875,
+        "highWeight": 0.8
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.002,
+          "max": 0.04,
+          "avg": 0.015,
+          "stdDev": 0.008
+        },
+        "frequencyStats": {
+          "bass": 0.25,
+          "mid": 0.35,
+          "high": 0.4
+        },
+        "dynamicRange": 1.8,
+        "beatPattern": {
+          "avgInterval": 160,
+          "consistency": 0.6
+        }
+      }
+    },
+    {
+      "trackId": "PUNCHSWORD",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/PUNCHSWORD.mp3",
+      "analysisDate": "2025-07-14T19:08:24.111Z",
+      "config": {
+        "energyThreshold": 0.03,
+        "beatSensitivity": 2,
+        "analyzeInterval": 40,
+        "smoothingTimeConstant": 0.675,
+        "minBeatInterval": 60,
+        "bassWeight": 1.7999999999999998,
+        "midWeight": 0.625,
+        "highWeight": 0.5
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.015,
+          "max": 0.2,
+          "avg": 0.075,
+          "stdDev": 0.04
+        },
+        "frequencyStats": {
+          "bass": 0.6,
+          "mid": 0.25,
+          "high": 0.15
+        },
+        "dynamicRange": 4.5,
+        "beatPattern": {
+          "avgInterval": 80,
+          "consistency": 0.9
+        }
+      }
+    },
+    {
+      "trackId": "SHONENSWORD",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/SHONENSWORD.mp3",
+      "analysisDate": "2025-07-14T19:08:24.112Z",
+      "config": {
+        "energyThreshold": 0.016,
+        "beatSensitivity": 1.275,
+        "analyzeInterval": 47.5,
+        "smoothingTimeConstant": 0.75,
+        "minBeatInterval": 66.5,
+        "bassWeight": 1.2000000000000002,
+        "midWeight": 0.875,
+        "highWeight": 0.5
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.008,
+          "max": 0.11,
+          "avg": 0.04,
+          "stdDev": 0.022
+        },
+        "frequencyStats": {
+          "bass": 0.4,
+          "mid": 0.35,
+          "high": 0.25
+        },
+        "dynamicRange": 3,
+        "beatPattern": {
+          "avgInterval": 95,
+          "consistency": 0.85
+        }
+      }
+    },
+    {
+      "trackId": "WORFSWORD",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/WORFSWORD.mp3",
+      "analysisDate": "2025-07-14T19:08:24.112Z",
+      "config": {
+        "energyThreshold": 0.020000000000000004,
+        "beatSensitivity": 1.5400000000000003,
+        "analyzeInterval": 44,
+        "smoothingTimeConstant": 0.7250000000000001,
+        "minBeatInterval": 61.599999999999994,
+        "bassWeight": 1.5,
+        "midWeight": 0.75,
+        "highWeight": 0.5
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.01,
+          "max": 0.14,
+          "avg": 0.05,
+          "stdDev": 0.028
+        },
+        "frequencyStats": {
+          "bass": 0.5,
+          "mid": 0.3,
+          "high": 0.2
+        },
+        "dynamicRange": 3.5,
+        "beatPattern": {
+          "avgInterval": 88,
+          "consistency": 0.88
+        }
+      }
+    },
+    {
+      "trackId": "atarisword",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/atarisword.mp3",
+      "analysisDate": "2025-07-14T19:08:24.112Z",
+      "config": {
+        "energyThreshold": 0.010000000000000002,
+        "beatSensitivity": 1,
+        "analyzeInterval": 60,
+        "smoothingTimeConstant": 0.775,
+        "minBeatInterval": 84,
+        "bassWeight": 1.2000000000000002,
+        "midWeight": 0.875,
+        "highWeight": 0.5
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.005,
+          "max": 0.08,
+          "avg": 0.025,
+          "stdDev": 0.015
+        },
+        "frequencyStats": {
+          "bass": 0.4,
+          "mid": 0.35,
+          "high": 0.25
+        },
+        "dynamicRange": 2.5,
+        "beatPattern": {
+          "avgInterval": 120,
+          "consistency": 0.8
+        }
+      }
+    },
+    {
+      "trackId": "flashword",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/flashword.mp3",
+      "analysisDate": "2025-07-14T19:08:24.112Z",
+      "config": {
+        "energyThreshold": 0.008,
+        "beatSensitivity": 0.7,
+        "analyzeInterval": 70,
+        "smoothingTimeConstant": 0.8,
+        "minBeatInterval": 98,
+        "bassWeight": 0.8999999999999999,
+        "midWeight": 1,
+        "highWeight": 0.6
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.003,
+          "max": 0.06,
+          "avg": 0.02,
+          "stdDev": 0.012
+        },
+        "frequencyStats": {
+          "bass": 0.3,
+          "mid": 0.4,
+          "high": 0.3
+        },
+        "dynamicRange": 2,
+        "beatPattern": {
+          "avgInterval": 140,
+          "consistency": 0.7
+        }
+      }
+    },
+    {
+      "trackId": "funksword",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/funksword.mp3",
+      "analysisDate": "2025-07-14T19:08:24.112Z",
+      "config": {
+        "energyThreshold": 0.014000000000000002,
+        "beatSensitivity": 1.1199999999999999,
+        "analyzeInterval": 55,
+        "smoothingTimeConstant": 0.76,
+        "minBeatInterval": 77,
+        "bassWeight": 1.0499999999999998,
+        "midWeight": 1,
+        "highWeight": 0.5
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.006,
+          "max": 0.09,
+          "avg": 0.035,
+          "stdDev": 0.018
+        },
+        "frequencyStats": {
+          "bass": 0.35,
+          "mid": 0.4,
+          "high": 0.25
+        },
+        "dynamicRange": 2.8,
+        "beatPattern": {
+          "avgInterval": 110,
+          "consistency": 0.8
+        }
+      }
+    },
+    {
+      "trackId": "gr1ftsword",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/gr1ftsword.mp3",
+      "analysisDate": "2025-07-14T19:08:24.113Z",
+      "config": {
+        "energyThreshold": 0.026000000000000002,
+        "beatSensitivity": 1.995,
+        "analyzeInterval": 42.5,
+        "smoothingTimeConstant": 0.6900000000000001,
+        "minBeatInterval": 60,
+        "bassWeight": 1.6500000000000001,
+        "midWeight": 0.75,
+        "highWeight": 0.5
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.012,
+          "max": 0.18,
+          "avg": 0.065,
+          "stdDev": 0.035
+        },
+        "frequencyStats": {
+          "bass": 0.55,
+          "mid": 0.3,
+          "high": 0.15
+        },
+        "dynamicRange": 4.2,
+        "beatPattern": {
+          "avgInterval": 85,
+          "consistency": 0.95
+        }
+      }
+    }
+  ]
+}

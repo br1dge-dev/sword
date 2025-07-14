@@ -83,20 +83,20 @@ export const vibrationIntensity = {
   3: 0.8   // Starke Vibration
 };
 
-// Glitch-Intensität für verschiedene Level
+// Glitch-Intensität für verschiedene Level - erhöht
 export const glitchIntensity = {
   0: 0,    // Kein Glitch
-  1: 0.3,  // Leichte Glitches
-  2: 0.6,  // Mittlere Glitches
-  3: 1.0   // Starke Glitches
+  1: 0.5,  // Leichte Glitches (erhöht von 0.3)
+  2: 0.8,  // Mittlere Glitches (erhöht von 0.6)
+  3: 1.2   // Starke Glitches (erhöht von 1.0)
 };
 
-// Glitch-Häufigkeit für verschiedene Level - um 20% erhöht
+// Glitch-Häufigkeit für verschiedene Level - sehr stark erhöht
 export const glitchFrequency = {
   0: 0,    // Kein Glitch
-  1: 0.12, // 12% Chance für Glitch (erhöht von 10%)
-  2: 0.3,  // 30% Chance für Glitch (erhöht von 25%)
-  3: 0.48  // 48% Chance für Glitch (erhöht von 40%)
+  1: 0.4,  // 40% Chance für Glitch (erhöht von 25%)
+  2: 0.7,  // 70% Chance für Glitch (erhöht von 50%)
+  3: 0.9   // 90% Chance für Glitch (erhöht von 75%)
 };
 
 // Farbeffekt-Häufigkeit für verschiedene Level

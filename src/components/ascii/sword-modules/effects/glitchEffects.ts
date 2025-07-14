@@ -21,8 +21,8 @@ export function generateEdgeGlitches(
   // Wenn kein Glitch-Level, keine Effekte
   if (glitchLevel === 0) return [];
   
-  // Wähle zufällige Kanten für Glitch-Effekte aus
-  const numGlitches = Math.floor(edgePositions.length * (0.05 + (glitchLevel * 0.05)));
+  // Wähle zufällige Kanten für Glitch-Effekte aus (deutlich erhöht)
+  const numGlitches = Math.floor(edgePositions.length * (0.2 + (glitchLevel * 0.15))); // Stark erhöht
   
   for (let i = 0; i < numGlitches; i++) {
     if (edgePositions.length === 0) continue;
@@ -87,9 +87,17 @@ export function generateUnicodeGlitches(
   // Wenn kein Glitch-Level, keine Glitches
   if (glitchLevel === 0) return [];
   
-  // Anzahl der Glitches basierend auf dem Glitch-Level
-  const glitchPercentage = 0.01 + (glitchLevel * 0.01); // 1-4% der Schwertpositionen
+  // Anzahl der Glitches basierend auf dem Glitch-Level (sehr stark erhöht)
+  let glitchPercentage = 0.1 + (glitchLevel * 0.05); // 10-25% der Schwertpositionen (sehr stark erhöht)
+  if (glitchLevel === 1) glitchPercentage *= 0.5; // 50% weniger
+  if (glitchLevel === 2) glitchPercentage *= 0.49; // 51% weniger (zusätzlich 30% weniger als vorher)
+  if (glitchLevel === 3) glitchPercentage *= 0.8; // 20% weniger
   const numGlitches = Math.floor(swordPositions.length * glitchPercentage);
+  
+  // Debug-Log für glitchPercentage-Berechnung (nur bei Änderungen)
+  if (numGlitches > 0) {
+    console.log(`[GLITCH-DEBUG] Level: ${glitchLevel}, Base %: ${(0.1 + (glitchLevel * 0.05)).toFixed(3)}, Final %: ${glitchPercentage.toFixed(3)}, Positions: ${swordPositions.length}, Glitches: ${numGlitches}`);
+  }
   
   // Wähle zufällige Positionen für Glitches
   for (let i = 0; i < numGlitches; i++) {
@@ -128,8 +136,8 @@ export function generateBlurredChars(
   
   const blurredChars: Array<{x: number, y: number}> = [];
   
-  // Anzahl der verschwommenen Zeichen basierend auf dem Glitch-Level
-  const numBlurred = Math.floor(swordPositions.length * (glitchLevel * 0.01)); // 1-3% der Schwertpositionen
+  // Anzahl der verschwommenen Zeichen basierend auf dem Glitch-Level (erhöht)
+  const numBlurred = Math.floor(swordPositions.length * (glitchLevel * 0.02)); // 2-6% der Schwertpositionen (verdoppelt)
   
   // Wähle zufällige Positionen für verschwommene Zeichen
   for (let i = 0; i < numBlurred; i++) {
@@ -158,8 +166,8 @@ export function generateSkewedChars(
   
   const skewedChars: Array<{x: number, y: number, angle: number}> = [];
   
-  // Anzahl der verzerrten Zeichen basierend auf dem Glitch-Level
-  const numSkewed = Math.floor(swordPositions.length * (glitchLevel * 0.005)); // 0.5-1.5% der Schwertpositionen
+  // Anzahl der verzerrten Zeichen basierend auf dem Glitch-Level (erhöht)
+  const numSkewed = Math.floor(swordPositions.length * (glitchLevel * 0.01)); // 1-3% der Schwertpositionen (verdoppelt)
   
   // Wähle zufällige Positionen für verzerrte Zeichen
   for (let i = 0; i < numSkewed; i++) {
@@ -193,8 +201,8 @@ export function generateFadedChars(
   
   const fadedChars: Array<{x: number, y: number, opacity: number}> = [];
   
-  // Anzahl der verblassten Zeichen basierend auf dem Glitch-Level
-  const numFaded = Math.floor(swordPositions.length * (glitchLevel * 0.003)); // 0.9% der Schwertpositionen bei Level 3
+  // Anzahl der verblassten Zeichen basierend auf dem Glitch-Level (erhöht)
+  const numFaded = Math.floor(swordPositions.length * (glitchLevel * 0.006)); // 1.8% der Schwertpositionen bei Level 3 (verdoppelt)
   
   // Wähle zufällige Positionen für verblasste Zeichen
   for (let i = 0; i < numFaded; i++) {
