@@ -50,6 +50,12 @@ export class AudioAnalyzer {
   private trackAnalysisStartTime: number = 0; // Startzeit der Track-Analyse
   private trackAnalysisDuration: number = 5000; // 5 Sekunden für Track-Analyse
 
+  // NEU: Dynamische Gewichtungen für Frequenzbereiche
+  private bassWeight: number = 2.0;
+  private midWeight: number = 1.5;
+  private highWeight: number = 0.8;
+  private minBeatInterval: number = 120; // ms
+
   // OPTIMIERT: Log-Throttling für bessere Performance
   private lastLogTime: number = 0;
   private logThrottleInterval: number = 1000; // 1 Sekunde zwischen Logs
@@ -246,19 +252,19 @@ export class AudioAnalyzer {
   }
 
   public setMinBeatInterval(val: number): void {
-    (this as any).minBeatInterval = Math.max(10, Math.min(1000, val));
+    this.minBeatInterval = Math.max(10, Math.min(1000, val));
   }
 
   public setBassWeight(val: number): void {
-    (this as any).bassWeight = Math.max(0.1, Math.min(5.0, val));
+    this.bassWeight = Math.max(0.1, Math.min(5.0, val));
   }
 
   public setMidWeight(val: number): void {
-    (this as any).midWeight = Math.max(0.1, Math.min(5.0, val));
+    this.midWeight = Math.max(0.1, Math.min(5.0, val));
   }
 
   public setHighWeight(val: number): void {
-    (this as any).highWeight = Math.max(0.1, Math.min(5.0, val));
+    this.highWeight = Math.max(0.1, Math.min(5.0, val));
   }
 
   private analyze(): void {
@@ -269,7 +275,7 @@ export class AudioAnalyzer {
     const now = performance.now();
     
     // OPTIMIERT: Niedrige Latenz für visuellen Impact, aber mit optimierten Schwellenwerten
-    if (now - this.lastAnalyzeTime < 50) { // 50ms = 20fps (zurück von 200ms für bessere Reaktivität)
+    if (now - this.lastAnalyzeTime < (this.options.analyzeInterval || 50)) { // Verwende analyzeInterval aus den Optionen
       this.animationFrameId = requestAnimationFrame(() => this.analyze());
       return;
     }
@@ -282,10 +288,10 @@ export class AudioAnalyzer {
       let sum = 0;
       let count = 0;
       
-      // NEU: Frequenzgewichtung für bessere Beat-Erkennung
-      const bassWeight = 2.0; // Bass stärker gewichten
-      const midWeight = 1.5;  // Mitten mittel gewichten
-      const highWeight = 0.8; // Höhen weniger gewichten
+      // NEU: Frequenzgewichtung für bessere Beat-Erkennung - verwende dynamische Werte
+      const bassWeight = this.bassWeight; // Dynamisch aus Setter
+      const midWeight = this.midWeight;   // Dynamisch aus Setter
+      const highWeight = this.highWeight; // Dynamisch aus Setter
       
       // Bass-Bereich (0-20% der Frequenzen)
       const bassEnd = Math.floor(this.frequencyData.length * 0.2);
@@ -346,7 +352,7 @@ export class AudioAnalyzer {
       // NEU: Empfindlichere Beat-Erkennung für bessere Reaktivität
       if (energy > currentThreshold) {
         const timeSinceLastBeat = now - this.lastBeatTime;
-        if (timeSinceLastBeat > 120) { // Reduziert von 180ms auf 120ms für schnellere Beats
+        if (timeSinceLastBeat > this.minBeatInterval) { // Verwende minBeatInterval aus den Optionen
           const beatIntensity = energy / currentThreshold;
           const minSensitivity = 0.3; // Reduziert von 0.5 für empfindlichere Reaktion
           const maxSensitivity = 2.5; // Reduziert von 3.0 für realistischere Werte
