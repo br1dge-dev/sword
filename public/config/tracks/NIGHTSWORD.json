@@ -1,15 +1,15 @@
 {
   "trackId": "NIGHTSWORD",
   "trackPath": "/Users/christian/+CODING/sword/public/music/NIGHTSWORD.mp3",
-  "analysisDate": "2025-07-14T19:08:24.111Z",
+  "analysisDate": "2025-07-15T12:00:39.010Z",
   "config": {
-    "energyThreshold": 0.012,
-    "beatSensitivity": 1.4,
-    "analyzeInterval": 50,
-    "smoothingTimeConstant": 0.8,
-    "minBeatInterval": 120,
-    "bassWeight": 2.0,
-    "midWeight": 1.5,
+    "energyThreshold": 0.006,
+    "beatSensitivity": 0.54,
+    "analyzeInterval": 80,
+    "smoothingTimeConstant": 0.81,
+    "minBeatInterval": 112,
+    "bassWeight": 0.75,
+    "midWeight": 0.875,
     "highWeight": 0.8
   },
   "metadata": {

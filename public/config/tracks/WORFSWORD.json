@@ -1,16 +1,16 @@
 {
   "trackId": "WORFSWORD",
   "trackPath": "/Users/christian/+CODING/sword/public/music/WORFSWORD.mp3",
-  "analysisDate": "2025-07-14T19:08:24.112Z",
+  "analysisDate": "2025-07-15T12:00:39.011Z",
   "config": {
-    "energyThreshold": 0.022,
-    "beatSensitivity": 0.9,
-    "analyzeInterval": 50,
-    "smoothingTimeConstant": 0.8,
-    "minBeatInterval": 120,
-    "bassWeight": 2.0,
-    "midWeight": 1.5,
-    "highWeight": 0.8
+    "energyThreshold": 0.020000000000000004,
+    "beatSensitivity": 1.5400000000000003,
+    "analyzeInterval": 44,
+    "smoothingTimeConstant": 0.7250000000000001,
+    "minBeatInterval": 61.599999999999994,
+    "bassWeight": 1.5,
+    "midWeight": 0.75,
+    "highWeight": 0.5
   },
   "metadata": {
     "energyStats": {

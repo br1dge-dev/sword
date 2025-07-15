@@ -1,0 +1,33 @@
+{
+  "trackId": "ABSWORD",
+  "trackPath": "/Users/christian/+CODING/sword/public/music/ABSWORD.mp3",
+  "analysisDate": "2025-07-15T12:00:39.009Z",
+  "config": {
+    "energyThreshold": 0.016,
+    "beatSensitivity": 1.2000000000000002,
+    "analyzeInterval": 50,
+    "smoothingTimeConstant": 0.75,
+    "minBeatInterval": 70,
+    "bassWeight": 1.2000000000000002,
+    "midWeight": 0.875,
+    "highWeight": 0.5
+  },
+  "metadata": {
+    "energyStats": {
+      "min": 0.01,
+      "max": 0.1,
+      "avg": 0.04,
+      "stdDev": 0.02
+    },
+    "frequencyStats": {
+      "bass": 0.4,
+      "mid": 0.35,
+      "high": 0.25
+    },
+    "dynamicRange": 3,
+    "beatPattern": {
+      "avgInterval": 100,
+      "consistency": 0.8
+    }
+  }
+}

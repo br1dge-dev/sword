@@ -1,16 +1,16 @@
 {
   "trackId": "funksword",
   "trackPath": "/Users/christian/+CODING/sword/public/music/funksword.mp3",
-  "analysisDate": "2025-07-14T19:08:24.112Z",
+  "analysisDate": "2025-07-15T12:00:39.012Z",
   "config": {
-    "energyThreshold": 0.022,
-    "beatSensitivity": 0.9,
-    "analyzeInterval": 50,
-    "smoothingTimeConstant": 0.8,
-    "minBeatInterval": 120,
-    "bassWeight": 2.0,
-    "midWeight": 1.5,
-    "highWeight": 0.8
+    "energyThreshold": 0.014000000000000002,
+    "beatSensitivity": 1.1199999999999999,
+    "analyzeInterval": 55,
+    "smoothingTimeConstant": 0.76,
+    "minBeatInterval": 77,
+    "bassWeight": 1.0499999999999998,
+    "midWeight": 1,
+    "highWeight": 0.5
   },
   "metadata": {
     "energyStats": {

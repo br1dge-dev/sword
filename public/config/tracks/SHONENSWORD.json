@@ -1,16 +1,16 @@
 {
   "trackId": "SHONENSWORD",
   "trackPath": "/Users/christian/+CODING/sword/public/music/SHONENSWORD.mp3",
-  "analysisDate": "2025-07-14T19:08:24.112Z",
+  "analysisDate": "2025-07-15T12:00:39.011Z",
   "config": {
-    "energyThreshold": 0.020,
-    "beatSensitivity": 1.0,
-    "analyzeInterval": 50,
-    "smoothingTimeConstant": 0.8,
-    "minBeatInterval": 120,
-    "bassWeight": 2.0,
-    "midWeight": 1.5,
-    "highWeight": 0.8
+    "energyThreshold": 0.016,
+    "beatSensitivity": 1.275,
+    "analyzeInterval": 47.5,
+    "smoothingTimeConstant": 0.75,
+    "minBeatInterval": 66.5,
+    "bassWeight": 1.2000000000000002,
+    "midWeight": 0.875,
+    "highWeight": 0.5
   },
   "metadata": {
     "energyStats": {

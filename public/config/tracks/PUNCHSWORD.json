@@ -1,16 +1,16 @@
 {
   "trackId": "PUNCHSWORD",
   "trackPath": "/Users/christian/+CODING/sword/public/music/PUNCHSWORD.mp3",
-  "analysisDate": "2025-07-14T19:08:24.111Z",
+  "analysisDate": "2025-07-15T12:00:39.010Z",
   "config": {
-    "energyThreshold": 0.025,
-    "beatSensitivity": 0.8,
-    "analyzeInterval": 50,
-    "smoothingTimeConstant": 0.8,
-    "minBeatInterval": 120,
-    "bassWeight": 2.0,
-    "midWeight": 1.5,
-    "highWeight": 0.8
+    "energyThreshold": 0.03,
+    "beatSensitivity": 2,
+    "analyzeInterval": 40,
+    "smoothingTimeConstant": 0.675,
+    "minBeatInterval": 60,
+    "bassWeight": 1.7999999999999998,
+    "midWeight": 0.625,
+    "highWeight": 0.5
   },
   "metadata": {
     "energyStats": {

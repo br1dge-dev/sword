@@ -15,7 +15,6 @@ import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdBulb } from 'react-icons/io';
-import PerformanceMonitor from '@/components/ui/PerformanceMonitor';
 
 export default function HomePage() {
   // Base level setting (will be overridden by PowerUp)
@@ -128,7 +127,6 @@ export default function HomePage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
-      <PerformanceMonitor />
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
         isModalOpen || isLeaderboardOpen || isWtfModalOpen ? 'backdrop-blur-modal' : ''
       }`}>
@@ -171,52 +169,60 @@ export default function HomePage() {
 
 
         {/* Bottom Buttons - HIDE, Config, Leaderboard, WTF */}
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-2 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0">
           {/* HIDE Button */}
           <button
             onClick={() => setIsUIVisible(!isUIVisible)}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-[4px] border-2 border-grifter-blue font-press-start-2p bg-black relative pixel-btn transition-all duration-150 hover:bg-[#1a1a1a] hover:border-cyan-300 hover:shadow-[0_0_8px_#3EE6FF] hover:scale-105"
             style={{
-              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+              imageRendering: 'pixelated',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='6' height='6' fill='%23000000'/%3E%3Crect x='0' y='0' width='2' height='2' fill='%233EE6FF' fill-opacity='0.08'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23FF3EC8' fill-opacity='0.08'/%3E%3C/svg%3E")`,
+              backgroundSize: '6px 6px',
             }}
           >
             {isUIVisible ? (
-              <IoMdEyeOff className="text-grifter-blue text-2xl" />
+              <IoMdEyeOff className="text-grifter-blue text-xl sm:text-2xl" />
             ) : (
-              <IoMdEye className="text-grifter-blue text-2xl" />
+              <IoMdEye className="text-grifter-blue text-xl sm:text-2xl" />
             )}
           </button>
           {/* Config Button (MobileControlsOverlay Trigger) */}
           <button
             onClick={() => setIsModalOpen(!isModalOpen)}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue sm:hidden"
+            className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-[4px] border-2 border-grifter-blue font-press-start-2p bg-black relative pixel-btn transition-all duration-150 hover:bg-[#1a1a1a] hover:border-cyan-300 hover:shadow-[0_0_8px_#3EE6FF] hover:scale-105 sm:hidden"
             style={{
-              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+              imageRendering: 'pixelated',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='6' height='6' fill='%23000000'/%3E%3Crect x='0' y='0' width='2' height='2' fill='%233EE6FF' fill-opacity='0.08'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23FF3EC8' fill-opacity='0.08'/%3E%3C/svg%3E")`,
+              backgroundSize: '6px 6px',
             }}
             aria-label="Config"
           >
-            <svg className={`text-grifter-blue text-2xl transition-transform duration-300 ${isModalOpen ? 'rotate-90' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5C13.933 15.5 15.5 13.933 15.5 12C15.5 10.067 13.933 8.5 12 8.5C10.067 8.5 8.5 10.067 8.5 12C8.5 13.933 10.067 15.5 12 15.5Z" stroke="#3EE6FF" strokeWidth="2"/><path d="M19.4 15A1.65 1.65 0 0 0 21 13.35V10.65A1.65 1.65 0 0 0 19.4 9L18.13 7.13A1.65 1.65 0 0 0 16.35 6.6L13.65 6.6A1.65 1.65 0 0 0 12 5A1.65 1.65 0 0 0 10.35 6.6L7.65 6.6A1.65 1.65 0 0 0 5.87 7.13L4.6 9A1.65 1.65 0 0 0 3 10.65V13.35A1.65 1.65 0 0 0 4.6 15L5.87 16.87A1.65 1.65 0 0 0 7.65 17.4L10.35 17.4A1.65 1.65 0 0 0 12 19A1.65 1.65 0 0 0 13.65 17.4L16.35 17.4A1.65 1.65 0 0 0 18.13 16.87L19.4 15Z" stroke="#3EE6FF" strokeWidth="2"/></svg>
+            <svg className={`text-grifter-blue text-xl sm:text-2xl transition-transform duration-300 ${isModalOpen ? 'rotate-90' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5C13.933 15.5 15.5 13.933 15.5 12C15.5 10.067 13.933 8.5 12 8.5C10.067 8.5 8.5 10.067 8.5 12C8.5 13.933 10.067 15.5 12 15.5Z" stroke="#3EE6FF" strokeWidth="2"/><path d="M19.4 15A1.65 1.65 0 0 0 21 13.35V10.65A1.65 1.65 0 0 0 19.4 9L18.13 7.13A1.65 1.65 0 0 0 16.35 6.6L13.65 6.6A1.65 1.65 0 0 0 12 5A1.65 1.65 0 0 0 10.35 6.6L7.65 6.6A1.65 1.65 0 0 0 5.87 7.13L4.6 9A1.65 1.65 0 0 0 3 10.65V13.35A1.65 1.65 0 0 0 4.6 15L5.87 16.87A1.65 1.65 0 0 0 7.65 17.4L10.35 17.4A1.65 1.65 0 0 0 12 19A1.65 1.65 0 0 0 13.65 17.4L16.35 17.4A1.65 1.65 0 0 0 18.13 16.87L19.4 15Z" stroke="#3EE6FF" strokeWidth="2"/></svg>
           </button>
           {/* Leaderboard Button */}
           <button
             onClick={() => setIsLeaderboardOpen(!isLeaderboardOpen)}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-[4px] border-2 border-grifter-blue font-press-start-2p bg-black relative pixel-btn transition-all duration-150 hover:bg-[#1a1a1a] hover:border-cyan-300 hover:shadow-[0_0_8px_#3EE6FF] hover:scale-105"
             style={{
-              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+              imageRendering: 'pixelated',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='6' height='6' fill='%23000000'/%3E%3Crect x='0' y='0' width='2' height='2' fill='%233EE6FF' fill-opacity='0.08'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23FF3EC8' fill-opacity='0.08'/%3E%3C/svg%3E")`,
+              backgroundSize: '6px 6px',
             }}
           >
-            <IoMdTrophy className="text-grifter-blue text-2xl" />
+            <IoMdTrophy className="text-grifter-blue text-xl sm:text-2xl" />
           </button>
           {/* WTF IS THIS Button */}
           <button
             onClick={() => setIsWtfModalOpen(true)}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-[4px] border-2 border-grifter-blue font-press-start-2p bg-black relative pixel-btn transition-all duration-150 hover:bg-[#1a1a1a] hover:border-cyan-300 hover:shadow-[0_0_8px_#3EE6FF] hover:scale-105"
             style={{
-              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+              imageRendering: 'pixelated',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='6' height='6' fill='%23000000'/%3E%3Crect x='0' y='0' width='2' height='2' fill='%233EE6FF' fill-opacity='0.08'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23FF3EC8' fill-opacity='0.08'/%3E%3C/svg%3E")`,
+              backgroundSize: '6px 6px',
             }}
             aria-label="WTF IS THIS"
           >
-            <IoMdBulb className="text-grifter-blue text-2xl" />
+            <IoMdBulb className="text-grifter-blue text-xl sm:text-2xl" />
           </button>
         </div>
 

@@ -29,7 +29,8 @@ const tracks = [
   // NEU:
   { src: "/music/DANGERSWORD.mp3", name: "DANGERSWORD" },
   { src: "/music/SHONENSWORD.mp3", name: "SHONENSWORD" },
-  { src: "/music/WORFSWORD.mp3", name: "WORFSWORD" }
+  { src: "/music/WORFSWORD.mp3", name: "WORFSWORD" },
+  { src: "/music/ABSWORD.mp3", name: "ABSWORD" }
 ];
 
 export default function MusicPlayer({ className = '', onBeat, onEnergyChange }: MusicPlayerProps) {

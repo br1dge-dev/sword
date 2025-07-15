@@ -2,7 +2,6 @@
 
 import React from 'react';
 import SideButtons from './SideButtons';
-import { IoMdSettings } from 'react-icons/io';
 
 interface MobileControlsOverlayProps {
   isOpen: boolean;
@@ -12,19 +11,6 @@ interface MobileControlsOverlayProps {
 export default function MobileControlsOverlay({ isOpen, onToggle }: MobileControlsOverlayProps) {
   return (
     <>
-      {/* Overlay-Button (immer sichtbar) */}
-      <button
-        onClick={() => onToggle(!isOpen)}
-        className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
-        style={{
-          boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
-        }}
-      >
-        <IoMdSettings 
-          className={`text-grifter-blue text-2xl transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} 
-        />
-      </button>
-
       {/* Overlay (nur sichtbar wenn isOpen true ist) - nur noch für SideButtons */}
       <div 
         className={`fixed inset-0 z-20 bg-black bg-opacity-90 transition-opacity duration-300 flex flex-col items-center justify-center ${

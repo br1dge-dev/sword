@@ -1,11 +1,44 @@
 {
-  "generatedAt": "2025-07-14T19:08:24.113Z",
-  "totalTracks": 10,
+  "generatedAt": "2025-07-15T12:00:39.012Z",
+  "totalTracks": 11,
   "tracks": [
+    {
+      "trackId": "ABSWORD",
+      "trackPath": "/Users/christian/+CODING/sword/public/music/ABSWORD.mp3",
+      "analysisDate": "2025-07-15T12:00:39.009Z",
+      "config": {
+        "energyThreshold": 0.016,
+        "beatSensitivity": 1.2000000000000002,
+        "analyzeInterval": 50,
+        "smoothingTimeConstant": 0.75,
+        "minBeatInterval": 70,
+        "bassWeight": 1.2000000000000002,
+        "midWeight": 0.875,
+        "highWeight": 0.5
+      },
+      "metadata": {
+        "energyStats": {
+          "min": 0.01,
+          "max": 0.1,
+          "avg": 0.04,
+          "stdDev": 0.02
+        },
+        "frequencyStats": {
+          "bass": 0.4,
+          "mid": 0.35,
+          "high": 0.25
+        },
+        "dynamicRange": 3,
+        "beatPattern": {
+          "avgInterval": 100,
+          "consistency": 0.8
+        }
+      }
+    },
     {
       "trackId": "DANGERSWORD",
       "trackPath": "/Users/christian/+CODING/sword/public/music/DANGERSWORD.mp3",
-      "analysisDate": "2025-07-14T19:08:24.110Z",
+      "analysisDate": "2025-07-15T12:00:39.010Z",
       "config": {
         "energyThreshold": 0.018,
         "beatSensitivity": 1.44,
@@ -38,7 +71,7 @@
     {
       "trackId": "DR4GONSWORD",
       "trackPath": "/Users/christian/+CODING/sword/public/music/DR4GONSWORD.mp3",
-      "analysisDate": "2025-07-14T19:08:24.111Z",
+      "analysisDate": "2025-07-15T12:00:39.010Z",
       "config": {
         "energyThreshold": 0.022000000000000002,
         "beatSensitivity": 1.615,
@@ -71,7 +104,7 @@
     {
       "trackId": "NIGHTSWORD",
       "trackPath": "/Users/christian/+CODING/sword/public/music/NIGHTSWORD.mp3",
-      "analysisDate": "2025-07-14T19:08:24.111Z",
+      "analysisDate": "2025-07-15T12:00:39.010Z",
       "config": {
         "energyThreshold": 0.006,
         "beatSensitivity": 0.54,
@@ -104,7 +137,7 @@
     {
       "trackId": "PUNCHSWORD",
       "trackPath": "/Users/christian/+CODING/sword/public/music/PUNCHSWORD.mp3",
-      "analysisDate": "2025-07-14T19:08:24.111Z",
+      "analysisDate": "2025-07-15T12:00:39.010Z",
       "config": {
         "energyThreshold": 0.03,
         "beatSensitivity": 2,
@@ -137,7 +170,7 @@
     {
       "trackId": "SHONENSWORD",
       "trackPath": "/Users/christian/+CODING/sword/public/music/SHONENSWORD.mp3",
-      "analysisDate": "2025-07-14T19:08:24.112Z",
+      "analysisDate": "2025-07-15T12:00:39.011Z",
       "config": {
         "energyThreshold": 0.016,
         "beatSensitivity": 1.275,
@@ -170,7 +203,7 @@
     {
       "trackId": "WORFSWORD",
       "trackPath": "/Users/christian/+CODING/sword/public/music/WORFSWORD.mp3",
-      "analysisDate": "2025-07-14T19:08:24.112Z",
+      "analysisDate": "2025-07-15T12:00:39.011Z",
       "config": {
         "energyThreshold": 0.020000000000000004,
         "beatSensitivity": 1.5400000000000003,
@@ -203,7 +236,7 @@
     {
       "trackId": "atarisword",
       "trackPath": "/Users/christian/+CODING/sword/public/music/atarisword.mp3",
-      "analysisDate": "2025-07-14T19:08:24.112Z",
+      "analysisDate": "2025-07-15T12:00:39.011Z",
       "config": {
         "energyThreshold": 0.010000000000000002,
         "beatSensitivity": 1,
@@ -236,7 +269,7 @@
     {
       "trackId": "flashword",
       "trackPath": "/Users/christian/+CODING/sword/public/music/flashword.mp3",
-      "analysisDate": "2025-07-14T19:08:24.112Z",
+      "analysisDate": "2025-07-15T12:00:39.011Z",
       "config": {
         "energyThreshold": 0.008,
         "beatSensitivity": 0.7,
@@ -269,7 +302,7 @@
     {
       "trackId": "funksword",
       "trackPath": "/Users/christian/+CODING/sword/public/music/funksword.mp3",
-      "analysisDate": "2025-07-14T19:08:24.112Z",
+      "analysisDate": "2025-07-15T12:00:39.012Z",
       "config": {
         "energyThreshold": 0.014000000000000002,
         "beatSensitivity": 1.1199999999999999,
@@ -302,7 +335,7 @@
     {
       "trackId": "gr1ftsword",
       "trackPath": "/Users/christian/+CODING/sword/public/music/gr1ftsword.mp3",
-      "analysisDate": "2025-07-14T19:08:24.113Z",
+      "analysisDate": "2025-07-15T12:00:39.012Z",
       "config": {
         "energyThreshold": 0.026000000000000002,
         "beatSensitivity": 1.995,

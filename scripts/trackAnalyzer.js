@@ -62,6 +62,12 @@ class TrackAnalyzer {
         dynamicRange: 2.5,
         beatPattern: { avgInterval: 120, consistency: 0.8 }
       },
+      'ABSWORD': {
+        energyStats: { min: 0.01, max: 0.1, avg: 0.04, stdDev: 0.02 },
+        frequencyStats: { bass: 0.4, mid: 0.35, high: 0.25 },
+        dynamicRange: 3.0,
+        beatPattern: { avgInterval: 100, consistency: 0.8 }
+      },
       'DANGERSWORD': {
         energyStats: { min: 0.01, max: 0.12, avg: 0.045, stdDev: 0.025 },
         frequencyStats: { bass: 0.5, mid: 0.3, high: 0.2 },
