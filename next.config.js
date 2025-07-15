@@ -10,7 +10,6 @@ module.exports = {
   reactStrictMode: true,
   swcMinify: true,
   experimental: {
-    optimizeCss: true,
     optimizePackageImports: ['react-icons', 'framer-motion'],
   },
   compiler: {
