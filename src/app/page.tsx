@@ -15,6 +15,7 @@ import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdBulb } from 'react-icons/io';
+import PerformanceMonitor from '@/components/ui/PerformanceMonitor';
 
 export default function HomePage() {
   // Base level setting (will be overridden by PowerUp)
@@ -127,6 +128,7 @@ export default function HomePage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
+      <PerformanceMonitor />
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
         isModalOpen || isLeaderboardOpen || isWtfModalOpen ? 'backdrop-blur-modal' : ''
       }`}>

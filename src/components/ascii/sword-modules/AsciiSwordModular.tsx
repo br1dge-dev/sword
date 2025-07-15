@@ -157,10 +157,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const cleanupTimeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
   const lastVeinSeedRef = useRef<number>(0); // Pseudo-random Seed für Vein-Generierung
   const veinLifetimeRef = useRef<Map<string, number>>(new Map()); // Vein-Lebensdauer-Tracking
-  const maxVeinsRef = useRef<number>(400); // Reduziert auf 400 für weniger Veins (20% reduziert)
-  const veinCleanupIntervalRef = useRef<number>(20000); // Erhöht von 15000ms auf 20000ms für bessere Performance
-  const veinGenerationIntervalRef = useRef<number>(12000); // Erhöht von 8000ms auf 12000ms für bessere Performance
+  const maxVeinsRef = useRef<number>(400); // Zurück auf 400 für Audio-Effekte
+  const veinCleanupIntervalRef = useRef<number>(20000); // Zurück auf 20000ms
+  const veinGenerationIntervalRef = useRef<number>(12000); // Zurück auf 12000ms
   const lastVeinLogTimeRef = useRef<number>(0);
+  
+  // NEU: IDLE-spezifische Vein-Limitation
+  const getIdleMaxVeins = () => {
+    return typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive ? 50 : 400;
+  };
   const idleStepRef = useRef<number>(0); // Für Idle-Animation Schritte
   
   // MACRO-PATTERN COOLDOWN: Verhindert zu häufige Hintergrund-Wechsel
@@ -704,10 +709,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       effectsTriggered++;
     }
     
-    // MACRO-PATTERN: Nur bei echten Stimmungswechseln (sehr selten)
+    // MACRO-PATTERN: Stark reduziert für bessere Performance
     const currentTime = Date.now();
     if (beatDetected && 
-        Math.random() < 0.0005 && // Nur 0.05% Chance bei jedem Beat
+        Math.random() < 0.0001 && // Nur 0.01% Chance bei jedem Beat (reduziert von 0.05%)
         currentTime - lastPatternChangeRef.current > PATTERN_COOLDOWN_MS) { // Mindestens 30s Cooldown
       
       lastPatternChangeRef.current = currentTime;

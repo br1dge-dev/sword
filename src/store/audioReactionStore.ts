@@ -14,10 +14,10 @@ let idleInterval: NodeJS.Timeout | null = null;
 let idleStep = 0;
 let idleInitialized = false;
 
-// OPTIMIERT: Einfache Idle-Animation mit vordefinierten Sequenzen
-const IDLE_STEPS = 10; // 10 Schritte pro Loop
-const IDLE_INTERVAL = 2000; // 2 Sekunden pro Schritt
-const IDLE_ENERGY = 0.15; // Konstante, niedrige Energy für subtile Animation
+// OPTIMIERT: Stark reduzierte Idle-Animation für bessere Performance
+const IDLE_STEPS = 3; // 3 Schritte pro Loop (reduziert von 5)
+const IDLE_INTERVAL = 6000; // 6 Sekunden pro Schritt (erhöht von 4s)
+const IDLE_ENERGY = 0.05; // Sehr niedrige Energy für minimale CPU-Last
 
 // OPTIMIERT: Reduziertes Throttling für bessere Reaktivität
 let lastEnergyUpdate = 0;
@@ -185,17 +185,17 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
       // Erhöhe den Schritt
       idleStep = (idleStep + 1) % IDLE_STEPS;
       
-      // Trigger einen subtilen Beat alle 3 Schritte für minimale Bewegung
-      if (idleStep % 3 === 0) {
+      // Trigger einen subtilen Beat nur alle 6 Schritte für minimale Bewegung
+      if (idleStep % 6 === 0) {
         store.triggerBeat();
         
-        // Automatisches Beat-Reset nach 200ms
+        // Automatisches Beat-Reset nach 100ms (kürzer für weniger CPU-Last)
         setTimeout(() => {
           if (useAudioReactionStore.getState().beatDetected) {
             const { resetBeat } = useAudioReactionStore.getState();
             resetBeat();
           }
-        }, 200);
+        }, 100);
       }
       
       // Log nur beim Start und alle 10 Schritte (ein kompletter Loop)
