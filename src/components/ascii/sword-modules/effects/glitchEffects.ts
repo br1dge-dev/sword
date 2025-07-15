@@ -96,7 +96,7 @@ export function generateUnicodeGlitches(
   
   // Debug-Log für glitchPercentage-Berechnung (nur bei Änderungen)
   if (numGlitches > 0) {
-    console.log(`[GLITCH-DEBUG] Level: ${glitchLevel}, Base %: ${(0.1 + (glitchLevel * 0.05)).toFixed(3)}, Final %: ${glitchPercentage.toFixed(3)}, Positions: ${swordPositions.length}, Glitches: ${numGlitches}`);
+    // console.log(`[GLITCH-DEBUG] Level: ${glitchLevel}, Base %: ${(0.1 + (glitchLevel * 0.05)).toFixed(3)}, Final %: ${glitchPercentage.toFixed(3)}, Positions: ${swordPositions.length}, Glitches: ${numGlitches}`);
   }
   
   // Wähle zufällige Positionen für Glitches

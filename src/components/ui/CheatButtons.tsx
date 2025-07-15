@@ -10,9 +10,10 @@ import { usePowerUpStore } from '@/store/powerUpStore';
 
 interface CheatButtonsProps {
   className?: string;
+  appendRight?: React.ReactNode;
 }
 
-export default function CheatButtons({ className = '' }: CheatButtonsProps) {
+export default function CheatButtons({ className = '', appendRight }: CheatButtonsProps) {
   const { 
     cheatForgeLevel, 
     cheatChargeLevel, 
@@ -80,7 +81,7 @@ export default function CheatButtons({ className = '' }: CheatButtonsProps) {
         CHEAT MODE
       </div>
       
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         {/* Forge Cheat-Button */}
         <button
           onClick={handleForgeCheat}
@@ -137,6 +138,8 @@ export default function CheatButtons({ className = '' }: CheatButtonsProps) {
         >
           <div className="text-xs font-bold text-pink-400">G</div>
         </button>
+        {/* Optional: Rechts daneben ein weiteres Element (z.B. CleanseButton) */}
+        {appendRight && <span className="ml-1">{appendRight}</span>}
       </div>
     </div>
   );

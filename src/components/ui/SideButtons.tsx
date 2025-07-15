@@ -75,12 +75,7 @@ export default function SideButtons({ className = '' }: SideButtonsProps) {
     <div className={`flex flex-col ${className}`} style={{ width: '100%', maxWidth: '200px' }}>
       {/* Cheat-Buttons + Cleanse-Besen in einer Zeile */}
       <div className="flex flex-row gap-2 items-center mb-4">
-        <CheatButtons />
-        <CleanseButton 
-          onClick={handleCleanse}
-          cooldown={3000}
-          iconOnly
-        />
+        <CheatButtons appendRight={<CleanseButton onClick={handleCleanse} cooldown={3000} iconOnly />} />
       </div>
       <div className="flex flex-col gap-4 mt-4">
         <ForgeProgressBar />

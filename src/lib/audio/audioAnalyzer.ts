@@ -141,7 +141,7 @@ export class AudioAnalyzer {
             this.analyser.smoothingTimeConstant = this.config.smoothingTimeConstant;
           }
           
-          console.log(`🎵 Track-Konfiguration geladen: ${trackName}`);
+          // console.log(`🎵 Track-Konfiguration geladen: ${trackName}`);
         }
       } catch (error) {
         console.warn(`⚠️ Keine Track-Konfiguration gefunden für: ${trackName}, verwende Standard-Werte`);

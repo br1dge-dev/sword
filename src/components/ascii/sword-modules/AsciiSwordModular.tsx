@@ -98,7 +98,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           else calculatedLevel = 1; // Niedrige Dynamik = Level 1
           
           setTrackLevel(calculatedLevel);
-          console.log(`🎵 Track-Level berechnet: ${trackName} -> Level ${calculatedLevel} (dynamicRange: ${dynamicRange})`);
+          // console.log(`🎵 Track-Level berechnet: ${trackName} -> Level ${calculatedLevel} (dynamicRange: ${dynamicRange})`);
         }
       } catch (error) {
         console.warn('⚠️ Fehler beim Laden der Track-Konfiguration für Level-Berechnung:', error);
@@ -135,7 +135,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // Debug-Log für effektive Level (nur bei Änderungen)
   useEffect(() => {
-    console.log(`🎯 Effektive Level: Glitch=${effectiveGlitchLevel} (PowerUp=${glitchLevel}, Base=${level}, Track=${trackLevel}), Charge=${effectiveChargeLevel} (PowerUp=${chargeLevel}, Base=${level}, Track=${trackLevel})`);
+    // console.log(`🎯 Effektive Level: Glitch=${effectiveGlitchLevel} (PowerUp=${glitchLevel}, Base=${level}, Track=${trackLevel}), Charge=${effectiveChargeLevel} (PowerUp=${chargeLevel}, Base=${level}, Track=${trackLevel})`);
   }, [effectiveGlitchLevel, effectiveChargeLevel, glitchLevel, chargeLevel, level, trackLevel]);
   
   // Audio-Reaktionsdaten abrufen
@@ -692,7 +692,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       
       // Debug-Log für glitchPercentage-Reduktion (nur bei signifikanten Änderungen)
       if (newUnicodeGlitches.length > 0 && (Math.random() < 0.1)) { // Nur 10% der Logs anzeigen
-        console.log(`[GLITCH] Generated ${newUnicodeGlitches.length} Unicode glitches at level ${tempGlitchLevel} (effectiveGlitchLevel: ${effectiveGlitchLevel})`);
+        // console.log(`[GLITCH] Generated ${newUnicodeGlitches.length} Unicode glitches at level ${tempGlitchLevel} (effectiveGlitchLevel: ${effectiveGlitchLevel})`);
       }
       
       // VIEL längere Cleanup-Dauer für bessere Sichtbarkeit
@@ -830,7 +830,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
     }
-  }, [beatDetected, getBackgroundDimensions, isMusicPlaying]);
+  }, [beatDetected, getBackgroundDimensions, isMusicPlaying, isIdleActive]);
   
   // VEREINFACHT: Farb-Effekte nur bei Beats oder hoher Energy
   useEffect(() => {
@@ -1025,38 +1025,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     
   }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions, isIdleActive]);
   
-  // OPTIMIERT: Separater useEffect für Idle-Animation (nur wenn Musik NICHT spielt)
-  useEffect(() => {
-    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) {
-      // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
-      if (isMusicPlaying) {
-        return;
-      }
-      
-      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-      
-      // Erhöhe den Idle-Schritt bei jedem Beat
-      if (beatDetected) {
-        idleStepRef.current = (idleStepRef.current + 1) % 10; // 10 Schritte pro Loop
-      }
-      
-      // Generiere vordefinierte Vein-Sequenz für den aktuellen Schritt
-      const idleVeins = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
-      
-      // Ersetze alle bestehenden Veins mit der Idle-Sequenz
-      veinsMapRef.current.clear();
-      const currentTime = Date.now();
-      idleVeins.forEach(vein => {
-        const key = `${vein.x}-${vein.y}`;
-        veinsMapRef.current.set(key, { vein, birth: currentTime });
-      });
-      
-      // Setze das State-Array für das Rendering
-      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
-    }
-  }, [isIdleActive, beatDetected, getBackgroundDimensions, isMusicPlaying]);
+
   
   // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
   useEffect(() => {
@@ -1301,6 +1270,31 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     setSwordColor(baseColor);
   }, [baseColor, setSwordColor]);
+
+  // OPTIMIERT: Verbessertes Cleanup-System für Memory-Leak-Prävention
+  useEffect(() => {
+    return () => {
+      // Cleanup aller Timeouts
+      cleanupTimeoutsRef.current.forEach(timeout => {
+        clearTimeout(timeout);
+      });
+      cleanupTimeoutsRef.current.clear();
+      
+      // Cleanup aller Intervals
+      Object.values(intervalsRef.current).forEach(interval => {
+        if (interval) clearInterval(interval);
+      });
+      
+      // Cleanup Vein-Map
+      veinsMapRef.current.clear();
+      
+      // Cleanup Tile-Timeout
+      if (tileTimeoutRef.current) {
+        clearTimeout(tileTimeoutRef.current);
+        tileTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div 

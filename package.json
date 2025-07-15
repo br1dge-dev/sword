@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest"
+    "test": "jest",
+    "analyze": "ANALYZE=true npm run build",
+    "performance": "node scripts/analyze-performance.js",
+    "clean": "rm -rf .next out"
   },
   "dependencies": {
     "autoprefixer": "^10.4.17",
