@@ -68,6 +68,7 @@ export default function RootLayout({
         <link rel="manifest" href="/icons/site.webmanifest" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/android-chrome-192x192.png" />
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/android-chrome-512x512.png" />
+        <meta name="theme-color" content="#00FCA6" />
       </head>
       <body className={`${inter.className} min-h-screen overflow-hidden horizontal-scanlines`} style={{
         backgroundColor: 'var(--color-bg-primary)',

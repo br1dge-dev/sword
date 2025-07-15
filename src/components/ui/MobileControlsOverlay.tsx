@@ -30,9 +30,16 @@ export default function MobileControlsOverlay({ isOpen, onToggle }: MobileContro
         className={`fixed inset-0 z-20 bg-black bg-opacity-90 transition-opacity duration-300 flex flex-col items-center justify-center ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mobile-controls-title"
+        aria-describedby="mobile-controls-description"
       >
         <div className="w-full max-w-sm p-6 flex flex-col items-center gap-8">
-          <div className="text-xl font-press-start-2p text-grifter-blue mb-4">CONTROLS</div>
+          <div id="mobile-controls-title" className="text-xl font-press-start-2p text-grifter-blue mb-4">CONTROLS</div>
+          <div id="mobile-controls-description" className="sr-only">
+            Mobile controls for the GR1FTSWORD application
+          </div>
           <div className="w-full flex flex-col items-center gap-8">
             <SideButtons className="items-center" />
           </div>

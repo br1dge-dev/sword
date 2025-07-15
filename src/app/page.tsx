@@ -220,7 +220,13 @@ export default function HomePage() {
 
         {/* Leaderboard Modal */}
         {isLeaderboardOpen && (
-          <div className="fixed inset-0 z-40 bg-black bg-opacity-90 backdrop-blur-modal flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 z-40 bg-black bg-opacity-90 backdrop-blur-modal flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="leaderboard-title"
+            aria-describedby="leaderboard-description"
+          >
             <div className="bg-black border border-grifter-blue rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto relative leaderboard-scrollbar">
               {/* X-Button oben rechts */}
               <button
@@ -232,11 +238,18 @@ export default function HomePage() {
                 ×
               </button>
               {/* Leaderboard Modal Headline Scanline */}
-              <h2 className="text-2xl font-press-start-2p mb-2 select-none relative scanlines-subtle" style={{ color: swordColor, letterSpacing: '0.05em' }}>
+              <h2 
+                id="leaderboard-title"
+                className="text-2xl font-press-start-2p mb-2 select-none relative scanlines-subtle" 
+                style={{ color: swordColor, letterSpacing: '0.05em' }}
+              >
                 {leaderboardTitle.split('').map((char, i) => (
                   <span key={i} style={i === highlightIdx ? { color: highlightColor } : {}}>{char}</span>
                 ))}
               </h2>
+              <div id="leaderboard-description" className="sr-only">
+                Leaderboard showing top contributors to the GR1FTSWORD project
+              </div>
               
               <div className="space-y-3">
                 {leaderboardData.map((entry) => {
@@ -305,7 +318,13 @@ export default function HomePage() {
         
         {/* WTF IS THIS Modal */}
         {isWtfModalOpen && (
-          <div className="fixed inset-0 z-40 bg-black bg-opacity-90 backdrop-blur-modal flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 z-40 bg-black bg-opacity-90 backdrop-blur-modal flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="wtf-title"
+            aria-describedby="wtf-description"
+          >
             <div className="bg-black border border-grifter-blue rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto relative leaderboard-scrollbar">
               {/* X-Button oben rechts */}
               <button
@@ -319,6 +338,7 @@ export default function HomePage() {
 
               {/* Headline wie im Leaderboard */}
               <h2
+                id="wtf-title"
                 className="text-2xl font-press-start-2p uppercase mb-4 text-center select-none relative scanlines-subtle"
                 style={{
                   color: swordColor,
@@ -330,6 +350,9 @@ export default function HomePage() {
                   <span key={i} style={i === highlightIdx ? { color: highlightColor } : {}}>{char}</span>
                 ))}
               </h2>
+              <div id="wtf-description" className="sr-only">
+                Information about the GR1FTSWORD project and how it works
+              </div>
 
               {/* Einleitung */}
               <p className="text-gray-300 mb-6 text-xs font-press-start-2p uppercase leading-relaxed text-center">
