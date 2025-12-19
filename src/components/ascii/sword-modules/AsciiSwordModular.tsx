@@ -643,35 +643,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     
   }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions]);
   
-  // OPTIMIERT: Separater useEffect für Idle-Animation (nur wenn Musik NICHT spielt)
-  useEffect(() => {
-    if (idle) {
-      // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
-      if (isMusicPlaying) {
-        return;
-      }
-      
-      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-      
-      // Erhöhe den Idle-Schritt bei jedem Beat
-      if (beatDetected) {
-        idleStepRef.current = (idleStepRef.current + 1) % 10; // 10 Schritte pro Loop
-      }
-      
-      // Generiere vordefinierte Vein-Sequenz für den aktuellen Schritt
-      const idleVeins = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
-      
-      // Ersetze alle bestehenden Veins mit der Idle-Sequenz
-      const currentTime = Date.now();
-      replaceVeinsInMap(veinsMapRef.current, idleVeins, currentTime);
-      
-      // Setze das State-Array für das Rendering
-      setColoredVeins(mapToVeins(veinsMapRef.current));
-    }
-  }, [beatDetected, getBackgroundDimensions, isMusicPlaying, idle]);
-  
   // NEU: Adaptive Audio-reaktive Farb-Effekte basierend auf tatsächlichen Energy-Werten
   useEffect(() => {
     const nowCheck = Date.now();
