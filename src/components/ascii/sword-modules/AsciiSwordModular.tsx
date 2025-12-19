@@ -83,6 +83,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       isIdleActive: s.isIdleActive, // keep function stable; call later where needed
     })),
   );
+
+  // Helper: normalize idle state checks (store currently exposes a function, but keep compatible)
+  const isIdle = useCallback(
+    () => (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive),
+    [isIdleActive],
+  );
   
   // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
   const energy = directEnergy !== undefined ? directEnergy : storeEnergy;
@@ -703,7 +709,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // OPTIMIERT: Separater useEffect für Idle-Animation (nur wenn Musik NICHT spielt)
   useEffect(() => {
-    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) {
+    if (isIdle()) {
       // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
       if (isMusicPlaying) {
         return;
@@ -732,7 +738,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
     }
-  }, [beatDetected, getBackgroundDimensions, isMusicPlaying, isIdleActive]);
+  }, [beatDetected, getBackgroundDimensions, isMusicPlaying, isIdle]);
   
   // NEU: Adaptive Audio-reaktive Farb-Effekte basierend auf tatsächlichen Energy-Werten
   useEffect(() => {
@@ -888,7 +894,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // --- IDLE TILE COLOR CYCLE ---
   useEffect(() => {
-    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) {
+    if (isIdle()) {
       // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
       if (isMusicPlaying) {
         // ENTFERNT: Sofortiges Entfernen der Tiles - Musik-Effekte sollen leben bleiben
@@ -938,11 +944,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     }
     // ENTFERNT: Sofortiges Entfernen der Tiles wenn Idle verlassen wird
     // Musik-Effekte sollen ihre natürliche Lebensdauer haben
-  }, [swordPositions, isMusicPlaying, isIdleActive]);
+  }, [swordPositions, isMusicPlaying, isIdle]);
 
   // --- ALLE ANIMATIONEN NUR WENN NICHT IDLE ---
   useEffect(() => {
-    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) return;
+    if (isIdle()) return;
     // OPTIMIERT: Dynamische Beat-Vein-Generierung für bessere Visualisierung
     if (beatDetected || energy > 0.05) { // Empfindlicher: ab 0.05 Energy
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
@@ -988,11 +994,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       cleanupTimeoutsRef.current.add(timeout);
     }
     
-  }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions, isIdleActive]);
+  }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions, isIdle]);
   
   // OPTIMIERT: Separater useEffect für Idle-Animation (nur wenn Musik NICHT spielt)
   useEffect(() => {
-    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) {
+    if (isIdle()) {
       // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
       if (isMusicPlaying) {
         return;
@@ -1021,11 +1027,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
     }
-  }, [isIdleActive, beatDetected, getBackgroundDimensions, isMusicPlaying]);
+  }, [isIdle, beatDetected, getBackgroundDimensions, isMusicPlaying]);
   
   // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
   useEffect(() => {
-    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) return;
+    if (isIdle()) return;
     if ((energy > 0.05 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) { // Noch empfindlicher: ab 0.05
       const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
       
@@ -1040,11 +1046,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       
       // performanceMonitor.trackColorChange(); // Entfernt
     }
-  }, [beatDetected, energy, lastColorChangeTime, colorStability, isIdleActive]);
+  }, [beatDetected, energy, lastColorChangeTime, colorStability, isIdle]);
   
   // OPTIMIERT: Verbesserte Audio-reaktive Edge-Effekte basierend auf Charge-Level
   useEffect(() => {
-    if (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) return;
+    if (isIdle()) return;
     if (beatDetected || energy > 0.03) { // Noch empfindlicher: ab 0.03
       if (edgePositions.length === 0) return;
       
@@ -1171,7 +1177,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       }, duration);
       cleanupTimeoutsRef.current.add(timeout);
     }
-  }, [beatDetected, energy, chargeLevel, edgePositions, isIdleActive]);
+  }, [beatDetected, energy, chargeLevel, edgePositions, isIdle]);
   
   // Frequenzdaten aus dem Store holen
   const frequencyData = useAudioReactionStore((s) => s.frequencyData);
@@ -1282,7 +1288,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           textAlign: 'center',
           width: '100%',
           lineHeight: '1.2',
-          transition: (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) ? 'color 2s linear' : undefined
+          transition: isIdle() ? 'color 2s linear' : undefined
         }}
       >
         {centeredSwordLines.map((line, y) => (
@@ -1339,7 +1345,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               return (
                 <span 
                   key={`sword-${x}-${y}`}
-                  style={{ ...style, transition: (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive) ? 'color 2s linear' : undefined }}
+                  style={{ ...style, transition: isIdle() ? 'color 2s linear' : undefined }}
                 >
                   {displayChar}
                 </span>
