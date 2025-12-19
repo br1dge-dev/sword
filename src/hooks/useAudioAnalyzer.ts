@@ -5,6 +5,7 @@ import { useAudioReactionStore } from '@/store/audioReactionStore';
 interface UseAudioAnalyzerOptions extends AudioAnalyzerOptions {
   autoStart?: boolean;
   autoDetectBeat?: boolean;
+  frequencyInterval?: number; // Throttle for frequency snapshots pushed to the store
 }
 
 interface UseAudioAnalyzerReturn {
@@ -57,6 +58,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   const triggerBeat = useAudioReactionStore((s) => s.triggerBeat);
   const setAudioActive = useAudioReactionStore((s) => s.setAudioActive);
   const setFrequencyData = useAudioReactionStore((s) => s.setFrequencyData);
+  const lastFrequencyUpdateRef = useRef<number>(0);
   
   // Reset beat detection after a short delay
   useEffect(() => {
@@ -79,11 +81,15 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   useEffect(() => {
     // NEU: Optimierte Standard-Optionen für bessere Beat-Erkennung
     const defaultOptions = {
-      analyzeInterval: 50, // 50ms für schnelle Reaktion
+      analyzeInterval: 33, // ~30Hz for smoother reactivity (energy still throttled in store)
       energyThreshold: 0.015, // Reduziert von 0.03 für empfindlichere Reaktion
       beatSensitivity: 1.2, // Erhöht von 0.8 für bessere Beat-Erkennung
       ...options,
       onFrequency: (frequencies: Uint8Array) => {
+        const now = Date.now();
+        const interval = options?.frequencyInterval ?? 50; // default ~20Hz for frequency-driven visuals
+        if (now - lastFrequencyUpdateRef.current < interval) return;
+        lastFrequencyUpdateRef.current = now;
         setFrequencyData(frequencies);
       }
     };
@@ -130,6 +136,8 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     } else {
       // Verwende den existierenden globalen Analyzer
       analyzerRef.current = globalAnalyzer;
+      // Keep global analyzer options in sync (intervals/callbacks/thresholds) with this hook.
+      globalAnalyzer.updateOptions(defaultOptions);
     }
     
     return () => {
