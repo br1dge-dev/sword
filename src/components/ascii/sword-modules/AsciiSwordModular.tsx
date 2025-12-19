@@ -643,44 +643,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     
   }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions]);
   
-  // OPTIMIERT: Dynamische Beat-Vein-Generierung für bessere Visualisierung
-  useEffect(() => {
-    // OPTIMIERT: Dynamische Beat-Vein-Generierung für bessere Visualisierung
-    if (beatDetected || energy > 0.05) { // Empfindlicher: ab 0.05 Energy
-      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-      
-      // OPTIMIERT: Verwende neue Beat-Vein-Funktion für bessere Performance
-      const currentTime = Date.now();
-      
-      // Generiere Beat-Veins basierend auf Energy und Beat
-      const beatVeins = generateBeatVeins(bgWidth, bgHeight, energy, beatDetected, viewportWidth, viewportHeight);
-      
-      // Ersetze alle bestehenden Veins mit den neuen Beat-Veins
-      replaceVeinsInMap(veinsMapRef.current, beatVeins, currentTime);
-      
-      // Setze das State-Array für das Rendering
-      setColoredVeins(mapToVeins(veinsMapRef.current));
-      
-      // OPTIMIERT: Längere Lebensdauer für Beat-Veins (4-10 Sekunden)
-      const veinLifetime = computeBeatVeinLifetimeMs(energy, beatDetected);
-      
-      // Cleanup nach der Lebensdauer
-      const timeout = setTimeout(() => {
-        const now = Date.now();
-        const changed = pruneVeinsByLifetime(veinsMapRef.current, now, veinLifetime);
-        
-        if (changed) {
-          setColoredVeins(mapToVeins(veinsMapRef.current));
-        }
-      }, veinLifetime);
-      
-      cleanupTimeoutsRef.current.add(timeout);
-    }
-    
-  }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions, setColoredVeins]);
-  
   // OPTIMIERT: Separater useEffect für Idle-Animation (nur wenn Musik NICHT spielt)
   useEffect(() => {
     if (idle) {
