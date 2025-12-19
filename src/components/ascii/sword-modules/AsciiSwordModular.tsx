@@ -222,71 +222,115 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   }, [glitchLevel, getBackgroundDimensions]);
 
   // Vein-Generierung: Mehr Aktivität, Debug-Log
+  const veinLoopRafIdRef = useRef<number | null>(null);
+  const veinLoopLastTickRef = useRef<number>(0);
+  const energyRef = useRef<number>(energy);
+  const beatDetectedRef = useRef<boolean>(beatDetected);
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      // Hole aktuelle Background-Dimensionen
-      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      let changed = false;
-      // Entferne abgelaufene Veins
-      veinsMapRef.current.forEach((value, key) => {
-        if (now - value.birth > 10000) {
-          veinsMapRef.current.delete(key);
-          changed = true;
-        }
-      });
-      // Dynamische Vein-Generierung
-      let newVeins = 0;
-      if (energy > 0.05 && veinsMapRef.current.size < maxVeinsRef.current) {
-        const count = Math.floor(Math.random() * 11) + 10; // 10–20 neue Veins (erhöht von 1-3)
-        for (let i = 0; i < count; i++) {
-          let x, y, pos, tries = 0;
-          do {
-            x = Math.floor(Math.random() * bgWidth);
-            y = Math.floor(Math.random() * bgHeight);
-            pos = `${x}_${y}`;
-            tries++;
-          } while (veinsMapRef.current.has(pos) && tries < 10);
-          if (!veinsMapRef.current.has(pos)) {
-            const color = accentColors[Math.floor(Math.random() * accentColors.length)];
-            veinsMapRef.current.set(pos, { vein: { x, y, color }, birth: now });
-            newVeins++;
-            changed = true;
-          }
-        }
-      }
-      if (beatDetected && veinsMapRef.current.size < maxVeinsRef.current) {
-        const count = Math.floor(Math.random() * 21) + 30; // 30–50 neue Veins (erhöht von 3-5)
-        for (let i = 0; i < count; i++) {
-          let x, y, pos, tries = 0;
-          do {
-            x = Math.floor(Math.random() * bgWidth);
-            y = Math.floor(Math.random() * bgHeight);
-            pos = `${x}_${y}`;
-            tries++;
-          } while (veinsMapRef.current.has(pos) && tries < 10);
-          if (!veinsMapRef.current.has(pos)) {
-            const color = accentColors[Math.floor(Math.random() * accentColors.length)];
-            veinsMapRef.current.set(pos, { vein: { x, y, color }, birth: now });
-            newVeins++;
-            changed = true;
-          }
-        }
-      }
-      if (changed) {
-        setColoredVeins(mapToVeins(veinsMapRef.current));
-      }
-      // Debug-Log nur bei signifikanten Änderungen
-      if (newVeins > 0) {
+    energyRef.current = energy;
+  }, [energy]);
+
+  useEffect(() => {
+    beatDetectedRef.current = beatDetected;
+  }, [beatDetected]);
+
+  useEffect(() => {
+    // Keep the previous effective cadence (~100ms), but schedule via rAF to reduce timer jitter.
+    const TICK_MS = 100;
+    const VEIN_TTL_MS = 10000;
+
+    let cancelled = false;
+
+    const tick = (nowMs: number) => {
+      if (cancelled) return;
+
+      if (nowMs - veinLoopLastTickRef.current >= TICK_MS) {
+        veinLoopLastTickRef.current = nowMs;
+
         const now = Date.now();
-        if (now - lastVeinLogTimeRef.current > 10000) {
-          throttledLog(`Veins active: ${veinsMapRef.current.size}, new: ${newVeins}, energy: ${energy.toFixed(2)}`);
-          lastVeinLogTimeRef.current = now;
+        const currentEnergy = energyRef.current;
+        const currentBeatDetected = beatDetectedRef.current;
+
+        // Hole aktuelle Background-Dimensionen
+        const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+
+        let changed = false;
+
+        // Entferne abgelaufene Veins
+        veinsMapRef.current.forEach((value, key) => {
+          if (now - value.birth > VEIN_TTL_MS) {
+            veinsMapRef.current.delete(key);
+            changed = true;
+          }
+        });
+
+        // Dynamische Vein-Generierung
+        let newVeins = 0;
+        if (currentEnergy > 0.05 && veinsMapRef.current.size < maxVeinsRef.current) {
+          const count = Math.floor(Math.random() * 11) + 10; // 10–20 neue Veins
+          for (let i = 0; i < count; i++) {
+            let x, y, pos, tries = 0;
+            do {
+              x = Math.floor(Math.random() * bgWidth);
+              y = Math.floor(Math.random() * bgHeight);
+              pos = `${x}_${y}`;
+              tries++;
+            } while (veinsMapRef.current.has(pos) && tries < 10);
+            if (!veinsMapRef.current.has(pos)) {
+              const color = accentColors[Math.floor(Math.random() * accentColors.length)];
+              veinsMapRef.current.set(pos, { vein: { x, y, color }, birth: now });
+              newVeins++;
+              changed = true;
+            }
+          }
+        }
+
+        if (currentBeatDetected && veinsMapRef.current.size < maxVeinsRef.current) {
+          const count = Math.floor(Math.random() * 21) + 30; // 30–50 neue Veins
+          for (let i = 0; i < count; i++) {
+            let x, y, pos, tries = 0;
+            do {
+              x = Math.floor(Math.random() * bgWidth);
+              y = Math.floor(Math.random() * bgHeight);
+              pos = `${x}_${y}`;
+              tries++;
+            } while (veinsMapRef.current.has(pos) && tries < 10);
+            if (!veinsMapRef.current.has(pos)) {
+              const color = accentColors[Math.floor(Math.random() * accentColors.length)];
+              veinsMapRef.current.set(pos, { vein: { x, y, color }, birth: now });
+              newVeins++;
+              changed = true;
+            }
+          }
+        }
+
+        if (changed) {
+          setColoredVeins(mapToVeins(veinsMapRef.current));
+        }
+
+        // Debug-Log nur bei signifikanten Änderungen
+        if (newVeins > 0) {
+          if (now - lastVeinLogTimeRef.current > 10000) {
+            throttledLog(`Veins active: ${veinsMapRef.current.size}, new: ${newVeins}, energy: ${currentEnergy.toFixed(2)}`);
+            lastVeinLogTimeRef.current = now;
+          }
         }
       }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [energy, beatDetected, getBackgroundDimensions]);
+
+      veinLoopRafIdRef.current = requestAnimationFrame(tick);
+    };
+
+    veinLoopRafIdRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      cancelled = true;
+      if (veinLoopRafIdRef.current !== null) {
+        cancelAnimationFrame(veinLoopRafIdRef.current);
+      }
+      veinLoopRafIdRef.current = null;
+    };
+  }, [getBackgroundDimensions]);
 
   // NOTE: Removed duplicate 100ms prune-only interval.
   // The interval above (Vein-Generierung) already prunes expired veins and updates the overlay.
