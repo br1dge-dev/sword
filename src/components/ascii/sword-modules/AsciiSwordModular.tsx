@@ -61,6 +61,7 @@ import {
 import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects';
 import { generateFrequencyVeins } from './effects/frequencyVeins';
 import { getIdleTilesForIndex, nextIdleTilesColorIndex } from './effects/idleTiles';
+import { generateReactiveEdgeEffects } from './effects/edgeEffects';
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
 import { useSwordAudioState, useSwordPowerUpState } from './hooks/useSwordStores';
@@ -748,128 +749,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     if (beatDetected || energy > 0.03) { // Noch empfindlicher: ab 0.03
       if (edgePositions.length === 0) return;
-      
-      const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}, rotation?: number}> = [];
-      
-      // CHARGE-LEVEL BASIERTE EFFEKTE (um 20% erhöht)
-      let vibrationChance, glitchChance, colorChance, rotationChance, patternSwapChance;
-      
-      switch (chargeLevel) {
-        case 1:
-          // CHARGE LVL1: Dünne Außenlinien, minimal vibrieren, selten Pattern-Tausch (um 20% erhöht)
-          vibrationChance = 0.12 + (energy * 0.24); // Minimal, reaktiv auf Musik-Intensität (erhöht von 0.1+0.2)
-          glitchChance = 0.06; // Sehr selten (erhöht von 0.05)
-          colorChance = 0.096; // Selten (erhöht von 0.08)
-          rotationChance = 0.18; // Dünne Linien können sich drehen (erhöht von 0.15)
-          patternSwapChance = 0.024; // Sehr selten mit Hintergrund-Pattern tauschen (erhöht von 0.02)
-          break;
-          
-        case 2:
-          // CHARGE LVL2: Stärkere Vibrationen, stärkerer Glow (um 20% erhöht)
-          vibrationChance = 0.36 + (energy * 0.48); // Sichtbarer und stärker (erhöht von 0.3+0.4)
-          glitchChance = 0.18; // Häufiger (erhöht von 0.15)
-          colorChance = 0.3; // Häufiger (erhöht von 0.25)
-          rotationChance = 0.3; // Häufigere Rotation (erhöht von 0.25)
-          patternSwapChance = 0.096; // Häufigerer Pattern-Tausch (erhöht von 0.08)
-          break;
-          
-        case 3:
-          // CHARGE LVL3: Von allem noch mehr (um 20% erhöht)
-          vibrationChance = 0.6 + (energy * 0.72); // Sehr stark (erhöht von 0.5+0.6)
-          glitchChance = 0.36; // Sehr häufig (erhöht von 0.3)
-          colorChance = 0.48; // Sehr häufig (erhöht von 0.4)
-          rotationChance = 0.48; // Sehr häufige Rotation (erhöht von 0.4)
-          patternSwapChance = 0.18; // Häufiger Pattern-Tausch (erhöht von 0.15)
-          break;
-          
-        default:
-          // Fallback für Level 0 oder undefined (um 20% erhöht)
-          vibrationChance = 0.06;
-          glitchChance = 0.024;
-          colorChance = 0.06;
-          rotationChance = 0.06;
-          patternSwapChance = 0.012;
-      }
-      
-      // Energie-Multiplikator für reaktive Intensität
-      const energyMultiplier = 1 + (energy * 1.5);
-      
-      // Effektive Chancen mit Energie-Multiplikator
-      const effectiveVibrationChance = Math.min(0.8, vibrationChance * energyMultiplier);
-      const effectiveGlitchChance = Math.min(0.7, glitchChance * energyMultiplier);
-      const effectiveColorChance = Math.min(0.7, colorChance * energyMultiplier);
-      const effectiveRotationChance = Math.min(0.6, rotationChance * energyMultiplier);
-      const effectivePatternSwapChance = Math.min(0.3, patternSwapChance * energyMultiplier);
-      
-      edgePositions.forEach(pos => {
-        // VIBRATION (reaktiv auf Musik-Intensität)
-        if (Math.random() < effectiveVibrationChance) {
-          const intensity = energy * (chargeLevel * 0.5 + 0.5); // Stärkere Vibration bei höherem Level
-          const offsetX = (Math.random() - 0.5) * intensity * 2;
-          const offsetY = (Math.random() - 0.5) * intensity * 2;
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            offset: { x: offsetX, y: offsetY }
-          });
-        }
-        
-        // ROTATION (dünne Linien drehen sich)
-        if (Math.random() < effectiveRotationChance) {
-          const rotationAngle = (Math.random() - 0.5) * 30; // ±15 Grad Rotation
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            rotation: rotationAngle
-          });
-        }
-        
-        // GLITCH-ZEICHEN
-        if (Math.random() < effectiveGlitchChance) {
-          const glitchCharSet = Math.floor(Math.random() * edgeGlitchChars[chargeLevel as keyof typeof edgeGlitchChars]?.length || edgeGlitchChars[1].length);
-          const glitchChar = edgeGlitchChars[chargeLevel as keyof typeof edgeGlitchChars]?.[glitchCharSet] || edgeGlitchChars[1][glitchCharSet];
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            char: glitchChar
-          });
-        }
-        
-        // FARB-EFFEKTE
-        if (Math.random() < effectiveColorChance) {
-          const colorIndex = Math.floor(Math.random() * accentColors.length);
-          const edgeColor = accentColors[colorIndex];
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            color: edgeColor
-          });
-        }
-        
-        // PATTERN-SWAP (mit Hintergrund-Elementen tauschen)
-        if (Math.random() < effectivePatternSwapChance) {
-          // Wähle ein zufälliges Hintergrund-Zeichen
-          const backgroundChars = ['░', '▒', '▓', '█', '▄', '▀', '▌', '▐'];
-          const randomBgChar = backgroundChars[Math.floor(Math.random() * backgroundChars.length)];
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            char: randomBgChar
-          });
-        }
+
+      const { effects, cleanupMs } = generateReactiveEdgeEffects({
+        edgePositions,
+        chargeLevel,
+        energy,
+        beatDetected,
       });
-      
-      setEdgeEffects(newEdgeEffects);
-      
-      // Cleanup für Edge-Effekte - Längere Dauer für sanftere Übergänge
-      const duration = beatDetected ? 250 : Math.max(200, Math.min(300, Math.floor(energy * 150)));
+
+      setEdgeEffects(effects);
+
       const timeout = setTimeout(() => {
         setEdgeEffects([]);
-      }, duration);
+      }, cleanupMs);
       cleanupTimeoutsRef.current.add(timeout);
     }
   }, [beatDetected, energy, chargeLevel, edgePositions]);
@@ -1035,128 +927,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     if (idle) return;
     if (beatDetected || energy > 0.03) { // Noch empfindlicher: ab 0.03
       if (edgePositions.length === 0) return;
-      
-      const newEdgeEffects: Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}, rotation?: number}> = [];
-      
-      // CHARGE-LEVEL BASIERTE EFFEKTE (um 20% erhöht)
-      let vibrationChance, glitchChance, colorChance, rotationChance, patternSwapChance;
-      
-      switch (chargeLevel) {
-        case 1:
-          // CHARGE LVL1: Dünne Außenlinien, minimal vibrieren, selten Pattern-Tausch (um 20% erhöht)
-          vibrationChance = 0.12 + (energy * 0.24); // Minimal, reaktiv auf Musik-Intensität (erhöht von 0.1+0.2)
-          glitchChance = 0.06; // Sehr selten (erhöht von 0.05)
-          colorChance = 0.096; // Selten (erhöht von 0.08)
-          rotationChance = 0.18; // Dünne Linien können sich drehen (erhöht von 0.15)
-          patternSwapChance = 0.024; // Sehr selten mit Hintergrund-Pattern tauschen (erhöht von 0.02)
-          break;
-          
-        case 2:
-          // CHARGE LVL2: Stärkere Vibrationen, stärkerer Glow (um 20% erhöht)
-          vibrationChance = 0.36 + (energy * 0.48); // Sichtbarer und stärker (erhöht von 0.3+0.4)
-          glitchChance = 0.18; // Häufiger (erhöht von 0.15)
-          colorChance = 0.3; // Häufiger (erhöht von 0.25)
-          rotationChance = 0.3; // Häufigere Rotation (erhöht von 0.25)
-          patternSwapChance = 0.096; // Häufigerer Pattern-Tausch (erhöht von 0.08)
-          break;
-          
-        case 3:
-          // CHARGE LVL3: Von allem noch mehr (um 20% erhöht)
-          vibrationChance = 0.6 + (energy * 0.72); // Sehr stark (erhöht von 0.5+0.6)
-          glitchChance = 0.36; // Sehr häufig (erhöht von 0.3)
-          colorChance = 0.48; // Sehr häufig (erhöht von 0.4)
-          rotationChance = 0.48; // Sehr häufige Rotation (erhöht von 0.4)
-          patternSwapChance = 0.18; // Häufiger Pattern-Tausch (erhöht von 0.15)
-          break;
-          
-        default:
-          // Fallback für Level 0 oder undefined (um 20% erhöht)
-          vibrationChance = 0.06;
-          glitchChance = 0.024;
-          colorChance = 0.06;
-          rotationChance = 0.06;
-          patternSwapChance = 0.012;
-      }
-      
-      // Energie-Multiplikator für reaktive Intensität
-      const energyMultiplier = 1 + (energy * 1.5);
-      
-      // Effektive Chancen mit Energie-Multiplikator
-      const effectiveVibrationChance = Math.min(0.8, vibrationChance * energyMultiplier);
-      const effectiveGlitchChance = Math.min(0.7, glitchChance * energyMultiplier);
-      const effectiveColorChance = Math.min(0.7, colorChance * energyMultiplier);
-      const effectiveRotationChance = Math.min(0.6, rotationChance * energyMultiplier);
-      const effectivePatternSwapChance = Math.min(0.3, patternSwapChance * energyMultiplier);
-      
-      edgePositions.forEach(pos => {
-        // VIBRATION (reaktiv auf Musik-Intensität)
-        if (Math.random() < effectiveVibrationChance) {
-          const intensity = energy * (chargeLevel * 0.5 + 0.5); // Stärkere Vibration bei höherem Level
-          const offsetX = (Math.random() - 0.5) * intensity * 2;
-          const offsetY = (Math.random() - 0.5) * intensity * 2;
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            offset: { x: offsetX, y: offsetY }
-          });
-        }
-        
-        // ROTATION (dünne Linien drehen sich)
-        if (Math.random() < effectiveRotationChance) {
-          const rotationAngle = (Math.random() - 0.5) * 30; // ±15 Grad Rotation
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            rotation: rotationAngle
-          });
-        }
-        
-        // GLITCH-ZEICHEN
-        if (Math.random() < effectiveGlitchChance) {
-          const glitchCharSet = Math.floor(Math.random() * edgeGlitchChars[chargeLevel as keyof typeof edgeGlitchChars]?.length || edgeGlitchChars[1].length);
-          const glitchChar = edgeGlitchChars[chargeLevel as keyof typeof edgeGlitchChars]?.[glitchCharSet] || edgeGlitchChars[1][glitchCharSet];
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            char: glitchChar
-          });
-        }
-        
-        // FARB-EFFEKTE
-        if (Math.random() < effectiveColorChance) {
-          const colorIndex = Math.floor(Math.random() * accentColors.length);
-          const edgeColor = accentColors[colorIndex];
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            color: edgeColor
-          });
-        }
-        
-        // PATTERN-SWAP (mit Hintergrund-Elementen tauschen)
-        if (Math.random() < effectivePatternSwapChance) {
-          // Wähle ein zufälliges Hintergrund-Zeichen
-          const backgroundChars = ['░', '▒', '▓', '█', '▄', '▀', '▌', '▐'];
-          const randomBgChar = backgroundChars[Math.floor(Math.random() * backgroundChars.length)];
-          
-          newEdgeEffects.push({
-            x: pos.x,
-            y: pos.y,
-            char: randomBgChar
-          });
-        }
+
+      const { effects, cleanupMs } = generateReactiveEdgeEffects({
+        edgePositions,
+        chargeLevel,
+        energy,
+        beatDetected,
       });
-      
-      setEdgeEffects(newEdgeEffects);
-      
-      // Cleanup für Edge-Effekte - Längere Dauer für sanftere Übergänge
-      const duration = beatDetected ? 250 : Math.max(200, Math.min(300, Math.floor(energy * 150)));
+
+      setEdgeEffects(effects);
+
       const timeout = setTimeout(() => {
         setEdgeEffects([]);
-      }, duration);
+      }, cleanupMs);
       cleanupTimeoutsRef.current.add(timeout);
     }
   }, [beatDetected, energy, chargeLevel, edgePositions, idle]);
