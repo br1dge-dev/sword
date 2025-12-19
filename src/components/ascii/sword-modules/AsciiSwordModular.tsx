@@ -664,15 +664,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const idleVeins = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
       
       // Ersetze alle bestehenden Veins mit der Idle-Sequenz
-      veinsMapRef.current.clear();
       const currentTime = Date.now();
-      idleVeins.forEach(vein => {
-        const key = `${vein.x}-${vein.y}`;
-        veinsMapRef.current.set(key, { vein, birth: currentTime });
-      });
+      replaceVeinsInMap(veinsMapRef.current, idleVeins, currentTime);
       
       // Setze das State-Array für das Rendering
-      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+      setColoredVeins(mapToVeins(veinsMapRef.current));
     }
   }, [beatDetected, getBackgroundDimensions, isMusicPlaying, idle]);
   
@@ -830,15 +826,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const idleVeins = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
       
       // Ersetze alle bestehenden Veins mit der Idle-Sequenz
-      veinsMapRef.current.clear();
       const currentTime = Date.now();
-      idleVeins.forEach(vein => {
-        const key = `${vein.x}-${vein.y}`;
-        veinsMapRef.current.set(key, { vein, birth: currentTime });
-      });
+      replaceVeinsInMap(veinsMapRef.current, idleVeins, currentTime);
       
       // Setze das State-Array für das Rendering
-      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+      setColoredVeins(mapToVeins(veinsMapRef.current));
     }
   }, [idle, beatDetected, getBackgroundDimensions, isMusicPlaying]);
   
