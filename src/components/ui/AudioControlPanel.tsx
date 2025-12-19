@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAudioAnalyzer, globalAnalyzer } from '../../hooks/useAudioAnalyzer';
 import { useAudioReactionStore } from '../../store/audioReactionStore';
+import { useShallow } from 'zustand/react/shallow';
 
 interface AudioControlPanelProps {
   className?: string;
@@ -61,14 +62,16 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   // };
   
   // Audio-Reaction-Store
-  const { setMusicPlaying, setAudioActive, energy, beatDetected, isIdleActive, swordColor } = useAudioReactionStore(state => ({
-    setMusicPlaying: state.setMusicPlaying,
-    setAudioActive: state.setAudioActive,
-    energy: state.energy,
-    beatDetected: state.beatDetected,
-    isIdleActive: state.isIdleActive(),
-    swordColor: state.swordColor
-  }));
+  const { setMusicPlaying, setAudioActive, energy, beatDetected, isIdleActive, swordColor } = useAudioReactionStore(
+    useShallow((state) => ({
+      setMusicPlaying: state.setMusicPlaying,
+      setAudioActive: state.setAudioActive,
+      energy: state.energy,
+      beatDetected: state.beatDetected,
+      isIdleActive: state.isIdleActive(),
+      swordColor: state.swordColor,
+    })),
+  );
   
   // Audio-Analyzer Hook
   const {

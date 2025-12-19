@@ -62,13 +62,27 @@ import {
 import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects';
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
-  const { currentLevel, chargeLevel, glitchLevel } = usePowerUpStore();
+  const { currentLevel, chargeLevel, glitchLevel } = usePowerUpStore(
+    useShallow((s) => ({
+      currentLevel: s.currentLevel,
+      chargeLevel: s.chargeLevel,
+      glitchLevel: s.glitchLevel,
+    })),
+  );
   
   // Audio-Reaktionsdaten abrufen
-  const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying, isIdleActive } = useAudioReactionStore();
+  const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying, isIdleActive } = useAudioReactionStore(
+    useShallow((s) => ({
+      energy: s.energy,
+      beatDetected: s.beatDetected,
+      isMusicPlaying: s.isMusicPlaying,
+      isIdleActive: s.isIdleActive, // keep function stable; call later where needed
+    })),
+  );
   
   // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
   const energy = directEnergy !== undefined ? directEnergy : storeEnergy;

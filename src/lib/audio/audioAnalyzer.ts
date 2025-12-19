@@ -242,7 +242,9 @@ export class AudioAnalyzer {
 
     try {
       // Hole Frequenzdaten
-      this.analyser.getByteFrequencyData(this.frequencyData);
+      // TS 5.9+ types `Uint8Array` as `Uint8Array<ArrayBufferLike>`; WebAudio expects `Uint8Array<ArrayBuffer>`.
+      // This is safe because `AnalyserNode` writes into the provided typed array.
+      this.analyser.getByteFrequencyData(this.frequencyData as any);
       
       // NEU: Verbesserte Energie-Berechnung mit Frequenzgewichtung
       let sum = 0;
