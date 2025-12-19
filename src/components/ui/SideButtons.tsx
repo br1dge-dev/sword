@@ -11,13 +11,16 @@ import ForgeProgressBar from './ForgeProgressBar';
 import ChargeProgressBar from './ChargeProgressBar';
 import GlitchProgressBar from './GlitchProgressBar';
 import { usePowerUpStore } from '@/store/powerUpStore';
+import { useShallow } from 'zustand/react/shallow';
 
 interface SideButtonsProps {
   className?: string;
 }
 
 export default function SideButtons({ className = '' }: SideButtonsProps) {
-  const { resetAllEffects } = usePowerUpStore();
+  const { resetAllEffects } = usePowerUpStore(
+    useShallow((s) => ({ resetAllEffects: s.resetAllEffects })),
+  );
   
   // Zustandsvariablen für Fehlerbehandlung
   const [errorCount, setErrorCount] = useState(0);
