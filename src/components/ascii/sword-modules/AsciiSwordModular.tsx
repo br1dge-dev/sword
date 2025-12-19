@@ -60,6 +60,7 @@ import {
 } from './effects/glitchEffects';
 import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects';
 import { generateFrequencyVeins } from './effects/frequencyVeins';
+import { getIdleTilesForIndex, nextIdleTilesColorIndex } from './effects/idleTiles';
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
 import { useSwordAudioState, useSwordPowerUpState } from './hooks/useSwordStores';
@@ -895,7 +896,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       
       // NEU: Nur Idle-Tiles setzen wenn keine Musik-Tiles leben
       if (currentTilesRef.current.length === 0) {
-        const idleTiles = swordPositions.map(pos => ({ ...pos, color: accentColors[colorIndex] }));
+        const idleTiles = getIdleTilesForIndex(swordPositions, colorIndex);
         currentTilesRef.current = idleTiles;
         tileBirthTimeRef.current = Date.now(); // Setze Geburtszeit für Idle-Tiles
         setColoredTiles(idleTiles);
@@ -911,8 +912,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         
         // NEU: Nur Idle-Tiles setzen wenn keine Musik-Tiles leben
         if (currentTilesRef.current.length === 0) {
-          colorIndex = (colorIndex + 1) % accentColors.length;
-          const idleTiles = swordPositions.map(pos => ({ ...pos, color: accentColors[colorIndex] }));
+          colorIndex = nextIdleTilesColorIndex(colorIndex);
+          const idleTiles = getIdleTilesForIndex(swordPositions, colorIndex);
           currentTilesRef.current = idleTiles;
           tileBirthTimeRef.current = Date.now(); // Setze Geburtszeit für Idle-Tiles
           setColoredTiles(idleTiles);
