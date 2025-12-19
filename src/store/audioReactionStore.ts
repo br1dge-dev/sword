@@ -18,8 +18,10 @@ const IDLE_INTERVAL = 2000; // 2 Sekunden pro Schritt
 const IDLE_ENERGY = 0.15; // Konstante, niedrige Energy für subtile Animation
 
 // OPTIMIERT: Reduziertes Throttling für bessere Reaktivität
-let lastEnergyUpdate = 0;
-const ENERGY_UPDATE_THROTTLE = 200; // Reduziert auf 200ms für bessere Reaktivität
+let lastEnergyUpdateLive = 0;
+let lastEnergyUpdateIdle = 0;
+const ENERGY_UPDATE_THROTTLE_LIVE = 50; // ~20Hz for live audio-driven updates
+const ENERGY_UPDATE_THROTTLE_IDLE = 200; // keep idle updates calmer
 
 // ENTFERNT: Logging-Variablen (lastLogTimeRef, logThrottleInterval)
 
@@ -65,10 +67,12 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   
   updateEnergy: (energy, opts = {}) => {
     const now = Date.now();
-    if (now - lastEnergyUpdate < ENERGY_UPDATE_THROTTLE) {
-      return; // Skip update if too soon
-    }
-    lastEnergyUpdate = now;
+    const isIdleUpdate = !!opts.forceIdle;
+    const throttle = isIdleUpdate ? ENERGY_UPDATE_THROTTLE_IDLE : ENERGY_UPDATE_THROTTLE_LIVE;
+    const last = isIdleUpdate ? lastEnergyUpdateIdle : lastEnergyUpdateLive;
+    if (now - last < throttle) return; // Skip update if too soon
+    if (isIdleUpdate) lastEnergyUpdateIdle = now;
+    else lastEnergyUpdateLive = now;
     const currentState = get();
     
     // NEU: Empfindlichere Idle-Animation-Deaktivierung
