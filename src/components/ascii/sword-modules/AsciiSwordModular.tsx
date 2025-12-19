@@ -51,6 +51,7 @@ import {
 // Importiere Effekt-Generatoren
 import { generateCaveBackground, generateColoredVeins, generateIdleVeinSequence, generateBeatVeins } from './effects/backgroundEffects';
 import { generateHarmonicColorPair } from './effects/colorEffects';
+import { computeAdaptiveColorCycle, computeOptimizedColorCycle } from './effects/colorCycle';
 import {
   generateEdgeGlitches,
   generateUnicodeGlitches,
@@ -725,23 +726,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // NEU: Adaptive Audio-reaktive Farb-Effekte basierend auf tatsächlichen Energy-Werten
   useEffect(() => {
-    // NEU: Adaptive Schwellenwerte basierend auf tatsächlichen Energy-Werten
-    const adaptiveEnergyThreshold = 0.15; // Reduziert von 0.05 für bessere Reaktivität
-    const adaptiveHighEnergyThreshold = 0.3; // Reduziert von 0.8 für realistische Werte
-    
-    if ((energy > adaptiveEnergyThreshold || beatDetected) && Date.now() - lastColorChangeTime > colorStability) {
-      const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
-      
-      // NEU: Adaptive Stabilität basierend auf realen Energy-Werten
-      const newStability = energy > adaptiveHighEnergyThreshold
-        ? Math.max(600, Math.floor(1200 - (energy * 200))) // 600-1200ms bei hoher Energy
-        : Math.floor(1500 + Math.random() * 2000); // 1500-3500ms bei niedriger Energy
-      
-      setBaseColor(swordColor);
-      setBgColor(newBgColor);
+    const nowCheck = Date.now();
+    const result = computeAdaptiveColorCycle({
+      energy,
+      beatDetected,
+      lastColorChangeTime,
+      colorStability,
+      nowMs: nowCheck,
+    });
+
+    if (result) {
+      setBaseColor(result.swordColor);
+      setBgColor(result.bgColor);
       setLastColorChangeTime(Date.now());
-      setColorStability(newStability);
-      
+      setColorStability(result.newStability);
     }
   }, [beatDetected, energy, lastColorChangeTime, colorStability]);
   
@@ -906,18 +904,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
   useEffect(() => {
     if (idle) return;
-    if ((energy > 0.05 || beatDetected) && Date.now() - lastColorChangeTime > colorStability) { // Noch empfindlicher: ab 0.05
-      const { swordColor, bgColor: newBgColor } = generateHarmonicColorPair();
-      
-      const newStability = energy > 0.8 // Erhöht von 0.7 auf 0.8 für längere Stabilität
-        ? Math.max(800, Math.floor(1500 - (energy * 300))) // Erhöht von 500/1200 auf 800/1500
-        : Math.floor(2000 + Math.random() * 2500); // Erhöht von 1500+2000 auf 2000+2500
-      
-      setBaseColor(swordColor);
-      setBgColor(newBgColor);
+    const nowCheck = Date.now();
+    const result = computeOptimizedColorCycle({
+      energy,
+      beatDetected,
+      lastColorChangeTime,
+      colorStability,
+      nowMs: nowCheck,
+    });
+
+    if (result) {
+      setBaseColor(result.swordColor);
+      setBgColor(result.bgColor);
       setLastColorChangeTime(Date.now());
-      setColorStability(newStability);
-      
+      setColorStability(result.newStability);
       // performanceMonitor.trackColorChange(); // Entfernt
     }
   }, [beatDetected, energy, lastColorChangeTime, colorStability, idle]);
