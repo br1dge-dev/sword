@@ -113,13 +113,13 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       // DEAKTIVIERT: Logging
       // console.error('Failed to initialize audio analyzer:', err);
     }
-  }, [audioRef.current, initialize, isInitialized, isAnalyzing, start, isPlaying, analyzerInitialized]);
+  }, [initialize, isInitialized, isAnalyzing, start, isPlaying, analyzerInitialized]);
   
   useEffect(() => {
     if (audioRef.current && !analyzerInitialized) {
       initializeAudioAnalyzer();
     }
-  }, [audioRef.current, analyzerInitialized, initializeAudioAnalyzer]);
+  }, [analyzerInitialized, initializeAudioAnalyzer]);
   
   // Starte/Stoppe Analyzer basierend auf Wiedergabestatus
   useEffect(() => {
@@ -132,6 +132,32 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     }
   }, [isInitialized, isAnalyzing, start, stop, isPlaying]);
   
+  // Nächsten Track (stabil, damit Event-Handler sauber sind)
+  const nextTrack = useCallback(async (autoplay = false) => {
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      
+      const nextIndex = (currentTrackIndex + 1) % tracks.length;
+      setCurrentTrackIndex(nextIndex);
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (audioRef.current) {
+        audioRef.current.src = tracks[nextIndex].src;
+        audioRef.current.volume = 0.5;
+        
+        if (isPlaying || autoplay) {
+          audioRef.current.play().catch(() => {});
+        }
+      }
+    } catch (err) {
+      // DEAKTIVIERT: Logging
+      // console.error('Error switching track:', err);
+    }
+  }, [currentTrackIndex, isPlaying]);
+
   // Audio-Element Event Handler
   useEffect(() => {
     const audio = audioRef.current;
@@ -155,7 +181,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, []);
+  }, [nextTrack]);
   
   // AudioContext aktivieren
   const resumeAudioContext = useCallback(async () => {
@@ -183,7 +209,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       }
     }
     return false;
-  }, [isInitialized, isAnalyzing, isPlaying, start]);
+  }, [isAnalyzing, isPlaying, start, setAudioActive]);
   
   // Wiedergabe starten/pausieren
   const togglePlay = async () => {
@@ -217,32 +243,6 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     } catch (err) {
       // DEAKTIVIERT: Logging
       // console.error('Error toggling playback:', err);
-    }
-  };
-
-  // Nächsten Track
-  const nextTrack = async (autoplay = false) => {
-    try {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      
-      const nextIndex = (currentTrackIndex + 1) % tracks.length;
-      setCurrentTrackIndex(nextIndex);
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      if (audioRef.current) {
-        audioRef.current.src = tracks[nextIndex].src;
-        audioRef.current.volume = 0.5;
-        
-        if (isPlaying || autoplay) {
-          audioRef.current.play().catch(() => {});
-        }
-      }
-    } catch (err) {
-      // DEAKTIVIERT: Logging
-      // console.error('Error switching track:', err);
     }
   };
 

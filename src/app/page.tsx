@@ -17,6 +17,8 @@ import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import BuildBadge from '@/components/ui/BuildBadge';
 import { IoMdEye, IoMdEyeOff, IoMdTrophy } from 'react-icons/io';
 
+const HIGHLIGHT_COLORS = ['#F8E16C', '#FF3EC8', '#3EE6FF'] as const;
+
 export default function HomePage() {
   // Base level setting (will be overridden by PowerUp)
   const baseSwordLevel = 1;
@@ -29,13 +31,14 @@ export default function HomePage() {
   
   // Für den Titel: Random Highlight
   const leaderboardTitle = 'L3ADERBOARD';
-  const highlightColors = ['#F8E16C', '#FF3EC8', '#3EE6FF'];
-  const [highlightIdx, setHighlightIdx] = useState(Math.floor(Math.random() * leaderboardTitle.length));
-  const [highlightColor, setHighlightColor] = useState(highlightColors[Math.floor(Math.random() * highlightColors.length)]);
+  const [highlightIdx, setHighlightIdx] = useState(() => Math.floor(Math.random() * leaderboardTitle.length));
+  const [highlightColor, setHighlightColor] = useState(
+    () => HIGHLIGHT_COLORS[Math.floor(Math.random() * HIGHLIGHT_COLORS.length)],
+  );
   useEffect(() => {
     const interval = setInterval(() => {
       setHighlightIdx(Math.floor(Math.random() * leaderboardTitle.length));
-      setHighlightColor(highlightColors[Math.floor(Math.random() * highlightColors.length)]);
+      setHighlightColor(HIGHLIGHT_COLORS[Math.floor(Math.random() * HIGHLIGHT_COLORS.length)]);
     }, 1800);
     return () => clearInterval(interval);
   }, []);

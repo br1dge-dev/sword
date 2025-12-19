@@ -396,6 +396,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       clearAllIntervals();
       clearBackgroundCache();
     };
+    // Intentionally run only on mount: re-running on `glitchLevel` changes would
+    // reset background/veins mid-session and can feel jarring.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getBackgroundDimensions, clearAllIntervals, clearBackgroundCache]);
   
   // OPTIMIERT: Resize-Handler mit besserer Performance
@@ -715,7 +718,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
     }
-  }, [beatDetected, getBackgroundDimensions, isMusicPlaying]);
+  }, [beatDetected, getBackgroundDimensions, isMusicPlaying, isIdleActive]);
   
   // NEU: Adaptive Audio-reaktive Farb-Effekte basierend auf tatsächlichen Energy-Werten
   useEffect(() => {
@@ -921,7 +924,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     }
     // ENTFERNT: Sofortiges Entfernen der Tiles wenn Idle verlassen wird
     // Musik-Effekte sollen ihre natürliche Lebensdauer haben
-  }, [swordPositions, isMusicPlaying]);
+  }, [swordPositions, isMusicPlaying, isIdleActive]);
 
   // --- ALLE ANIMATIONEN NUR WENN NICHT IDLE ---
   useEffect(() => {
@@ -1023,7 +1026,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       
       // performanceMonitor.trackColorChange(); // Entfernt
     }
-  }, [beatDetected, energy, lastColorChangeTime, colorStability]);
+  }, [beatDetected, energy, lastColorChangeTime, colorStability, isIdleActive]);
   
   // OPTIMIERT: Verbesserte Audio-reaktive Edge-Effekte basierend auf Charge-Level
   useEffect(() => {
@@ -1154,7 +1157,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       }, duration);
       cleanupTimeoutsRef.current.add(timeout);
     }
-  }, [beatDetected, energy, chargeLevel, edgePositions]);
+  }, [beatDetected, energy, chargeLevel, edgePositions, isIdleActive]);
   
   // Frequenzdaten aus dem Store holen
   const frequencyData = useAudioReactionStore((s) => s.frequencyData);
