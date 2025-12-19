@@ -180,7 +180,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Wenn schon vorhanden, Zeitstempel aktualisieren
       veinsMapRef.current.set(key, { vein, birth: currentTime });
     });
-    setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+    setColoredVeins(mapToVeins(veinsMapRef.current));
     return () => {
       clearAllIntervals();
       clearBackgroundCache();
@@ -204,7 +204,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         const key = `${vein.x}-${vein.y}`;
         veinsMapRef.current.set(key, { vein, birth: currentTime });
       });
-      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+      setColoredVeins(mapToVeins(veinsMapRef.current));
     };
     const debouncedResize = () => {
       if (resizeTimeout) {
@@ -274,7 +274,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         }
       }
       if (changed) {
-        setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+        setColoredVeins(mapToVeins(veinsMapRef.current));
       }
       // Debug-Log nur bei signifikanten Änderungen
       if (newVeins > 0) {
@@ -300,7 +300,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         }
       });
       if (changed) {
-        setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+        setColoredVeins(mapToVeins(veinsMapRef.current));
       }
     }, 100);
     return () => clearInterval(interval);
