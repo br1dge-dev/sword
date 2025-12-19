@@ -52,6 +52,7 @@ import {
 import { generateCaveBackground, generateColoredVeins, generateIdleVeinSequence, generateBeatVeins } from './effects/backgroundEffects';
 import { generateHarmonicColorPair } from './effects/colorEffects';
 import { computeAdaptiveColorCycle, computeOptimizedColorCycle } from './effects/colorCycle';
+import { computeBeatVeinLifetimeMs, mapToVeins, pruneVeinsByLifetime, replaceVeinsInMap } from './effects/veinLifecycle';
 import {
   generateEdgeGlitches,
   generateUnicodeGlitches,
@@ -657,32 +658,21 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const beatVeins = generateBeatVeins(bgWidth, bgHeight, energy, beatDetected, viewportWidth, viewportHeight);
       
       // Ersetze alle bestehenden Veins mit den neuen Beat-Veins
-      veinsMapRef.current.clear();
-      beatVeins.forEach(vein => {
-        const key = `${vein.x}-${vein.y}`;
-        veinsMapRef.current.set(key, { vein, birth: currentTime });
-      });
+      replaceVeinsInMap(veinsMapRef.current, beatVeins, currentTime);
       
       // Setze das State-Array für das Rendering
-      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+      setColoredVeins(mapToVeins(veinsMapRef.current));
       
       // OPTIMIERT: Längere Lebensdauer für Beat-Veins (4-10 Sekunden)
-      const veinLifetime = beatDetected ? 4000 : Math.max(4000, Math.min(10000, Math.floor(energy * 12000)));
+      const veinLifetime = computeBeatVeinLifetimeMs(energy, beatDetected);
       
       // Cleanup nach der Lebensdauer
       const timeout = setTimeout(() => {
         const now = Date.now();
-        let changed = false;
-        
-        Array.from(veinsMapRef.current.entries()).forEach(([key, value]) => {
-          if (now - value.birth > veinLifetime) {
-            veinsMapRef.current.delete(key);
-            changed = true;
-          }
-        });
+        const changed = pruneVeinsByLifetime(veinsMapRef.current, now, veinLifetime);
         
         if (changed) {
-          setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+          setColoredVeins(mapToVeins(veinsMapRef.current));
         }
       }, veinLifetime);
       
@@ -834,32 +824,21 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const beatVeins = generateBeatVeins(bgWidth, bgHeight, energy, beatDetected, viewportWidth, viewportHeight);
       
       // Ersetze alle bestehenden Veins mit den neuen Beat-Veins
-      veinsMapRef.current.clear();
-      beatVeins.forEach(vein => {
-        const key = `${vein.x}-${vein.y}`;
-        veinsMapRef.current.set(key, { vein, birth: currentTime });
-      });
+      replaceVeinsInMap(veinsMapRef.current, beatVeins, currentTime);
       
       // Setze das State-Array für das Rendering
-      setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+      setColoredVeins(mapToVeins(veinsMapRef.current));
       
       // OPTIMIERT: Längere Lebensdauer für Beat-Veins (4-10 Sekunden)
-      const veinLifetime = beatDetected ? 4000 : Math.max(4000, Math.min(10000, Math.floor(energy * 12000)));
+      const veinLifetime = computeBeatVeinLifetimeMs(energy, beatDetected);
       
       // Cleanup nach der Lebensdauer
       const timeout = setTimeout(() => {
         const now = Date.now();
-        let changed = false;
-        
-        Array.from(veinsMapRef.current.entries()).forEach(([key, value]) => {
-          if (now - value.birth > veinLifetime) {
-            veinsMapRef.current.delete(key);
-            changed = true;
-          }
-        });
+        const changed = pruneVeinsByLifetime(veinsMapRef.current, now, veinLifetime);
         
         if (changed) {
-          setColoredVeins(Array.from(veinsMapRef.current.values()).map(v => v.vein));
+          setColoredVeins(mapToVeins(veinsMapRef.current));
         }
       }, veinLifetime);
       
