@@ -288,23 +288,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     return () => clearInterval(interval);
   }, [energy, beatDetected, getBackgroundDimensions]);
 
-  // Intervall: Entferne abgelaufene Veins und aktualisiere das Overlay
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      let changed = false;
-      veinsMapRef.current.forEach((value, key) => {
-        if (now - value.birth > 10000) {
-          veinsMapRef.current.delete(key);
-          changed = true;
-        }
-      });
-      if (changed) {
-        setColoredVeins(mapToVeins(veinsMapRef.current));
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, []);
+  // NOTE: Removed duplicate 100ms prune-only interval.
+  // The interval above (Vein-Generierung) already prunes expired veins and updates the overlay.
   
   // OPTIMIERT: Memoisierte Schwert-Positionen (nur bei Level-Änderung neu berechnen)
   const swordPositions = useMemo(() => {
