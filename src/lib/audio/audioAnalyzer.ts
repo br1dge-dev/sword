@@ -63,6 +63,10 @@ export class AudioAnalyzer {
     // console.log('AudioAnalyzer initialized');
   }
 
+  public updateOptions(options: Partial<AudioAnalyzerOptions>): void {
+    this.options = { ...this.options, ...options };
+  }
+
   // DEAKTIVIERT: Logging-Methode
   // private throttledLog(message: string, force: boolean = false): void {
   //   const now = Date.now();
@@ -141,8 +145,9 @@ export class AudioAnalyzer {
     try {
       // Create analyzer node
       this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 1024;
-      this.analyser.smoothingTimeConstant = 0.8;
+      // Higher FFT + lower smoothing => more responsive + more detailed frequency signal.
+      this.analyser.fftSize = 2048;
+      this.analyser.smoothingTimeConstant = 0.4;
       
       // Create gain node
       this.gainNode = this.audioContext.createGain();
@@ -233,9 +238,11 @@ export class AudioAnalyzer {
     }
 
     const now = performance.now();
-    
-    // OPTIMIERT: Niedrige Latenz für visuellen Impact, aber mit optimierten Schwellenwerten
-    if (now - this.lastAnalyzeTime < 50) { // 50ms = 20fps (zurück von 200ms für bessere Reaktivität)
+
+    const analyzeIntervalMs = this.options.analyzeInterval ?? 50;
+
+    // Respect configured interval; schedule via rAF for smoother pacing.
+    if (now - this.lastAnalyzeTime < analyzeIntervalMs) {
       this.animationFrameId = requestAnimationFrame(() => this.analyze());
       return;
     }
@@ -245,6 +252,11 @@ export class AudioAnalyzer {
       // TS 5.9+ types `Uint8Array` as `Uint8Array<ArrayBufferLike>`; WebAudio expects `Uint8Array<ArrayBuffer>`.
       // This is safe because `AnalyserNode` writes into the provided typed array.
       this.analyser.getByteFrequencyData(this.frequencyData as any);
+
+      // Send frequency snapshot to consumers (copy because WebAudio mutates the array in-place).
+      if (this.options.onFrequency) {
+        this.options.onFrequency(this.frequencyData.slice());
+      }
       
       // NEU: Verbesserte Energie-Berechnung mit Frequenzgewichtung
       let sum = 0;
