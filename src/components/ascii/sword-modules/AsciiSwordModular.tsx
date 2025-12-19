@@ -8,7 +8,6 @@
  * OPTIMIERT: Direkte Reaktionen, einfachere State-Updates, sofortige Audio-Reaktivität
  */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { usePowerUpStore } from '@/store/powerUpStore';
 import { useAudioReactionStore, useBeatReset } from '@/store/audioReactionStore';
 import { useAudioAnalyzer } from '@/hooks/useAudioAnalyzer';
 
@@ -62,33 +61,14 @@ import {
 import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects';
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
-import { useShallow } from 'zustand/react/shallow';
+import { useSwordAudioState, useSwordPowerUpState } from './hooks/useSwordStores';
 
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
-  const { currentLevel, chargeLevel, glitchLevel } = usePowerUpStore(
-    useShallow((s) => ({
-      currentLevel: s.currentLevel,
-      chargeLevel: s.chargeLevel,
-      glitchLevel: s.glitchLevel,
-    })),
-  );
+  const { currentLevel, chargeLevel, glitchLevel } = useSwordPowerUpState();
   
   // Audio-Reaktionsdaten abrufen
-  const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying, isIdleActive } = useAudioReactionStore(
-    useShallow((s) => ({
-      energy: s.energy,
-      beatDetected: s.beatDetected,
-      isMusicPlaying: s.isMusicPlaying,
-      isIdleActive: s.isIdleActive, // keep function stable; call later where needed
-    })),
-  );
-
-  // Helper: normalize idle state checks (store currently exposes a function, but keep compatible)
-  const isIdle = useCallback(
-    () => (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive),
-    [isIdleActive],
-  );
+  const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying, isIdle } = useSwordAudioState();
   
   // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
   const energy = directEnergy !== undefined ? directEnergy : storeEnergy;
