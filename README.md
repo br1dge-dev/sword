@@ -1,75 +1,54 @@
-# SWORD - ASCII Blockchain Visualizer
+# SWORD (GR1FTSWORD)
 
-A minimalist, ASCII-based DApp for real-time visualization of Ethereum blockchain activities. SWORD combines retro ASCII art aesthetics with cutting-edge blockchain technology.
+An interactive **ASCII sword + music** experience built with Next.js. The UI reacts to audio energy/beat and includes idle animations when music isn’t playing.
 
 ## Features
 
-- **Real-time Block Visualization**: See blocks finalized on the Ethereum blockchain with ASCII art animations
-- **Interactive Sword Enhancement**: Sign messages to enhance your sword and unlock new visual features
-- **Minimalist Design**: Clean, terminal-inspired interface with ASCII art at its core
-- **Mobile-First**: Optimized for both desktop and mobile experiences
+- **Audio-reactive ASCII visuals**: sword + background react to energy/beat
+- **Built-in music playback**: bundled tracks in `public/music`
+- **Idle mode**: subtle animation when playback is stopped
+- **Debug build fingerprint**: `/api/build` + optional on-screen badge via `?debug=1`
 
-## Tech Stack
+## Tech stack (current)
 
-- **Frontend**: Next.js 14 with Server Components
-- **Styling**: Tailwind CSS
-- **State Management**: Zustand/Jotai
-- **Blockchain Connection**: ethers.js with WebSockets
+- **Next.js**: 16.x (App Router)
+- **React**: 19.x
+- **State**: Zustand 5.x
+- **Styling**: Tailwind CSS 4.x + PostCSS
+- **Audio analysis**: Web Audio API + `web-audio-beat-detector`
 - **Deployment**: Vercel
 
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- Node.js 18+ and npm/yarn
-- MetaMask or another Ethereum wallet browser extension
+- Node.js 20+ recommended
 
-### Installation
+### Install & run
 
-1. Clone the repository
-   ```
-   git clone https://github.com/yourusername/sword.git
-   cd sword
-   ```
+```bash
+npm ci
+npm run dev
+```
 
-2. Install dependencies
-   ```
-   npm install
-   # or
-   yarn
-   ```
+Open `http://localhost:3000`.
 
-3. Create a `.env.local` file with your Ethereum provider details
-   ```
-   NEXT_PUBLIC_ETHEREUM_WS_URL=wss://mainnet.infura.io/ws/v3/YOUR_INFURA_KEY
-   ```
+### Build & lint
 
-4. Start the development server
-   ```
-   npm run dev
-   # or
-   yarn dev
-   ```
+```bash
+npm run lint
+npm run build
+```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser
+### Debug deployed builds
 
-## Development
+- Build info JSON: `/api/build`
+- On-screen badge: add `?debug=1` to the URL
 
-The project follows a modular structure with clear separation of concerns:
+## Repo layout (high level)
 
-- `components/ascii`: ASCII art components
-- `lib/blockchain`: Ethereum connection utilities
-- `hooks`: Custom React hooks for blockchain interaction
-
-## Deployment
-
-The project is set up for easy deployment to Vercel:
-
-1. Push your code to GitHub
-2. Connect your repository to Vercel
-3. Configure environment variables in Vercel dashboard
-4. Deploy!
-
-## License
-
-MIT 
+- `src/app`: Next.js app router (layout/page, API routes)
+- `src/components/ascii`: ASCII sword components
+- `src/components/ui`: UI controls (audio, buttons, overlays)
+- `src/store`: Zustand stores (audio reaction + power-ups)
+- `src/lib/audio`: audio analyzer
