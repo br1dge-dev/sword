@@ -1,5 +1,6 @@
 import { useAudioReactionStore } from '@/store/audioReactionStore';
 import { usePowerUpStore } from '@/store/powerUpStore';
+import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 export function useSwordPowerUpState() {
@@ -22,10 +23,13 @@ export function useSwordAudioState() {
     })),
   );
 
-  // store exposes a function today; keep compatibility if this ever changes
-  const isIdle = () => (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive);
+  // Compute a stable boolean so consumers can safely put it in dependency arrays.
+  const idle = useMemo(
+    () => (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive),
+    [isIdleActive],
+  );
 
-  return { energy, beatDetected, isMusicPlaying, isIdleActive, isIdle };
+  return { energy, beatDetected, isMusicPlaying, idle };
 }
 
 
