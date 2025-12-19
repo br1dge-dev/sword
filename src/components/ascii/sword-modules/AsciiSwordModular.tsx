@@ -99,7 +99,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // NEU: Tile-Management-System
   const currentTilesRef = useRef<Array<{x: number, y: number, color: string}>>([]);
-  const tileTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tileBirthTimeRef = useRef<number>(0); // Geburtszeit der aktuellen Tiles
   // --- TILE-LOCK für Mindestlebensdauer ---
   const TILE_LOCK_MS = 200;
@@ -524,153 +523,146 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   }, [caveBackground, backgroundGenerated]);
 
   // OPTIMIERT: Reaktive Audio-Effekte für visuellen Impact
+  const effectsRafIdRef = useRef<number | null>(null);
+  const effectsLastTickRef = useRef<number>(0);
+  const glitchLevelRef = useRef<number>(glitchLevel);
+  const idleRef = useRef<boolean>(idle);
+  const unicodeGlitchUntilRef = useRef<number>(0);
+  const unicodeGlitchActiveRef = useRef<boolean>(false);
+  const edgeEffectsUntilRef = useRef<number>(0);
+  const edgeEffectsActiveRef = useRef<boolean>(false);
+
   useEffect(() => {
-    // OPTIMIERT: Niedrige Latenz für visuellen Impact
-    const now = Date.now();
-    const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
-    
-    if (timeSinceLastUpdate < 50) { // Reduziert von 100ms auf 50ms für maximale Reaktivität
-      return;
-    }
-    
-    // OPTIMIERT: Empfindlichere Reaktion für visuellen Impact
-    if (energy < 0.005 && !beatDetected) { // Noch empfindlicher: ab 0.005
-      return;
-    }
-    
-    lastUpdateTimeRef.current = now;
-    
-    // OPTIMIERT: Reaktive Effekt-Aktivität für visuellen Impact
-    let effectsTriggered = 0;
-    const MAX_EFFECTS_PER_UPDATE = 1; // Zurück zu 1 Effekt pro Update für besseren visuellen Impact
-    
-    // Glow-Effekte - Reaktiver für visuellen Impact
-    if ((beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || energy > 0.03) { // Noch empfindlicher: ab 0.03
-      const randomIntensity = Math.random() * 0.15 + 0.05; // Zurück zu 0.15 für besseren visuellen Impact
-      setGlowIntensity(randomIntensity);
-      effectsTriggered++;
-    }
-    
-    // Tile-Effekte - REAKTIVER: Bei jedem Beat oder höherer Energy
-    if (beatDetected || energy > 0.02) { // Empfindlicher: ab 0.02 statt 0.03
-      const now = Date.now();
-      // Wenn Tiles gelockt sind, keine neue Generierung zulassen
-      if (tileLockedRef.current) {
-        return;
-      }
-      // Wenn Tiles existieren, entferne sie (nach Ablauf des Locks)
-      if (currentTilesRef.current.length > 0) {
-        const removeAge = now - tileBirthTimeRef.current;
-        if (removeAge < TILE_LOCK_MS) {
-          if (tileTimeoutRef.current) {
-            clearTimeout(tileTimeoutRef.current);
-            tileTimeoutRef.current = null;
-          }
-          tileLockedRef.current = true;
-          tileTimeoutRef.current = setTimeout(() => {
-            currentTilesRef.current = [];
-            setColoredTiles([]);
-            tileBirthTimeRef.current = 0;
-            tileLockedRef.current = false;
-            // Nach Ablauf des Locks: neue Tiles generieren, falls Event noch gültig
-            if (beatDetected || energy > 0.02) {
-              // (Kopiere den Generierungsblock von unten hierher)
+    glitchLevelRef.current = glitchLevel;
+  }, [glitchLevel]);
+
+  useEffect(() => {
+    idleRef.current = idle;
+  }, [idle]);
+
+  // rAF scheduler for tile/glitch/edge updates to avoid setTimeout bursts and timer jitter.
+  useEffect(() => {
+    const TICK_MS = 50; // matches previous internal throttle
+
+    let cancelled = false;
+
+    const frame = (nowMs: number) => {
+      if (cancelled) return;
+
+      if (nowMs - effectsLastTickRef.current >= TICK_MS) {
+        effectsLastTickRef.current = nowMs;
+
+        // Stop effect generation during idle (idle system has its own visuals).
+        if (!idleRef.current) {
+          const now = Date.now();
+          const currentEnergy = energyRef.current;
+          const currentBeat = beatDetectedRef.current;
+          const currentGlitchLevel = glitchLevelRef.current;
+
+          // OPTIMIERT: Empfindlichere Reaktion für visuellen Impact
+          if (!(currentEnergy < 0.005 && !currentBeat)) {
+            // Track last tick time (kept for debugging/consistency with existing code)
+            lastUpdateTimeRef.current = now;
+
+            let effectsTriggered = 0;
+            const MAX_EFFECTS_PER_UPDATE = 1;
+
+            // --- Glow ---
+            if ((currentBeat && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || currentEnergy > 0.03) {
+              const randomIntensity = Math.random() * 0.15 + 0.05;
+              setGlowIntensity(randomIntensity);
+              effectsTriggered++;
+            }
+
+            // --- Tiles (no setTimeout; lifecycle handled here) ---
+            if (tileLockedRef.current && tileBirthTimeRef.current > 0) {
+              const age = now - tileBirthTimeRef.current;
+              if (age >= TILE_LOCK_MS) {
+                currentTilesRef.current = [];
+                setColoredTiles([]);
+                tileBirthTimeRef.current = 0;
+                tileLockedRef.current = false;
+              }
+            }
+
+            const shouldTriggerTiles = currentBeat || currentEnergy > 0.02;
+            if (shouldTriggerTiles && !tileLockedRef.current) {
               const tempIntensity = { ...colorEffectIntensity };
               for (const level in tempIntensity) {
                 if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
                   const numLevel = Number(level) as keyof typeof colorEffectIntensity;
-                  tempIntensity[numLevel] = Math.min(2, tempIntensity[numLevel] + Math.floor(energy * (beatDetected ? 1 : 0.5)));
+                  tempIntensity[numLevel] = Math.min(
+                    2,
+                    tempIntensity[numLevel] + Math.floor(currentEnergy * (currentBeat ? 1 : 0.5)),
+                  );
                 }
               }
-              const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity, energy);
+
+              const generatedTiles = generateColoredTiles(swordPositions, currentGlitchLevel, tempIntensity, currentEnergy);
               currentTilesRef.current = generatedTiles;
-              tileBirthTimeRef.current = Date.now();
+              tileBirthTimeRef.current = now;
               setColoredTiles(generatedTiles);
-              // Lock erneut setzen
               tileLockedRef.current = true;
-              if (tileTimeoutRef.current) {
-                clearTimeout(tileTimeoutRef.current);
-              }
-              tileTimeoutRef.current = setTimeout(() => {
-                const removeAge2 = Date.now() - tileBirthTimeRef.current;
-                currentTilesRef.current = [];
-                tileBirthTimeRef.current = 0;
-                setColoredTiles([]);
-                tileTimeoutRef.current = null;
-                tileLockedRef.current = false;
-              }, TILE_LOCK_MS);
+              effectsTriggered++;
             }
-          }, TILE_LOCK_MS - removeAge);
-          return;
-        }
-        // Tiles sind alt genug, können entfernt werden
-        currentTilesRef.current = [];
-        setColoredTiles([]);
-        tileBirthTimeRef.current = 0;
-        tileLockedRef.current = false;
-        if (tileTimeoutRef.current) {
-          clearTimeout(tileTimeoutRef.current);
-          tileTimeoutRef.current = null;
+
+            // --- Unicode glitches (no setTimeout; expiry handled here) ---
+            if (unicodeGlitchActiveRef.current && now >= unicodeGlitchUntilRef.current) {
+              unicodeGlitchActiveRef.current = false;
+              setUnicodeGlitches([]);
+            }
+
+            if (currentBeat && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
+              const tempGlitchLevel = Math.min(1, Math.floor(currentGlitchLevel + (currentEnergy * 1.0)));
+              setUnicodeGlitches(generateUnicodeGlitches(swordPositions, tempGlitchLevel));
+              unicodeGlitchActiveRef.current = true;
+              unicodeGlitchUntilRef.current = now + 500;
+            }
+
+            // --- Edge effects (no setTimeout; expiry handled here) ---
+            if (edgeEffectsActiveRef.current && now >= edgeEffectsUntilRef.current) {
+              edgeEffectsActiveRef.current = false;
+              setEdgeEffects([]);
+            }
+
+            if ((currentBeat || currentEnergy > 0.03) && edgePositions.length > 0) {
+              // Regenerate if expired or on new beat.
+              if (!edgeEffectsActiveRef.current || currentBeat) {
+                const { effects, cleanupMs } = generateReactiveEdgeEffects({
+                  edgePositions,
+                  chargeLevel,
+                  energy: currentEnergy,
+                  beatDetected: currentBeat,
+                });
+                setEdgeEffects(effects);
+                edgeEffectsActiveRef.current = true;
+                edgeEffectsUntilRef.current = now + cleanupMs;
+              }
+            }
+
+            // --- Rare background regen ---
+            if ((currentBeat && Math.random() < 0.0008) || currentEnergy > 0.95) {
+              const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+              const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
+              const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
+              setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+              setBackgroundGenerated(false);
+            }
+          }
         }
       }
-      // Jetzt neue Tiles generieren
-      const tempIntensity = { ...colorEffectIntensity };
-      for (const level in tempIntensity) {
-        if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
-          const numLevel = Number(level) as keyof typeof colorEffectIntensity;
-          tempIntensity[numLevel] = Math.min(2, tempIntensity[numLevel] + Math.floor(energy * (beatDetected ? 1 : 0.5)));
-        }
-      }
-      const generatedTiles = generateColoredTiles(swordPositions, glitchLevel, tempIntensity, energy);
-      currentTilesRef.current = generatedTiles;
-      tileBirthTimeRef.current = now;
-      setColoredTiles(generatedTiles);
-      effectsTriggered++;
-      // Lock setzen
-      tileLockedRef.current = true;
-      if (tileTimeoutRef.current) {
-        clearTimeout(tileTimeoutRef.current);
-      }
-      tileTimeoutRef.current = setTimeout(() => {
-        const removeAge = Date.now() - tileBirthTimeRef.current;
-        currentTilesRef.current = [];
-        tileBirthTimeRef.current = 0;
-        setColoredTiles([]);
-        tileTimeoutRef.current = null;
-        tileLockedRef.current = false;
-      }, TILE_LOCK_MS);
-    } else {
-    }
-    // ENTFERNT: Sofortiges Entfernen der Tiles wenn keine Bedingungen erfüllt sind
-    // Tiles leben jetzt bis zu 3 Sekunden, auch wenn keine neuen Effekte ausgelöst werden
-    
-    // OPTIMIERT: Reduzierte Unicode-Glitch-Effekte für bessere Performance
-    if (beatDetected && effectsTriggered < MAX_EFFECTS_PER_UPDATE) {
-      const tempGlitchLevel = Math.min(1, Math.floor(glitchLevel + (energy * 1.0))); // Reduziert von 2/1.5 auf 1/1.0
-      
-      setUnicodeGlitches(generateUnicodeGlitches(swordPositions, tempGlitchLevel));
-      
-      // OPTIMIERT: Längere Cleanup-Dauer
-      const duration = beatDetected ? 500 : Math.max(400, Math.min(600, Math.floor(energy * 300))); // Erhöht von 300/250-400 auf 500/400-600 für weniger Flackern
-      const timeout = setTimeout(() => {
-        setUnicodeGlitches([]);
-      }, duration);
-      cleanupTimeoutsRef.current.add(timeout);
-    }
-    
-    // OPTIMIERT: Reduzierte Hintergrund-Effekte für bessere Performance
-    if ((beatDetected && Math.random() < 0.0008) || energy > 0.95) { // Reduziert von 0.001 auf 0.0008 (20% weniger)
-      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-      
-      setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-      
-      // OPTIMIERT: Statischen Hintergrund zurücksetzen, damit er neu generiert wird
-      setBackgroundGenerated(false);
-    }
-    
-  }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions]);
+
+      effectsRafIdRef.current = requestAnimationFrame(frame);
+    };
+
+    effectsRafIdRef.current = requestAnimationFrame(frame);
+
+    return () => {
+      cancelled = true;
+      if (effectsRafIdRef.current !== null) cancelAnimationFrame(effectsRafIdRef.current);
+      effectsRafIdRef.current = null;
+    };
+  }, [chargeLevel, edgePositions, getBackgroundDimensions, swordPositions]);
   
   // NEU: Adaptive Audio-reaktive Farb-Effekte basierend auf tatsächlichen Energy-Werten
   useEffect(() => {
@@ -691,26 +683,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     }
   }, [beatDetected, energy, lastColorChangeTime, colorStability]);
   
-  // OPTIMIERT: Verbesserte Audio-reaktive Edge-Effekte basierend auf Charge-Level
-  useEffect(() => {
-    if (beatDetected || energy > 0.03) { // Noch empfindlicher: ab 0.03
-      if (edgePositions.length === 0) return;
-
-      const { effects, cleanupMs } = generateReactiveEdgeEffects({
-        edgePositions,
-        chargeLevel,
-        energy,
-        beatDetected,
-      });
-
-      setEdgeEffects(effects);
-
-      const timeout = setTimeout(() => {
-        setEdgeEffects([]);
-      }, cleanupMs);
-      cleanupTimeoutsRef.current.add(timeout);
-    }
-  }, [beatDetected, energy, chargeLevel, edgePositions]);
+  // Edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
   
   // --- IDLE TILE COLOR CYCLE ---
   useEffect(() => {
