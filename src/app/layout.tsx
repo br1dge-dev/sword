@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { Inter, Press_Start_2P } from 'next/font/google';
 import { useAudioReactionStore, useIdleAnimation } from '@/store/audioReactionStore';
 import '../styles/globals.css';
+import { useShallow } from 'zustand/react/shallow';
 
 // Initialize the Inter font with Latin subset
 const inter = Inter({ subsets: ['latin'] });
@@ -28,7 +29,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   // Idle-Animation im Layout starten, damit sie nicht bei Page-Wechseln unterbrochen wird
-  const { startIdle, stopIdle } = useAudioReactionStore();
+  const { startIdle, stopIdle } = useAudioReactionStore(
+    useShallow((s) => ({
+      startIdle: s.startIdle,
+      stopIdle: s.stopIdle,
+    })),
+  );
   useIdleAnimation();
   
   useEffect(() => {

@@ -5,9 +5,7 @@
  * It's imported in the root layout component.
  */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
   --color-bg-primary: #0c0c3a;

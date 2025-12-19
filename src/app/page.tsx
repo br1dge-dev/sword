@@ -16,6 +16,7 @@ import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import BuildBadge from '@/components/ui/BuildBadge';
 import { IoMdEye, IoMdEyeOff, IoMdTrophy } from 'react-icons/io';
+import { useShallow } from 'zustand/react/shallow';
 
 const HIGHLIGHT_COLORS = ['#F8E16C', '#FF3EC8', '#3EE6FF'] as const;
 
@@ -27,7 +28,15 @@ export default function HomePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUIVisible, setIsUIVisible] = useState(true);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
-  const { energy, beatDetected, setMusicPlaying, swordColor = '#00FCA6' } = useAudioReactionStore();
+  const { energy, beatDetected, setMusicPlaying, swordColor } = useAudioReactionStore(
+    useShallow((s) => ({
+      energy: s.energy,
+      beatDetected: s.beatDetected,
+      setMusicPlaying: s.setMusicPlaying,
+      swordColor: s.swordColor,
+    })),
+  );
+  const swordColorSafe = swordColor ?? '#00FCA6';
   
   // Für den Titel: Random Highlight
   const leaderboardTitle = 'L3ADERBOARD';
@@ -226,7 +235,7 @@ export default function HomePage() {
               </button>
               <div className="text-center mb-6">
                 {/* Titel wie Track-Title */}
-                <h2 className="text-2xl font-press-start-2p mb-2 select-none" style={{ color: swordColor, letterSpacing: '0.05em' }}>
+                <h2 className="text-2xl font-press-start-2p mb-2 select-none" style={{ color: swordColorSafe, letterSpacing: '0.05em' }}>
                   {leaderboardTitle.split('').map((char, i) => (
                     <span key={i} style={i === highlightIdx ? { color: highlightColor } : {}}>{char}</span>
                   ))}
