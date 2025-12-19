@@ -531,6 +531,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const unicodeGlitchActiveRef = useRef<boolean>(false);
   const edgeEffectsUntilRef = useRef<number>(0);
   const edgeEffectsActiveRef = useRef<boolean>(false);
+  const lastColorChangeTimeRef = useRef<number>(lastColorChangeTime);
+  const colorStabilityRef = useRef<number>(colorStability);
 
   useEffect(() => {
     glitchLevelRef.current = glitchLevel;
@@ -539,6 +541,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     idleRef.current = idle;
   }, [idle]);
+
+  useEffect(() => {
+    lastColorChangeTimeRef.current = lastColorChangeTime;
+  }, [lastColorChangeTime]);
+
+  useEffect(() => {
+    colorStabilityRef.current = colorStability;
+  }, [colorStability]);
 
   // rAF scheduler for tile/glitch/edge updates to avoid setTimeout bursts and timer jitter.
   useEffect(() => {
@@ -552,9 +562,45 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       if (nowMs - effectsLastTickRef.current >= TICK_MS) {
         effectsLastTickRef.current = nowMs;
 
+        // --- Color cycle (moved into scheduler; avoids extra effect bursts) ---
+        const now = Date.now();
+
+        const adaptive = computeAdaptiveColorCycle({
+          energy: energyRef.current,
+          beatDetected: beatDetectedRef.current,
+          lastColorChangeTime: lastColorChangeTimeRef.current,
+          colorStability: colorStabilityRef.current,
+          nowMs: now,
+        });
+        if (adaptive) {
+          setBaseColor(adaptive.swordColor);
+          setBgColor(adaptive.bgColor);
+          setLastColorChangeTime(now);
+          setColorStability(adaptive.newStability);
+          lastColorChangeTimeRef.current = now;
+          colorStabilityRef.current = adaptive.newStability;
+        }
+
+        if (!idleRef.current) {
+          const optimized = computeOptimizedColorCycle({
+            energy: energyRef.current,
+            beatDetected: beatDetectedRef.current,
+            lastColorChangeTime: lastColorChangeTimeRef.current,
+            colorStability: colorStabilityRef.current,
+            nowMs: now,
+          });
+          if (optimized) {
+            setBaseColor(optimized.swordColor);
+            setBgColor(optimized.bgColor);
+            setLastColorChangeTime(now);
+            setColorStability(optimized.newStability);
+            lastColorChangeTimeRef.current = now;
+            colorStabilityRef.current = optimized.newStability;
+          }
+        }
+
         // Stop effect generation during idle (idle system has its own visuals).
         if (!idleRef.current) {
-          const now = Date.now();
           const currentEnergy = energyRef.current;
           const currentBeat = beatDetectedRef.current;
           const currentGlitchLevel = glitchLevelRef.current;
@@ -663,25 +709,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       effectsRafIdRef.current = null;
     };
   }, [chargeLevel, edgePositions, getBackgroundDimensions, swordPositions]);
-  
-  // NEU: Adaptive Audio-reaktive Farb-Effekte basierend auf tatsächlichen Energy-Werten
-  useEffect(() => {
-    const nowCheck = Date.now();
-    const result = computeAdaptiveColorCycle({
-      energy,
-      beatDetected,
-      lastColorChangeTime,
-      colorStability,
-      nowMs: nowCheck,
-    });
-
-    if (result) {
-      setBaseColor(result.swordColor);
-      setBgColor(result.bgColor);
-      setLastColorChangeTime(Date.now());
-      setColorStability(result.newStability);
-    }
-  }, [beatDetected, energy, lastColorChangeTime, colorStability]);
   
   // Edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
   
@@ -807,49 +834,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     }
   }, [idle, beatDetected, getBackgroundDimensions, isMusicPlaying]);
   
-  // OPTIMIERT: Drastisch reduzierte Audio-reaktive Farb-Effekte für bessere Performance
-  useEffect(() => {
-    if (idle) return;
-    const nowCheck = Date.now();
-    const result = computeOptimizedColorCycle({
-      energy,
-      beatDetected,
-      lastColorChangeTime,
-      colorStability,
-      nowMs: nowCheck,
-    });
+  // Color cycle + edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
 
-    if (result) {
-      setBaseColor(result.swordColor);
-      setBgColor(result.bgColor);
-      setLastColorChangeTime(Date.now());
-      setColorStability(result.newStability);
-      // performanceMonitor.trackColorChange(); // Entfernt
-    }
-  }, [beatDetected, energy, lastColorChangeTime, colorStability, idle]);
-  
-  // OPTIMIERT: Verbesserte Audio-reaktive Edge-Effekte basierend auf Charge-Level
-  useEffect(() => {
-    if (idle) return;
-    if (beatDetected || energy > 0.03) { // Noch empfindlicher: ab 0.03
-      if (edgePositions.length === 0) return;
-
-      const { effects, cleanupMs } = generateReactiveEdgeEffects({
-        edgePositions,
-        chargeLevel,
-        energy,
-        beatDetected,
-      });
-
-      setEdgeEffects(effects);
-
-      const timeout = setTimeout(() => {
-        setEdgeEffects([]);
-      }, cleanupMs);
-      cleanupTimeoutsRef.current.add(timeout);
-    }
-  }, [beatDetected, energy, chargeLevel, edgePositions, idle]);
-  
   // Frequenzdaten aus dem Store holen
   const frequencyData = useAudioReactionStore((s) => s.frequencyData);
 
