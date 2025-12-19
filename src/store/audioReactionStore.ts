@@ -6,13 +6,11 @@
  */
 import { create } from 'zustand';
 import { useEffect } from 'react';
-import { useRef } from 'react';
 
 // Globale Variablen für Idle-Animation
 let idleActive = false;
 let idleInterval: NodeJS.Timeout | null = null;
 let idleStep = 0;
-let idleInitialized = false;
 
 // OPTIMIERT: Einfache Idle-Animation mit vordefinierten Sequenzen
 const IDLE_STEPS = 10; // 10 Schritte pro Loop

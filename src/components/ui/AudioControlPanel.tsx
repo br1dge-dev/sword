@@ -62,12 +62,10 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   // };
   
   // Audio-Reaction-Store
-  const { setMusicPlaying, setAudioActive, energy, beatDetected, isIdleActive, swordColor } = useAudioReactionStore(
+  const { setMusicPlaying, setAudioActive, isIdleActive, swordColor } = useAudioReactionStore(
     useShallow((state) => ({
       setMusicPlaying: state.setMusicPlaying,
       setAudioActive: state.setAudioActive,
-      energy: state.energy,
-      beatDetected: state.beatDetected,
       isIdleActive: state.isIdleActive(),
       swordColor: state.swordColor,
     })),
