@@ -28,6 +28,9 @@ interface PowerUpState {
   isGlitchComplete: boolean;
 
   // Visual layers
+  invertPowerMode: boolean;
+  toggleInvertPowerMode: () => void;
+  setInvertPowerMode: (enabled: boolean) => void;
   
   // Aktionen
   startPowerUp: () => void;
@@ -60,6 +63,10 @@ export const usePowerUpStore = create<PowerUpState>()(
       maxGlitchLevel: 3,
       glitchProgress: 0,
       isGlitchComplete: false,
+
+      invertPowerMode: false,
+      toggleInvertPowerMode: () => set((s) => ({ invertPowerMode: !s.invertPowerMode })),
+      setInvertPowerMode: (enabled) => set({ invertPowerMode: enabled }),
       
       startPowerUp: () => {
         set((state) => {
@@ -176,6 +183,7 @@ export const usePowerUpStore = create<PowerUpState>()(
           isChargeComplete: false,
           glitchProgress: 0,
           isGlitchComplete: false,
+          invertPowerMode: false,
         });
       }
     }),
@@ -192,6 +200,7 @@ export const usePowerUpStore = create<PowerUpState>()(
         isChargeComplete: state.isChargeComplete,
         glitchProgress: state.glitchProgress,
         isGlitchComplete: state.isGlitchComplete,
+        invertPowerMode: state.invertPowerMode,
       })
     }
   )

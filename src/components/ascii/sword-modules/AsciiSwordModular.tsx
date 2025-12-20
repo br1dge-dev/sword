@@ -436,7 +436,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // Zustände für visuelle Effekte
   const [glowIntensity, setGlowIntensity] = useState(0);
   const [baseColor, setBaseColor] = useState('#00FCA6');
-  const [bgColor, setBgColor] = useState<string>(getComplementaryColor('#00FCA6'));
+  // Background should feel stable/dark by default (no constant color cycling).
+  const [bgColor, setBgColor] = useState<string>('#0A0B0D');
   const [lastColorChangeTime, setLastColorChangeTime] = useState<number>(Date.now());
   const [colorStability, setColorStability] = useState<number>(3000); // Erhöht von 2000 auf 3000 für sanftere Farbübergänge
   const [coloredTiles, setColoredTiles] = useState<Array<{x: number, y: number, color: string}>>([]);
@@ -689,6 +690,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }
         }
 
+        // Background stays stable/dark by default (no color cycling).
+        // (We can still change sword/base colors if desired, but background shifting is disabled.)
+        const allowBgColorCycle = false;
+
         // In idle we keep colors stable (idle visuals are handled separately).
         if (!idleRef.current) {
           const adaptive = computeAdaptiveColorCycle({
@@ -700,7 +705,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           });
           if (adaptive) {
             setBaseColor(adaptive.swordColor);
-            setBgColor(adaptive.bgColor);
+            if (allowBgColorCycle) setBgColor(adaptive.bgColor);
             setLastColorChangeTime(now);
             setColorStability(adaptive.newStability);
             lastColorChangeTimeRef.current = now;
@@ -716,7 +721,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           });
           if (optimized) {
             setBaseColor(optimized.swordColor);
-            setBgColor(optimized.bgColor);
+            if (allowBgColorCycle) setBgColor(optimized.bgColor);
             setLastColorChangeTime(now);
             setColorStability(optimized.newStability);
             lastColorChangeTimeRef.current = now;

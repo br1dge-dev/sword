@@ -3,8 +3,10 @@
 import React from 'react';
 import SideButtons from './SideButtons';
 import { IoMdSettings } from 'react-icons/io';
-import { IoMdEye, IoMdEyeOff, IoMdHelpCircle, IoMdTrophy } from 'react-icons/io';
+import { IoMdEye, IoMdEyeOff, IoMdHelpCircle, IoMdTrophy, IoMdFlash } from 'react-icons/io';
 import AudioControlPanel from './AudioControlPanel';
+import { usePowerUpStore } from '@/store/powerUpStore';
+import { useShallow } from 'zustand/react/shallow';
 
 interface MobileControlsOverlayProps {
   isOpen: boolean;
@@ -27,6 +29,13 @@ export default function MobileControlsOverlay({
   onToggleLeaderboard,
   isUIVisible,
 }: MobileControlsOverlayProps) {
+  const { invertPowerMode, toggleInvertPowerMode } = usePowerUpStore(
+    useShallow((s) => ({
+      invertPowerMode: s.invertPowerMode,
+      toggleInvertPowerMode: s.toggleInvertPowerMode,
+    })),
+  );
+
   return (
     <>
       {/* Overlay-Button (immer sichtbar) */}
@@ -66,6 +75,16 @@ export default function MobileControlsOverlay({
 
           {/* Actions behind the gear button */}
           <div className="flex items-center justify-center gap-4 pt-2">
+            <button
+              onClick={toggleInvertPowerMode}
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+              style={{ boxShadow: invertPowerMode ? '0 0 16px rgba(255,255,255,0.75)' : '0 0 10px rgba(62, 230, 255, 0.45)' }}
+              aria-label="Power (invert)"
+              title="POWER"
+            >
+              <IoMdFlash className={`${invertPowerMode ? 'text-black' : 'text-grifter-blue'} text-2xl`} />
+            </button>
+
             <button
               onClick={onToggleUI}
               className="w-11 h-11 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
