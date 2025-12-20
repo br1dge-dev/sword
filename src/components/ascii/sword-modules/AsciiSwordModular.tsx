@@ -851,34 +851,41 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       return Math.abs(a.x - middleX) - Math.abs(b.x - middleX);
     });
 
-    const pickSubset = (color: string) => {
-      const hashed = base.filter((p) => ((p.x * 19 + p.y * 11) % 23) === 0);
-      const seed = (hashed.length ? hashed : sorted).slice(0, 16);
-      return seed.map((p) => ({ ...p, color }));
+    const pickSubset = (color: string, phase: number) => {
+      const hashed = base.filter((p) => ((p.x * 19 + p.y * 11 + phase) % 23) === 0);
+      const pool = (hashed.length ? hashed : sorted);
+      const take = Math.min(14, pool.length);
+      const start = pool.length ? (phase * 3) % pool.length : 0;
+      const picked: Array<{ x: number; y: number }> = [];
+      for (let i = 0; i < take; i++) {
+        picked.push(pool[(start + i) % pool.length]);
+      }
+      return picked.map((p) => ({ ...p, color }));
     };
 
     let phase = 0;
     const renderPilot = () => {
       // color: mostly dim green/cyan, occasionally pink (very rare)
+      // Make the pilot light clearly visible but still subtle: mostly warm ember, sometimes cool, rarely pink spark.
       const color =
-        phase % 12 === 0
-          ? getDarkerColor(getDarkerColor('#FF3EC8'))
-          : phase % 3 === 0
-            ? getDarkerColor(getDarkerColor('#3EE6FF'))
-            : getDarkerColor(getDarkerColor('#00FCA6'));
+        phase % 16 === 0
+          ? getDarkerColor('#FF3EC8', 0.35) // rare spark
+          : phase % 4 === 0
+            ? getDarkerColor('#3EE6FF', 0.55) // cool flicker
+            : getDarkerColor('#F8E16C', 0.50); // warm ember
 
-      const tiles = pickSubset(color);
+      const tiles = pickSubset(color, phase);
       currentTilesRef.current = tiles;
       setColoredTiles(tiles);
 
       // gentle breathing glow
-      const glow = 0.016 + (phase % 5) * 0.006; // 0.016..0.040 (still subtle but visible)
+      const glow = 0.02 + Math.sin(phase * 0.9) * 0.015; // ~0.005..0.035
       setGlowIntensity(glow);
       phase++;
     };
 
     renderPilot();
-    const interval = setInterval(renderPilot, 2200); // slow, subtle
+    const interval = setInterval(renderPilot, 1200); // visible, but still "sparflamme"
 
     return () => {
       clearInterval(interval);
