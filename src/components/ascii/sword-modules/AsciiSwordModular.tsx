@@ -68,6 +68,7 @@ import { createReactivityController } from './effects/reactivityController';
 import {
   buildEqualizerGeometry,
   computeEqBands,
+  type EqPalette,
   renderEqTiles,
   stepEqState,
   type EqState,
@@ -75,6 +76,13 @@ import {
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
 import { useSwordAudioState, useSwordPowerUpState } from './hooks/useSwordStores';
+
+const EQ_PALETTES: EqPalette[] = [
+  { low: '#00FCA6', mid: '#3EE6FF', high: '#FF3EC8', peak: '#F8E16C' }, // green -> cyan -> pink
+  { low: '#3EE6FF', mid: '#F8E16C', high: '#FF3EC8', peak: '#00FCA6' }, // cyan -> yellow -> pink
+  { low: '#FF3EC8', mid: '#3EE6FF', high: '#00FCA6', peak: '#F8E16C' }, // pink -> cyan -> green
+  { low: '#F8E16C', mid: '#00FCA6', high: '#3EE6FF', peak: '#FF3EC8' }, // yellow -> green -> cyan
+];
 
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
@@ -626,6 +634,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     return buildEqualizerGeometry(centeredSwordLines, swordPositions, 16, { includeHandle: true, includeEdges: false });
   }, [centeredSwordLines, swordPositions]);
 
+  // Dynamic EQ palette (avoid “always green” by rotating on beat/onset).
+  const eqPaletteIndexRef = useRef(0);
+  const eqPaletteLastSwapMsRef = useRef(0);
+
   useEffect(() => {
     lastColorChangeTimeRef.current = lastColorChangeTime;
   }, [lastColorChangeTime]);
@@ -765,7 +777,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               eqPeakHoldUntilRef.current = stepped.peakHoldUntilMs;
               eqStateRef.current = stepped.state;
 
-              const eqTiles = renderEqTiles(eqGeom, stepped.state);
+              // Palette swap on strong events (musical, not random).
+              const swapCooldownMs = 650;
+              const wantsSwap = currentBeat || onset > 0.08 || (beatStrength > 0.25 && currentEnergy > 0.18);
+              if (wantsSwap && nowMs - eqPaletteLastSwapMsRef.current > swapCooldownMs) {
+                eqPaletteLastSwapMsRef.current = nowMs;
+                eqPaletteIndexRef.current = (eqPaletteIndexRef.current + 1) % EQ_PALETTES.length;
+              }
+              const palette = EQ_PALETTES[eqPaletteIndexRef.current] ?? EQ_PALETTES[0];
+
+              const eqTiles = renderEqTiles(eqGeom, stepped.state, palette);
               // Add a bit of “old chaos” on top (controlled) so it doesn’t feel too sterile.
               let mergedTiles = eqTiles;
               const chaosChance = Math.min(0.28, 0.06 + onset * 2.2 + beatStrength * 0.12);
