@@ -74,13 +74,15 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/android-chrome-192x192.png" />
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/android-chrome-512x512.png" />
       </head>
-      <body className={`${inter.className} min-h-screen overflow-hidden horizontal-scanlines crt-global`} style={{
+      <body className={`${inter.className} min-h-screen overflow-hidden`} style={{
         backgroundColor: 'var(--color-bg-primary)',
         backgroundImage: 'radial-gradient(circle at 50% 50%, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%)',
       }}>
         <div className="min-h-screen overflow-hidden">
           {children}
         </div>
+        {/* Global CRT overlay: scanlines + tube glow + subtle noise (affects ALL UI) */}
+        <div className="crt-overlay" aria-hidden="true" />
       </body>
     </html>
   );
