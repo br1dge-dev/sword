@@ -112,6 +112,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     onset: number;
     beat: number;
     freqLen: number;
+    idle: boolean;
+    isMusicPlaying: boolean;
+    idleVisual: boolean;
+    tilesLen: number;
   } | null>(null);
   const debugReactiveLastSetRef = useRef<number>(0);
   
@@ -650,6 +654,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               onset: reactive.onset,
               beat: reactive.beat,
               freqLen: frequencyDataRef.current?.length ?? 0,
+              idle: idleRef.current,
+              isMusicPlaying: isMusicPlayingRef.current,
+              idleVisual: idleRef.current || !isMusicPlayingRef.current,
+              tilesLen: currentTilesRef.current.length,
             });
           }
         }
@@ -997,6 +1005,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           style={{ backdropFilter: 'blur(6px)' }}
         >
           <div className="font-bold">REACTIVE</div>
+          <div>idle: {debugReactive?.idle ? '1' : '0'}</div>
+          <div>music: {debugReactive?.isMusicPlaying ? '1' : '0'}</div>
+          <div>idleVisual: {debugReactive?.idleVisual ? '1' : '0'}</div>
+          <div>tilesLen: {debugReactive?.tilesLen ?? 0}</div>
           <div>freqLen: {debugReactive?.freqLen ?? 0}</div>
           <div>energy: {(debugReactive?.energy ?? 0).toFixed(3)}</div>
           <div>bass: {(debugReactive?.bass ?? 0).toFixed(3)}</div>
