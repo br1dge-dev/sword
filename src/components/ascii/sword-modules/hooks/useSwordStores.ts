@@ -9,8 +9,6 @@ export function useSwordPowerUpState() {
       currentLevel: s.currentLevel,
       chargeLevel: s.chargeLevel,
       glitchLevel: s.glitchLevel,
-      shootingStarEnabled: s.shootingStarEnabled,
-      setShootingStarEnabled: s.setShootingStarEnabled,
     })),
   );
 }
