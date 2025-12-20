@@ -545,6 +545,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // OPTIMIERT: Statischer Hintergrund - nur einmal generieren und dann konstant halten
   const [staticBackground, setStaticBackground] = useState<string[][]>([]);
   const [backgroundGenerated, setBackgroundGenerated] = useState(false);
+  const idleVeinsLastUpdateRef = useRef<number>(0);
 
   // OPTIMIERT: Statischen Hintergrund nur einmal generieren
   useEffect(() => {
@@ -818,10 +819,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         const full = getIdleTilesForIndex(swordPositions, idx);
         if (!full.length) return full;
         // dim the chosen accent color (twice) for less intensity in idle
-        const dimColor = getDarkerColor(getDarkerColor(full[0].color ?? '#00FCA6'));
-        // deterministic ~10-12% subset to avoid flicker (stable across renders)
+        const dimColor = getDarkerColor(getDarkerColor(getDarkerColor(full[0].color ?? '#00FCA6')));
+        // deterministic ~6% subset to avoid flicker (stable across renders)
         return full
-          .filter((p) => ((p.x * 13 + p.y * 7) % 9) === 0)
+          .filter((p) => ((p.x * 13 + p.y * 7) % 17) === 0)
           .map((p) => ({ ...p, color: dimColor }));
       };
       
@@ -905,17 +906,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
       
-      // Erhöhe den Idle-Schritt bei jedem Beat
-      if (beatDetected) {
-        idleStepRef.current = (idleStepRef.current + 1) % 10; // 10 Schritte pro Loop
-      }
+      // Idle cadence: do NOT advance on every idle beat; keep it slow and calm.
+      const now = Date.now();
+      const IDLE_VEINS_STEP_MS = 9000;
+      if (now - idleVeinsLastUpdateRef.current < IDLE_VEINS_STEP_MS) return;
+      idleVeinsLastUpdateRef.current = now;
+      idleStepRef.current = (idleStepRef.current + 1) % 10; // 10 steps per loop
       
       // Generiere vordefinierte Vein-Sequenz für den aktuellen Schritt
       const idleVeinsRaw = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
       // Idle should be subtle: thin out + dim the accent colors
       const idleVeins = idleVeinsRaw
-        .filter((_, i) => i % 2 === 0)
-        .map((v) => ({ ...v, color: getDarkerColor(getDarkerColor(v.color)) }));
+        .filter((_, i) => i % 4 === 0)
+        .map((v) => ({ ...v, color: getDarkerColor(getDarkerColor(getDarkerColor(v.color))) }));
       
       // Ersetze alle bestehenden Veins mit der Idle-Sequenz
       const currentTime = Date.now();
@@ -924,7 +927,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(mapToVeins(veinsMapRef.current));
     }
-  }, [idle, beatDetected, getBackgroundDimensions, isMusicPlaying]);
+  }, [idle, getBackgroundDimensions, isMusicPlaying, beatDetected]);
   
   // Color cycle + edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
 
@@ -985,7 +988,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       <div 
         className="absolute inset-0"
         style={{
-          opacity: 0.45 + (glitchLevel * 0.08),
+          opacity: (0.45 + (glitchLevel * 0.08)) * (idle ? 0.55 : 1),
           color: lighterBgColor,
           filter: `brightness(${0.35 + (glitchLevel * 0.075)}) contrast(${0.65 + (glitchLevel * 0.05)})`,
           width: '100%',
