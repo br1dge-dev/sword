@@ -1,6 +1,5 @@
 import { useAudioReactionStore } from '@/store/audioReactionStore';
 import { usePowerUpStore } from '@/store/powerUpStore';
-import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 export function useSwordPowerUpState() {
@@ -23,11 +22,9 @@ export function useSwordAudioState() {
     })),
   );
 
-  // Compute a stable boolean so consumers can safely put it in dependency arrays.
-  const idle = useMemo(
-    () => (typeof isIdleActive === 'function' ? isIdleActive() : isIdleActive),
-    [isIdleActive],
-  );
+  // IMPORTANT: do NOT memoize this against the function reference; it will freeze idle state.
+  // We want the latest idle flag whenever the component re-renders (energy/beat updates cause rerenders).
+  const idle = typeof isIdleActive === 'function' ? isIdleActive() : !!isIdleActive;
 
   return { energy, beatDetected, isMusicPlaying, idle };
 }
