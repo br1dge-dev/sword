@@ -811,14 +811,24 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setFadedChars([]);
       // Starte sanften Farbwechsel für Tiles
       let colorIndex = 0;
+
+      // Subtle idle tiles: only a small deterministic subset + dimmed colors (previously this colored the whole sword).
+      const buildIdleTiles = (idx: number) => {
+        const full = getIdleTilesForIndex(swordPositions, idx);
+        if (!full.length) return full;
+        // dim the chosen accent color (twice) for less intensity in idle
+        const dimColor = getDarkerColor(getDarkerColor(full[0].color ?? '#00FCA6'));
+        // deterministic ~10-12% subset to avoid flicker (stable across renders)
+        return full
+          .filter((p) => ((p.x * 13 + p.y * 7) % 9) === 0)
+          .map((p) => ({ ...p, color: dimColor }));
+      };
       
-      // NEU: Nur Idle-Tiles setzen wenn keine Musik-Tiles leben
-      if (currentTilesRef.current.length === 0) {
-        const idleTiles = getIdleTilesForIndex(swordPositions, colorIndex);
-        currentTilesRef.current = idleTiles;
-        tileBirthTimeRef.current = Date.now(); // Setze Geburtszeit für Idle-Tiles
-        setColoredTiles(idleTiles);
-      }
+      // Always set idle tiles (subtle) while idle; music tiles will overwrite when playback starts.
+      const initialIdleTiles = buildIdleTiles(colorIndex);
+      currentTilesRef.current = initialIdleTiles;
+      tileBirthTimeRef.current = Date.now();
+      setColoredTiles(initialIdleTiles);
       
       const interval = setInterval(() => {
         // Prüfe nochmal, ob Musik läuft
@@ -828,15 +838,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           return;
         }
         
-        // NEU: Nur Idle-Tiles setzen wenn keine Musik-Tiles leben
-        if (currentTilesRef.current.length === 0) {
-          colorIndex = nextIdleTilesColorIndex(colorIndex);
-          const idleTiles = getIdleTilesForIndex(swordPositions, colorIndex);
-          currentTilesRef.current = idleTiles;
-          tileBirthTimeRef.current = Date.now(); // Setze Geburtszeit für Idle-Tiles
-          setColoredTiles(idleTiles);
-        }
-      }, 2000); // alle 2 Sekunden
+        colorIndex = nextIdleTilesColorIndex(colorIndex);
+        const idleTiles = buildIdleTiles(colorIndex);
+        currentTilesRef.current = idleTiles;
+        tileBirthTimeRef.current = Date.now();
+        setColoredTiles(idleTiles);
+      }, 3500); // slower + calmer in idle
       return () => {
         clearInterval(interval);
         // ENTFERNT: Sofortiges Entfernen der Tiles beim Cleanup
