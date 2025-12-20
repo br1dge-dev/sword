@@ -83,7 +83,8 @@
 
 @layer base {
   body {
-    @apply font-mono antialiased;
+    @apply antialiased;
+    font-family: var(--font-console), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     background-color: var(--color-bg-primary);
     color: var(--color-neon-green);
     overflow: hidden;
@@ -100,6 +101,11 @@
 }
 
 @layer components {
+  /* Use the VT323 (DOS/console) font explicitly where needed */
+  .font-console {
+    font-family: var(--font-console), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+
   .ascii-container {
     @apply whitespace-pre font-mono leading-none;
     text-rendering: geometricPrecision;
