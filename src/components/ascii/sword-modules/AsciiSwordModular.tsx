@@ -981,7 +981,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // OPTIMIERT: Memoisierte Berechnungen für Rendering
   const shadowSize = useMemo(() => Math.floor(glowIntensity * 20), [glowIntensity]);
   const textShadow = useMemo(() => `0 0 ${shadowSize + (glitchLevel * 2)}px ${baseColor}`, [shadowSize, glitchLevel, baseColor]);
-  const backgroundColor = useMemo(() => getDarkerColor(bgColor), [bgColor]);
+  // Background should stay dark even when bgColor is a vivid complementary neon.
+  const backgroundColor = useMemo(() => getDarkerColor(bgColor, 0.88), [bgColor]);
   const lighterBgColor = useMemo(() => getLighterColor(bgColor), [bgColor]);
 
   const setSwordColor = useAudioReactionStore(state => state.setSwordColor);
