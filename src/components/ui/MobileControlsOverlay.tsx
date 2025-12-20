@@ -27,7 +27,7 @@ export default function MobileControlsOverlay({ isOpen, onToggle }: MobileContro
 
       {/* Overlay (nur sichtbar wenn isOpen true ist) - nur noch für SideButtons */}
       <div 
-        className={`fixed inset-0 z-20 bg-black bg-opacity-90 transition-opacity duration-300 flex flex-col items-center justify-center ${
+        className={`fixed inset-0 z-20 bg-black bg-opacity-90 transition-opacity duration-300 flex flex-col items-center justify-center ui-caps ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
       >

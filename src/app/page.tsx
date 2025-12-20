@@ -158,7 +158,7 @@ export default function HomePage() {
         <div className={`absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 top-4 left-1/2 -translate-x-1/2 sm:bottom-auto transition-opacity duration-300 ${
           isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}>
-          <div className="scale-125 origin-center">
+          <div className="scale-125 origin-center ui-caps">
             <AudioControlPanel 
               onBeat={handleBeat} 
               onEnergyChange={handleEnergyChange} 
@@ -170,7 +170,7 @@ export default function HomePage() {
         <div className={`hidden sm:flex absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10 transition-opacity duration-300 ${
           isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}>
-          <div className="scale-125 origin-center">
+          <div className="scale-125 origin-center ui-caps">
             <SideButtons />
           </div>
         </div>
@@ -186,7 +186,7 @@ export default function HomePage() {
         </div>
 
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0 ui-caps">
           {/* HIDE Button */}
           <button
             onClick={() => setIsUIVisible(!isUIVisible)}
