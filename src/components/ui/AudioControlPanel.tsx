@@ -70,6 +70,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       swordColor: state.swordColor,
     })),
   );
+
   
   // Audio-Analyzer Hook
   const {

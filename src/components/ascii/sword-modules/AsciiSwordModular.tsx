@@ -64,6 +64,7 @@ import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects
 import { generateFrequencyVeins } from './effects/frequencyVeins';
 import { getIdleTilesForIndex, nextIdleTilesColorIndex } from './effects/idleTiles';
 import { generateReactiveEdgeEffects } from './effects/edgeEffects';
+import { createReactivityController } from './effects/reactivityController';
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
 import { useSwordAudioState, useSwordPowerUpState } from './hooks/useSwordStores';
@@ -74,10 +75,49 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // Audio-Reaktionsdaten abrufen
   const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying, idle } = useSwordAudioState();
+
+  // Treat "paused" as idle-visual state immediately (store idle starts after delay; visuals shouldn't keep raging).
+  const idleVisual = idle || !isMusicPlaying;
   
   // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
   const energy = directEnergy !== undefined ? directEnergy : storeEnergy;
   const beatDetected = directBeat !== undefined ? directBeat : storeBeat;
+
+  // Frequenzdaten aus dem Store holen (für band/onset-basierte Reaktivität)
+  const frequencyData = useAudioReactionStore((s) => s.frequencyData);
+  const frequencyDataRef = useRef<Uint8Array | null>(frequencyData);
+
+  useEffect(() => {
+    frequencyDataRef.current = frequencyData;
+  }, [frequencyData]);
+
+  // NOTE: This must be "mount-gated" to avoid hydration mismatches in Next.js
+  // (server-rendered HTML must match the client's first render).
+  const [debugReactiveEnabled, setDebugReactiveEnabled] = useState(false);
+
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      setDebugReactiveEnabled(url.searchParams.get('debug') === 'reactive');
+    } catch {
+      setDebugReactiveEnabled(false);
+    }
+  }, []);
+
+  const [debugReactive, setDebugReactive] = useState<{
+    energy: number;
+    bass: number;
+    mid: number;
+    high: number;
+    onset: number;
+    beat: number;
+    freqLen: number;
+    idle: boolean;
+    isMusicPlaying: boolean;
+    idleVisual: boolean;
+    tilesLen: number;
+  } | null>(null);
+  const debugReactiveLastSetRef = useRef<number>(0);
   
   // Automatisches Beat-Reset aktivieren
   useBeatReset(500);
@@ -512,6 +552,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // OPTIMIERT: Statischer Hintergrund - nur einmal generieren und dann konstant halten
   const [staticBackground, setStaticBackground] = useState<string[][]>([]);
   const [backgroundGenerated, setBackgroundGenerated] = useState(false);
+  const idleVeinsLastUpdateRef = useRef<number>(0);
 
   // OPTIMIERT: Statischen Hintergrund nur einmal generieren
   useEffect(() => {
@@ -533,6 +574,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const edgeEffectsActiveRef = useRef<boolean>(false);
   const lastColorChangeTimeRef = useRef<number>(lastColorChangeTime);
   const colorStabilityRef = useRef<number>(colorStability);
+  const lastBgRegenAtRef = useRef<number>(0);
+  const isMusicPlayingRef = useRef<boolean>(isMusicPlaying);
+
+  // “Reactivity Controller”: stable audio features (bands + onset) for more immersive mapping
+  const reactivityControllerRef = useRef<ReturnType<typeof createReactivityController> | null>(null);
+  if (reactivityControllerRef.current === null) {
+    reactivityControllerRef.current = createReactivityController();
+  }
 
   useEffect(() => {
     glitchLevelRef.current = glitchLevel;
@@ -541,6 +590,26 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     idleRef.current = idle;
   }, [idle]);
+
+  useEffect(() => {
+    isMusicPlayingRef.current = isMusicPlaying;
+  }, [isMusicPlaying]);
+
+  // When playback stops, immediately clear playback-driven visuals (no "keep going" state leak).
+  useEffect(() => {
+    if (isMusicPlaying) return;
+    tileLockedRef.current = false;
+    tileBirthTimeRef.current = 0;
+    currentTilesRef.current = [];
+    setColoredTiles([]);
+    setUnicodeGlitches([]);
+    setEdgeEffects([]);
+    setGlitchChars([]);
+    setBlurredChars([]);
+    setSkewedChars([]);
+    setFadedChars([]);
+    setGlowIntensity(0);
+  }, [isMusicPlaying]);
 
   useEffect(() => {
     lastColorChangeTimeRef.current = lastColorChangeTime;
@@ -565,25 +634,54 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         // --- Color cycle (moved into scheduler; avoids extra effect bursts) ---
         const now = Date.now();
 
-        const adaptive = computeAdaptiveColorCycle({
+        const reactive = reactivityControllerRef.current!.update({
+          nowMs,
           energy: energyRef.current,
           beatDetected: beatDetectedRef.current,
-          lastColorChangeTime: lastColorChangeTimeRef.current,
-          colorStability: colorStabilityRef.current,
-          nowMs: now,
+          frequencyData: frequencyDataRef.current,
         });
-        if (adaptive) {
-          setBaseColor(adaptive.swordColor);
-          setBgColor(adaptive.bgColor);
-          setLastColorChangeTime(now);
-          setColorStability(adaptive.newStability);
-          lastColorChangeTimeRef.current = now;
-          colorStabilityRef.current = adaptive.newStability;
+
+        // Debug overlay (only when enabled; low refresh rate to avoid perf impact)
+        if (debugReactiveEnabled) {
+          const last = debugReactiveLastSetRef.current;
+          if (nowMs - last >= 200) {
+            debugReactiveLastSetRef.current = nowMs;
+            setDebugReactive({
+              energy: reactive.energy,
+              bass: reactive.bass,
+              mid: reactive.mid,
+              high: reactive.high,
+              onset: reactive.onset,
+              beat: reactive.beat,
+              freqLen: frequencyDataRef.current?.length ?? 0,
+              idle: idleRef.current,
+              isMusicPlaying: isMusicPlayingRef.current,
+              idleVisual: idleRef.current || !isMusicPlayingRef.current,
+              tilesLen: currentTilesRef.current.length,
+            });
+          }
         }
 
+        // In idle we keep colors stable (idle visuals are handled separately).
         if (!idleRef.current) {
+          const adaptive = computeAdaptiveColorCycle({
+            energy: reactive.energy,
+            beatDetected: beatDetectedRef.current,
+            lastColorChangeTime: lastColorChangeTimeRef.current,
+            colorStability: colorStabilityRef.current,
+            nowMs: now,
+          });
+          if (adaptive) {
+            setBaseColor(adaptive.swordColor);
+            setBgColor(adaptive.bgColor);
+            setLastColorChangeTime(now);
+            setColorStability(adaptive.newStability);
+            lastColorChangeTimeRef.current = now;
+            colorStabilityRef.current = adaptive.newStability;
+          }
+
           const optimized = computeOptimizedColorCycle({
-            energy: energyRef.current,
+            energy: reactive.energy,
             beatDetected: beatDetectedRef.current,
             lastColorChangeTime: lastColorChangeTimeRef.current,
             colorStability: colorStabilityRef.current,
@@ -599,11 +697,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }
         }
 
-        // Stop effect generation during idle (idle system has its own visuals).
-        if (!idleRef.current) {
-          const currentEnergy = energyRef.current;
+        // Only generate playback effects when music is actually playing.
+        // (Paused state should not keep spawning tiles/glow/glitches.)
+        if (!idleRef.current && isMusicPlayingRef.current) {
+          const currentEnergy = reactive.energy;
           const currentBeat = beatDetectedRef.current;
           const currentGlitchLevel = glitchLevelRef.current;
+          const onset = reactive.onset;
+          const beatStrength = reactive.beat;
+          const bass = reactive.bass;
+          const mid = reactive.mid;
 
           // OPTIMIERT: Empfindlichere Reaktion für visuellen Impact
           if (!(currentEnergy < 0.005 && !currentBeat)) {
@@ -614,8 +717,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             const MAX_EFFECTS_PER_UPDATE = 1;
 
             // --- Glow ---
-            if ((currentBeat && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || currentEnergy > 0.03) {
-              const randomIntensity = Math.random() * 0.15 + 0.05;
+            if ((currentBeat && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || onset > 0.01 || currentEnergy > 0.03) {
+              const base = 0.03 + 0.22 * Math.min(1, (bass * 0.7 + currentEnergy * 0.3) + beatStrength * 0.25);
+              const randomIntensity = base + Math.random() * 0.04;
               setGlowIntensity(randomIntensity);
               effectsTriggered++;
             }
@@ -631,7 +735,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               }
             }
 
-            const shouldTriggerTiles = currentBeat || currentEnergy > 0.02;
+            const shouldTriggerTiles =
+              currentBeat ||
+              (onset > 0.012 && (bass > 0.05 || mid > 0.05)) ||
+              currentEnergy > 0.03;
             if (shouldTriggerTiles && !tileLockedRef.current) {
               const tempIntensity = { ...colorEffectIntensity };
               for (const level in tempIntensity) {
@@ -658,11 +765,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               setUnicodeGlitches([]);
             }
 
-            if (currentBeat && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
+            if ((beatStrength > 0.85 || onset > 0.03) && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
               const tempGlitchLevel = Math.min(1, Math.floor(currentGlitchLevel + (currentEnergy * 1.0)));
               setUnicodeGlitches(generateUnicodeGlitches(swordPositions, tempGlitchLevel));
               unicodeGlitchActiveRef.current = true;
-              unicodeGlitchUntilRef.current = now + 500;
+              unicodeGlitchUntilRef.current = now + (beatStrength > 0.85 ? 520 : 360);
             }
 
             // --- Edge effects (no setTimeout; expiry handled here) ---
@@ -671,13 +778,13 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               setEdgeEffects([]);
             }
 
-            if ((currentBeat || currentEnergy > 0.03) && edgePositions.length > 0) {
+            if ((beatStrength > 0.6 || onset > 0.02 || currentEnergy > 0.03) && edgePositions.length > 0) {
               // Regenerate if expired or on new beat.
               if (!edgeEffectsActiveRef.current || currentBeat) {
                 const { effects, cleanupMs } = generateReactiveEdgeEffects({
                   edgePositions,
                   chargeLevel,
-                  energy: currentEnergy,
+                  energy: Math.min(1, currentEnergy + onset * 0.8),
                   beatDetected: currentBeat,
                 });
                 setEdgeEffects(effects);
@@ -687,12 +794,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             }
 
             // --- Rare background regen ---
-            if ((currentBeat && Math.random() < 0.0008) || currentEnergy > 0.95) {
+            const BG_REGEN_COOLDOWN_MS = 4000;
+            if (
+              now - lastBgRegenAtRef.current >= BG_REGEN_COOLDOWN_MS &&
+              (
+                currentEnergy > 0.97 ||
+                (beatStrength > 0.9 && onset > 0.015 && Math.random() < 0.08)
+              )
+            ) {
               const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
               const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
               const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
               setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
               setBackgroundGenerated(false);
+              lastBgRegenAtRef.current = now;
             }
           }
         }
@@ -708,63 +823,74 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       if (effectsRafIdRef.current !== null) cancelAnimationFrame(effectsRafIdRef.current);
       effectsRafIdRef.current = null;
     };
-  }, [chargeLevel, edgePositions, getBackgroundDimensions, swordPositions]);
+  }, [chargeLevel, debugReactiveEnabled, edgePositions, getBackgroundDimensions, swordPositions]);
   
   // Edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
   
-  // --- IDLE TILE COLOR CYCLE ---
+  // --- IDLE SWORD "SPARFLAMME" (pilot light) ---
+  // Goal: subtle, slow, visible; and also used during the pause->idle transition (idleVisual).
   useEffect(() => {
-    if (idle) {
-      // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
-      if (isMusicPlaying) {
-        // ENTFERNT: Sofortiges Entfernen der Tiles - Musik-Effekte sollen leben bleiben
-        return;
+    if (!idleVisual) return;
+
+    // Stop any aggressive visuals during idle/pause and show only a tiny pilot light.
+    setUnicodeGlitches([]);
+    setEdgeEffects([]);
+    setGlitchChars([]);
+    setBlurredChars([]);
+    setSkewedChars([]);
+    setFadedChars([]);
+
+    const handlePositions = swordPositions.filter((p) => isHandlePosition(p.x, p.y, centeredSwordLines));
+    const base = handlePositions.length ? handlePositions : swordPositions;
+
+    // Ensure we ALWAYS render something visible (previous hash filter could yield 0 tiles depending on geometry).
+    const middleX = centeredSwordLines[0]?.length ? Math.floor(centeredSwordLines[0].length / 2) : 0;
+    const sorted = [...base].sort((a, b) => {
+      // prefer lower parts + closer to center
+      if (b.y !== a.y) return b.y - a.y;
+      return Math.abs(a.x - middleX) - Math.abs(b.x - middleX);
+    });
+
+    const pickSubset = (color: string, phase: number) => {
+      const hashed = base.filter((p) => ((p.x * 19 + p.y * 11 + phase) % 23) === 0);
+      const pool = (hashed.length ? hashed : sorted);
+      const take = Math.min(14, pool.length);
+      const start = pool.length ? (phase * 3) % pool.length : 0;
+      const picked: Array<{ x: number; y: number }> = [];
+      for (let i = 0; i < take; i++) {
+        picked.push(pool[(start + i) % pool.length]);
       }
-      
-      // Im Idle: Alle Animationen stoppen
-      setGlowIntensity(0);
-      setGlitchChars([]);
-      setUnicodeGlitches([]);
-      setEdgeEffects([]);
-      setBlurredChars([]);
-      setSkewedChars([]);
-      setFadedChars([]);
-      // Starte sanften Farbwechsel für Tiles
-      let colorIndex = 0;
-      
-      // NEU: Nur Idle-Tiles setzen wenn keine Musik-Tiles leben
-      if (currentTilesRef.current.length === 0) {
-        const idleTiles = getIdleTilesForIndex(swordPositions, colorIndex);
-        currentTilesRef.current = idleTiles;
-        tileBirthTimeRef.current = Date.now(); // Setze Geburtszeit für Idle-Tiles
-        setColoredTiles(idleTiles);
-      }
-      
-      const interval = setInterval(() => {
-        // Prüfe nochmal, ob Musik läuft
-        if (isMusicPlaying) {
-          clearInterval(interval);
-          // ENTFERNT: Sofortiges Entfernen der Tiles - Musik-Effekte sollen leben bleiben
-          return;
-        }
-        
-        // NEU: Nur Idle-Tiles setzen wenn keine Musik-Tiles leben
-        if (currentTilesRef.current.length === 0) {
-          colorIndex = nextIdleTilesColorIndex(colorIndex);
-          const idleTiles = getIdleTilesForIndex(swordPositions, colorIndex);
-          currentTilesRef.current = idleTiles;
-          tileBirthTimeRef.current = Date.now(); // Setze Geburtszeit für Idle-Tiles
-          setColoredTiles(idleTiles);
-        }
-      }, 2000); // alle 2 Sekunden
-      return () => {
-        clearInterval(interval);
-        // ENTFERNT: Sofortiges Entfernen der Tiles beim Cleanup
-      };
-    }
-    // ENTFERNT: Sofortiges Entfernen der Tiles wenn Idle verlassen wird
-    // Musik-Effekte sollen ihre natürliche Lebensdauer haben
-  }, [swordPositions, isMusicPlaying, idle]);
+      return picked.map((p) => ({ ...p, color }));
+    };
+
+    let phase = 0;
+    const renderPilot = () => {
+      // color: mostly dim green/cyan, occasionally pink (very rare)
+      // Make the pilot light clearly visible but still subtle: mostly warm ember, sometimes cool, rarely pink spark.
+      const color =
+        phase % 16 === 0
+          ? getDarkerColor('#FF3EC8', 0.35) // rare spark
+          : phase % 4 === 0
+            ? getDarkerColor('#3EE6FF', 0.55) // cool flicker
+            : getDarkerColor('#F8E16C', 0.50); // warm ember
+
+      const tiles = pickSubset(color, phase);
+      currentTilesRef.current = tiles;
+      setColoredTiles(tiles);
+
+      // gentle breathing glow
+      const glow = 0.02 + Math.sin(phase * 0.9) * 0.015; // ~0.005..0.035
+      setGlowIntensity(glow);
+      phase++;
+    };
+
+    renderPilot();
+    const interval = setInterval(renderPilot, 1200); // visible, but still "sparflamme"
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [idleVisual, swordPositions, centeredSwordLines]);
 
   // --- ALLE ANIMATIONEN NUR WENN NICHT IDLE ---
   useEffect(() => {
@@ -817,13 +943,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
       
-      // Erhöhe den Idle-Schritt bei jedem Beat
-      if (beatDetected) {
-        idleStepRef.current = (idleStepRef.current + 1) % 10; // 10 Schritte pro Loop
-      }
+      // Idle cadence: do NOT advance on every idle beat; keep it slow and calm.
+      const now = Date.now();
+      const IDLE_VEINS_STEP_MS = 9000;
+      if (now - idleVeinsLastUpdateRef.current < IDLE_VEINS_STEP_MS) return;
+      idleVeinsLastUpdateRef.current = now;
+      idleStepRef.current = (idleStepRef.current + 1) % 10; // 10 steps per loop
       
       // Generiere vordefinierte Vein-Sequenz für den aktuellen Schritt
-      const idleVeins = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
+      const idleVeinsRaw = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
+      // Idle should be subtle: thin out + dim the accent colors
+      const idleVeins = idleVeinsRaw
+        .filter((_, i) => i % 4 === 0)
+        .map((v) => ({ ...v, color: getDarkerColor(getDarkerColor(getDarkerColor(v.color))) }));
       
       // Ersetze alle bestehenden Veins mit der Idle-Sequenz
       const currentTime = Date.now();
@@ -832,15 +964,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Setze das State-Array für das Rendering
       setColoredVeins(mapToVeins(veinsMapRef.current));
     }
-  }, [idle, beatDetected, getBackgroundDimensions, isMusicPlaying]);
+  }, [idle, getBackgroundDimensions, isMusicPlaying, beatDetected]);
   
   // Color cycle + edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
 
-  // Frequenzdaten aus dem Store holen
-  const frequencyData = useAudioReactionStore((s) => s.frequencyData);
-
   // In der useEffect für die Vein-Generierung:
   useEffect(() => {
+    // Only drive frequency veins during playback; idle has its own calmer vein sequence.
+    if (idle || !isMusicPlaying) return;
     if (!frequencyData) return;
     const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
     const now = Date.now();
@@ -852,12 +983,13 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       beatDetected,
     });
     setColoredVeins(veins);
-  }, [frequencyData, beatDetected, getBackgroundDimensions]);
+  }, [frequencyData, beatDetected, getBackgroundDimensions, idle, isMusicPlaying]);
   
   // OPTIMIERT: Memoisierte Berechnungen für Rendering
   const shadowSize = useMemo(() => Math.floor(glowIntensity * 20), [glowIntensity]);
   const textShadow = useMemo(() => `0 0 ${shadowSize + (glitchLevel * 2)}px ${baseColor}`, [shadowSize, glitchLevel, baseColor]);
-  const backgroundColor = useMemo(() => getDarkerColor(bgColor), [bgColor]);
+  // Background should stay dark even when bgColor is a vivid complementary neon.
+  const backgroundColor = useMemo(() => getDarkerColor(bgColor, 0.88), [bgColor]);
   const lighterBgColor = useMemo(() => getLighterColor(bgColor), [bgColor]);
 
   const setSwordColor = useAudioReactionStore(state => state.setSwordColor);
@@ -875,11 +1007,30 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         height: '100%'
       }}
     >
+      {debugReactiveEnabled && (
+        <div
+          className="fixed left-2 bottom-2 z-[9999] rounded border border-grifter-blue bg-black/80 px-3 py-2 text-[10px] font-mono text-grifter-blue"
+          style={{ backdropFilter: 'blur(6px)' }}
+        >
+          <div className="font-bold">REACTIVE</div>
+          <div>idle: {debugReactive?.idle ? '1' : '0'}</div>
+          <div>music: {debugReactive?.isMusicPlaying ? '1' : '0'}</div>
+          <div>idleVisual: {debugReactive?.idleVisual ? '1' : '0'}</div>
+          <div>tilesLen: {debugReactive?.tilesLen ?? 0}</div>
+          <div>freqLen: {debugReactive?.freqLen ?? 0}</div>
+          <div>energy: {(debugReactive?.energy ?? 0).toFixed(3)}</div>
+          <div>bass: {(debugReactive?.bass ?? 0).toFixed(3)}</div>
+          <div>mid: {(debugReactive?.mid ?? 0).toFixed(3)}</div>
+          <div>high: {(debugReactive?.high ?? 0).toFixed(3)}</div>
+          <div>onset: {(debugReactive?.onset ?? 0).toFixed(3)}</div>
+          <div>beat: {(debugReactive?.beat ?? 0).toFixed(3)}</div>
+        </div>
+      )}
       {/* Höhlen-Hintergrund */}
       <div 
         className="absolute inset-0"
         style={{
-          opacity: 0.45 + (glitchLevel * 0.08),
+          opacity: (0.45 + (glitchLevel * 0.08)) * (idle ? 0.55 : 1),
           color: lighterBgColor,
           filter: `brightness(${0.35 + (glitchLevel * 0.075)}) contrast(${0.65 + (glitchLevel * 0.05)})`,
           width: '100%',
@@ -888,7 +1039,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         }}
       >
         <div 
-          className="w-full h-full"
+          className="relative w-full h-full"
           style={{
             display: 'flex',
             justifyContent: 'center',

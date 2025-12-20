@@ -26,6 +26,8 @@ interface PowerUpState {
   maxGlitchLevel: number;
   glitchProgress: number;
   isGlitchComplete: boolean;
+
+  // Visual layers
   
   // Aktionen
   startPowerUp: () => void;
@@ -173,7 +175,7 @@ export const usePowerUpStore = create<PowerUpState>()(
           chargeProgress: 0,
           isChargeComplete: false,
           glitchProgress: 0,
-          isGlitchComplete: false
+          isGlitchComplete: false,
         });
       }
     }),
@@ -189,7 +191,7 @@ export const usePowerUpStore = create<PowerUpState>()(
         chargeProgress: state.chargeProgress,
         isChargeComplete: state.isChargeComplete,
         glitchProgress: state.glitchProgress,
-        isGlitchComplete: state.isGlitchComplete
+        isGlitchComplete: state.isGlitchComplete,
       })
     }
   )
