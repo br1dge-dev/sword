@@ -64,6 +64,7 @@ import { generateColoredTiles, generateGlitchChars } from './effects/tileEffects
 import { generateFrequencyVeins } from './effects/frequencyVeins';
 import { getIdleTilesForIndex, nextIdleTilesColorIndex } from './effects/idleTiles';
 import { generateReactiveEdgeEffects } from './effects/edgeEffects';
+import { createReactivityController } from './effects/reactivityController';
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
 import { useSwordAudioState, useSwordPowerUpState } from './hooks/useSwordStores';
@@ -78,6 +79,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
   const energy = directEnergy !== undefined ? directEnergy : storeEnergy;
   const beatDetected = directBeat !== undefined ? directBeat : storeBeat;
+
+  // Frequenzdaten aus dem Store holen (für band/onset-basierte Reaktivität)
+  const frequencyData = useAudioReactionStore((s) => s.frequencyData);
+  const frequencyDataRef = useRef<Uint8Array | null>(frequencyData);
+
+  useEffect(() => {
+    frequencyDataRef.current = frequencyData;
+  }, [frequencyData]);
   
   // Automatisches Beat-Reset aktivieren
   useBeatReset(500);
@@ -533,6 +542,13 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const edgeEffectsActiveRef = useRef<boolean>(false);
   const lastColorChangeTimeRef = useRef<number>(lastColorChangeTime);
   const colorStabilityRef = useRef<number>(colorStability);
+  const lastBgRegenAtRef = useRef<number>(0);
+
+  // “Reactivity Controller”: stable audio features (bands + onset) for more immersive mapping
+  const reactivityControllerRef = useRef<ReturnType<typeof createReactivityController> | null>(null);
+  if (reactivityControllerRef.current === null) {
+    reactivityControllerRef.current = createReactivityController();
+  }
 
   useEffect(() => {
     glitchLevelRef.current = glitchLevel;
@@ -565,8 +581,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         // --- Color cycle (moved into scheduler; avoids extra effect bursts) ---
         const now = Date.now();
 
-        const adaptive = computeAdaptiveColorCycle({
+        const reactive = reactivityControllerRef.current!.update({
+          nowMs,
           energy: energyRef.current,
+          beatDetected: beatDetectedRef.current,
+          frequencyData: frequencyDataRef.current,
+        });
+
+        const adaptive = computeAdaptiveColorCycle({
+          energy: reactive.energy,
           beatDetected: beatDetectedRef.current,
           lastColorChangeTime: lastColorChangeTimeRef.current,
           colorStability: colorStabilityRef.current,
@@ -583,7 +606,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
         if (!idleRef.current) {
           const optimized = computeOptimizedColorCycle({
-            energy: energyRef.current,
+            energy: reactive.energy,
             beatDetected: beatDetectedRef.current,
             lastColorChangeTime: lastColorChangeTimeRef.current,
             colorStability: colorStabilityRef.current,
@@ -601,9 +624,13 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
         // Stop effect generation during idle (idle system has its own visuals).
         if (!idleRef.current) {
-          const currentEnergy = energyRef.current;
+          const currentEnergy = reactive.energy;
           const currentBeat = beatDetectedRef.current;
           const currentGlitchLevel = glitchLevelRef.current;
+          const onset = reactive.onset;
+          const beatStrength = reactive.beat;
+          const bass = reactive.bass;
+          const mid = reactive.mid;
 
           // OPTIMIERT: Empfindlichere Reaktion für visuellen Impact
           if (!(currentEnergy < 0.005 && !currentBeat)) {
@@ -614,8 +641,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             const MAX_EFFECTS_PER_UPDATE = 1;
 
             // --- Glow ---
-            if ((currentBeat && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || currentEnergy > 0.03) {
-              const randomIntensity = Math.random() * 0.15 + 0.05;
+            if ((currentBeat && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || onset > 0.01 || currentEnergy > 0.03) {
+              const base = 0.03 + 0.22 * Math.min(1, (bass * 0.7 + currentEnergy * 0.3) + beatStrength * 0.25);
+              const randomIntensity = base + Math.random() * 0.04;
               setGlowIntensity(randomIntensity);
               effectsTriggered++;
             }
@@ -631,7 +659,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               }
             }
 
-            const shouldTriggerTiles = currentBeat || currentEnergy > 0.02;
+            const shouldTriggerTiles =
+              currentBeat ||
+              (onset > 0.012 && (bass > 0.05 || mid > 0.05)) ||
+              currentEnergy > 0.03;
             if (shouldTriggerTiles && !tileLockedRef.current) {
               const tempIntensity = { ...colorEffectIntensity };
               for (const level in tempIntensity) {
@@ -658,11 +689,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               setUnicodeGlitches([]);
             }
 
-            if (currentBeat && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
+            if ((beatStrength > 0.85 || onset > 0.03) && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
               const tempGlitchLevel = Math.min(1, Math.floor(currentGlitchLevel + (currentEnergy * 1.0)));
               setUnicodeGlitches(generateUnicodeGlitches(swordPositions, tempGlitchLevel));
               unicodeGlitchActiveRef.current = true;
-              unicodeGlitchUntilRef.current = now + 500;
+              unicodeGlitchUntilRef.current = now + (beatStrength > 0.85 ? 520 : 360);
             }
 
             // --- Edge effects (no setTimeout; expiry handled here) ---
@@ -671,13 +702,13 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               setEdgeEffects([]);
             }
 
-            if ((currentBeat || currentEnergy > 0.03) && edgePositions.length > 0) {
+            if ((beatStrength > 0.6 || onset > 0.02 || currentEnergy > 0.03) && edgePositions.length > 0) {
               // Regenerate if expired or on new beat.
               if (!edgeEffectsActiveRef.current || currentBeat) {
                 const { effects, cleanupMs } = generateReactiveEdgeEffects({
                   edgePositions,
                   chargeLevel,
-                  energy: currentEnergy,
+                  energy: Math.min(1, currentEnergy + onset * 0.8),
                   beatDetected: currentBeat,
                 });
                 setEdgeEffects(effects);
@@ -687,12 +718,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             }
 
             // --- Rare background regen ---
-            if ((currentBeat && Math.random() < 0.0008) || currentEnergy > 0.95) {
+            const BG_REGEN_COOLDOWN_MS = 4000;
+            if (
+              now - lastBgRegenAtRef.current >= BG_REGEN_COOLDOWN_MS &&
+              (
+                currentEnergy > 0.97 ||
+                (beatStrength > 0.9 && onset > 0.015 && Math.random() < 0.08)
+              )
+            ) {
               const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
               const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
               const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
               setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
               setBackgroundGenerated(false);
+              lastBgRegenAtRef.current = now;
             }
           }
         }
@@ -835,9 +874,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   }, [idle, beatDetected, getBackgroundDimensions, isMusicPlaying]);
   
   // Color cycle + edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
-
-  // Frequenzdaten aus dem Store holen
-  const frequencyData = useAudioReactionStore((s) => s.frequencyData);
 
   // In der useEffect für die Vein-Generierung:
   useEffect(() => {
