@@ -157,16 +157,24 @@ export function stepEqState(
   return { state: { levels, peaks }, peakHoldUntilMs: holds };
 }
 
-function eqColorForHeight(h01: number): string {
-  // bottom green -> mid yellow -> top pink/red
-  if (h01 < 0.55) return '#00FCA6';
-  if (h01 < 0.80) return '#F8E16C';
-  return '#FF3EC8';
+export type EqPalette = {
+  low: string;
+  mid: string;
+  high: string;
+  peak: string;
+};
+
+function eqColorForHeight(h01: number, p: EqPalette): string {
+  // 3-step NES-ish gradient
+  if (h01 < 0.55) return p.low;
+  if (h01 < 0.80) return p.mid;
+  return p.high;
 }
 
 export function renderEqTiles(
   geom: EqGeometry,
   state: EqState,
+  palette: EqPalette,
 ): Array<{ x: number; y: number; color: string }> {
   const out: Array<{ x: number; y: number; color: string }> = [];
   const n = geom.barCount;
@@ -182,13 +190,13 @@ export function renderEqTiles(
     for (let c = 0; c < height; c++) {
       const p = cells[c];
       const h01 = cells.length ? c / cells.length : 0;
-      out.push({ x: p.x, y: p.y, color: eqColorForHeight(h01) });
+      out.push({ x: p.x, y: p.y, color: eqColorForHeight(h01, palette) });
     }
 
     // peak cap (one bright cell)
     const peakPos = cells[peak];
     if (peakPos) {
-      out.push({ x: peakPos.x, y: peakPos.y, color: getLighterColor('#3EE6FF', 0.25) });
+      out.push({ x: peakPos.x, y: peakPos.y, color: getLighterColor(palette.peak, 0.18) });
     }
   }
 
