@@ -15,13 +15,13 @@ export default function MobileControlsOverlay({ isOpen, onToggle }: MobileContro
       {/* Overlay-Button (immer sichtbar) */}
       <button
         onClick={() => onToggle(!isOpen)}
-        className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+        className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue"
         style={{
-          boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+          boxShadow: '0 0 16px rgba(62, 230, 255, 0.75)',
         }}
       >
         <IoMdSettings 
-          className={`text-grifter-blue text-2xl transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} 
+          className={`text-grifter-blue text-3xl transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} 
         />
       </button>
 
