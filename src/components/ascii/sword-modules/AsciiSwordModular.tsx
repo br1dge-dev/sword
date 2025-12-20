@@ -88,13 +88,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     frequencyDataRef.current = frequencyData;
   }, [frequencyData]);
 
-  const debugReactiveEnabled = useMemo(() => {
-    if (typeof window === 'undefined') return false;
+  // NOTE: This must be "mount-gated" to avoid hydration mismatches in Next.js
+  // (server-rendered HTML must match the client's first render).
+  const [debugReactiveEnabled, setDebugReactiveEnabled] = useState(false);
+
+  useEffect(() => {
     try {
       const url = new URL(window.location.href);
-      return url.searchParams.get('debug') === 'reactive';
+      setDebugReactiveEnabled(url.searchParams.get('debug') === 'reactive');
     } catch {
-      return false;
+      setDebugReactiveEnabled(false);
     }
   }, []);
 
