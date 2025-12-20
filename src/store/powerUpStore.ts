@@ -28,8 +28,6 @@ interface PowerUpState {
   isGlitchComplete: boolean;
 
   // Visual layers
-  shootingStarEnabled: boolean;
-  setShootingStarEnabled: (enabled: boolean) => void;
   
   // Aktionen
   startPowerUp: () => void;
@@ -62,9 +60,6 @@ export const usePowerUpStore = create<PowerUpState>()(
       maxGlitchLevel: 3,
       glitchProgress: 0,
       isGlitchComplete: false,
-
-      shootingStarEnabled: true,
-      setShootingStarEnabled: (enabled) => set({ shootingStarEnabled: enabled }),
       
       startPowerUp: () => {
         set((state) => {
@@ -181,7 +176,6 @@ export const usePowerUpStore = create<PowerUpState>()(
           isChargeComplete: false,
           glitchProgress: 0,
           isGlitchComplete: false,
-          shootingStarEnabled: true,
         });
       }
     }),
@@ -198,7 +192,6 @@ export const usePowerUpStore = create<PowerUpState>()(
         isChargeComplete: state.isChargeComplete,
         glitchProgress: state.glitchProgress,
         isGlitchComplete: state.isGlitchComplete,
-        shootingStarEnabled: state.shootingStarEnabled,
       })
     }
   )

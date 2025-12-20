@@ -68,11 +68,10 @@ import { createReactivityController } from './effects/reactivityController';
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
 import { useSwordAudioState, useSwordPowerUpState } from './hooks/useSwordStores';
-import ShootingStarLayer from './ShootingStarLayer';
 
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
-  const { currentLevel, chargeLevel, glitchLevel, shootingStarEnabled } = useSwordPowerUpState();
+  const { currentLevel, chargeLevel, glitchLevel } = useSwordPowerUpState();
   
   // Audio-Reaktionsdaten abrufen
   const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying, idle } = useSwordAudioState();
@@ -960,7 +959,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
   return (
     <div 
-      className="relative flex items-center justify-center w-full h-full overflow-hidden crt-effect crt-curve-strong crt-tube crt-glow vignette scanlines-light"
+      className="relative flex items-center justify-center w-full h-full overflow-hidden"
       style={{ 
         backgroundColor,
         width: '100%',
@@ -1006,14 +1005,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             overflow: 'hidden'
           }}
         >
-          {/* Shooting Star layer (neon band sweeping across background) */}
-          <div className="absolute inset-0 z-[2] pointer-events-none" style={{ opacity: 0.95 }}>
-            <ShootingStarLayer
-              enabled={shootingStarEnabled}
-              width={((staticBackground.length > 0 ? staticBackground[0].length : caveBackground[0]?.length) || 160) * 10}
-              height={((staticBackground.length > 0 ? staticBackground.length : caveBackground.length) || 100) * 14}
-            />
-          </div>
           <AsciiBackgroundCanvas
             pattern={staticBackground.length > 0 ? staticBackground : caveBackground}
             veins={coloredVeins}

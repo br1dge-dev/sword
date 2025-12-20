@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAudioAnalyzer, globalAnalyzer } from '../../hooks/useAudioAnalyzer';
 import { useAudioReactionStore } from '../../store/audioReactionStore';
-import { usePowerUpStore } from '../../store/powerUpStore';
 import { useShallow } from 'zustand/react/shallow';
 
 interface AudioControlPanelProps {
@@ -72,12 +71,6 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     })),
   );
 
-  const { shootingStarEnabled, setShootingStarEnabled } = usePowerUpStore(
-    useShallow((s) => ({
-      shootingStarEnabled: s.shootingStarEnabled,
-      setShootingStarEnabled: s.setShootingStarEnabled,
-    })),
-  );
   
   // Audio-Analyzer Hook
   const {
@@ -441,19 +434,6 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
             })
           )}
         </div>
-      </div>
-
-      {/* Visual layer toggle: Shooting Star */}
-      <div className="mb-2 w-full flex items-center justify-center gap-2">
-        <button
-          type="button"
-          onClick={() => setShootingStarEnabled(!shootingStarEnabled)}
-          className="px-2 py-1 rounded-[4px] border border-grifter-blue bg-black text-[10px] font-press-start-2p text-grifter-blue hover:shadow-[0_0_8px_#3EE6FF] transition"
-          style={{ letterSpacing: '0.05em' }}
-          title="Toggle Shooting Star layer"
-        >
-          SHOOTING STAR: {shootingStarEnabled ? 'ON' : 'OFF'}
-        </button>
       </div>
 
       <style jsx>{`

@@ -196,6 +196,50 @@
         rgba(0, 0, 0, 0.55) 100%);
     border-radius: inherit;
   }
+
+  /* Global CRT overlay (apply to <body>): affects ALL UI, not just the sword */
+  .crt-global {
+    position: relative;
+  }
+
+  .crt-global::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.12),
+      rgba(0, 0, 0, 0.12) 1px,
+      rgba(0, 0, 0, 0) 1px,
+      rgba(0, 0, 0, 0) 3px
+    );
+    mix-blend-mode: multiply;
+    opacity: 0.9;
+  }
+
+  .crt-global::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background:
+      radial-gradient(ellipse at center,
+        rgba(62, 230, 255, 0.08) 0%,
+        rgba(255, 62, 200, 0.05) 28%,
+        rgba(0, 252, 166, 0.04) 52%,
+        rgba(0, 0, 0, 0) 70%),
+      radial-gradient(ellipse at center,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(0, 0, 0, 0) 55%,
+        rgba(0, 0, 0, 0.35) 85%,
+        rgba(0, 0, 0, 0.55) 100%);
+    filter: blur(10px);
+    mix-blend-mode: screen;
+    opacity: 0.65;
+  }
   
   /* Horizontale Scanlines nur für den Hintergrund */
   .horizontal-scanlines {
