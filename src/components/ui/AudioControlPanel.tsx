@@ -218,6 +218,16 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     if (!audioRef.current) return;
     
     try {
+      // On mobile Safari, initialization sometimes needs to happen *after* a user gesture.
+      // If the auto-init failed earlier, retry here (safe: useAudioAnalyzer now allows retries).
+      if (!isInitialized) {
+        try {
+          await initialize(audioRef.current);
+        } catch {
+          // If it still fails, we still allow audio playback; visuals may remain idle.
+        }
+      }
+
       await resumeAudioContext();
       
       if (isPlaying) {
