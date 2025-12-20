@@ -2,6 +2,8 @@ import React, { useRef, useEffect } from 'react';
 
 interface AsciiBackgroundCanvasProps {
   pattern: string[][];
+  patternB?: string[][];
+  patternBlend?: number; // 0..1
   veins: Array<{ x: number; y: number; color: string }>;
   width: number;
   height: number;
@@ -11,6 +13,8 @@ interface AsciiBackgroundCanvasProps {
 
 const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
   pattern,
+  patternB,
+  patternBlend = 0,
   veins,
   width,
   height,
@@ -54,16 +58,31 @@ const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
     const offsetX = (width - totalWidth) / 2;
     const offsetY = (height - totalHeight) / 2;
 
-    // Pattern zeichnen
-    for (let y = 0; y < pattern.length; y++) {
-      for (let x = 0; x < pattern[y].length; x++) {
-        const char = pattern[y][x];
-        const veinColor = veinMap.get(`${x},${y}`);
-        ctx.fillStyle = veinColor || '#888';
-        ctx.fillText(char, offsetX + x * charWidth, offsetY + y * charHeight);
+    const drawPattern = (p: string[][], alpha: number) => {
+      if (!p || p.length === 0) return;
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+      for (let y = 0; y < p.length; y++) {
+        const row = p[y] || [];
+        for (let x = 0; x < row.length; x++) {
+          const char = row[x];
+          const veinColor = veinMap.get(`${x},${y}`);
+          ctx.fillStyle = veinColor || '#888';
+          ctx.fillText(char, offsetX + x * charWidth, offsetY + y * charHeight);
+        }
       }
+    };
+
+    // Pattern draw (optionally crossfade to next pattern)
+    if (patternB && patternB.length > 0 && patternBlend > 0) {
+      const b = Math.max(0, Math.min(1, patternBlend));
+      drawPattern(pattern, 1 - b);
+      drawPattern(patternB, b);
+    } else {
+      drawPattern(pattern, 1);
     }
-  }, [pattern, veins, width, height, fontSize, fontFamily]);
+
+    ctx.globalAlpha = 1;
+  }, [pattern, patternB, patternBlend, veins, width, height, fontSize, fontFamily]);
 
   return (
     <canvas
