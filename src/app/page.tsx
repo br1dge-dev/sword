@@ -10,12 +10,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAudioReactionStore } from '@/store/audioReactionStore';
+import { usePowerUpStore } from '@/store/powerUpStore';
 import AsciiSword from '@/components/ascii/AsciiSword';
 import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import BuildBadge from '@/components/ui/BuildBadge';
-import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle } from 'react-icons/io';
+import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle, IoMdFlash } from 'react-icons/io';
 import { useShallow } from 'zustand/react/shallow';
 import WtfIsThisModal from '@/components/ui/WtfIsThisModal';
 
@@ -37,6 +38,12 @@ export default function HomePage() {
       beatDetected: s.beatDetected,
       setMusicPlaying: s.setMusicPlaying,
       swordColor: s.swordColor,
+    })),
+  );
+  const { invertPowerMode, toggleInvertPowerMode } = usePowerUpStore(
+    useShallow((s) => ({
+      invertPowerMode: s.invertPowerMode,
+      toggleInvertPowerMode: s.toggleInvertPowerMode,
     })),
   );
   const swordColorSafe = swordColor ?? '#00FCA6';
@@ -159,7 +166,7 @@ export default function HomePage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
+    <main className={`flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden ${invertPowerMode ? 'invert-power' : ''}`}>
       <BuildBadge />
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
         isModalOpen || isLeaderboardOpen ? 'backdrop-blur-modal' : ''
@@ -219,6 +226,21 @@ export default function HomePage() {
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
         {isClient && isDesktop && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0 ui-caps">
+          {/* POWER (invert) */}
+          <button
+            onClick={toggleInvertPowerMode}
+            className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            style={{
+              boxShadow: invertPowerMode
+                ? '0 0 22px rgba(255, 255, 255, 0.85)'
+                : '0 0 16px rgba(62, 230, 255, 0.75)',
+            }}
+            aria-label="Power (invert)"
+            title="POWER"
+          >
+            <IoMdFlash className={`${invertPowerMode ? 'text-black' : 'text-grifter-blue'} text-3xl`} />
+          </button>
+
           {/* HIDE Button */}
           <button
             onClick={() => setIsUIVisible(!isUIVisible)}
