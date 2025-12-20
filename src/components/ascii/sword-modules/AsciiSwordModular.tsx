@@ -87,6 +87,27 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     frequencyDataRef.current = frequencyData;
   }, [frequencyData]);
+
+  const debugReactiveEnabled = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const url = new URL(window.location.href);
+      return url.searchParams.get('debug') === 'reactive';
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const [debugReactive, setDebugReactive] = useState<{
+    energy: number;
+    bass: number;
+    mid: number;
+    high: number;
+    onset: number;
+    beat: number;
+    freqLen: number;
+  } | null>(null);
+  const debugReactiveLastSetRef = useRef<number>(0);
   
   // Automatisches Beat-Reset aktivieren
   useBeatReset(500);
@@ -588,6 +609,23 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           frequencyData: frequencyDataRef.current,
         });
 
+        // Debug overlay (only when enabled; low refresh rate to avoid perf impact)
+        if (debugReactiveEnabled) {
+          const last = debugReactiveLastSetRef.current;
+          if (nowMs - last >= 200) {
+            debugReactiveLastSetRef.current = nowMs;
+            setDebugReactive({
+              energy: reactive.energy,
+              bass: reactive.bass,
+              mid: reactive.mid,
+              high: reactive.high,
+              onset: reactive.onset,
+              beat: reactive.beat,
+              freqLen: frequencyDataRef.current?.length ?? 0,
+            });
+          }
+        }
+
         const adaptive = computeAdaptiveColorCycle({
           energy: reactive.energy,
           beatDetected: beatDetectedRef.current,
@@ -747,7 +785,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       if (effectsRafIdRef.current !== null) cancelAnimationFrame(effectsRafIdRef.current);
       effectsRafIdRef.current = null;
     };
-  }, [chargeLevel, edgePositions, getBackgroundDimensions, swordPositions]);
+  }, [chargeLevel, debugReactiveEnabled, edgePositions, getBackgroundDimensions, swordPositions]);
   
   // Edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
   
@@ -911,6 +949,21 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         height: '100%'
       }}
     >
+      {debugReactiveEnabled && (
+        <div
+          className="fixed left-2 bottom-2 z-[9999] rounded border border-grifter-blue bg-black/80 px-3 py-2 text-[10px] font-mono text-grifter-blue"
+          style={{ backdropFilter: 'blur(6px)' }}
+        >
+          <div className="font-bold">REACTIVE</div>
+          <div>freqLen: {debugReactive?.freqLen ?? 0}</div>
+          <div>energy: {(debugReactive?.energy ?? 0).toFixed(3)}</div>
+          <div>bass: {(debugReactive?.bass ?? 0).toFixed(3)}</div>
+          <div>mid: {(debugReactive?.mid ?? 0).toFixed(3)}</div>
+          <div>high: {(debugReactive?.high ?? 0).toFixed(3)}</div>
+          <div>onset: {(debugReactive?.onset ?? 0).toFixed(3)}</div>
+          <div>beat: {(debugReactive?.beat ?? 0).toFixed(3)}</div>
+        </div>
+      )}
       {/* Höhlen-Hintergrund */}
       <div 
         className="absolute inset-0"
