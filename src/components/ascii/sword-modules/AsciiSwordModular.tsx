@@ -629,23 +629,24 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }
         }
 
-        const adaptive = computeAdaptiveColorCycle({
-          energy: reactive.energy,
-          beatDetected: beatDetectedRef.current,
-          lastColorChangeTime: lastColorChangeTimeRef.current,
-          colorStability: colorStabilityRef.current,
-          nowMs: now,
-        });
-        if (adaptive) {
-          setBaseColor(adaptive.swordColor);
-          setBgColor(adaptive.bgColor);
-          setLastColorChangeTime(now);
-          setColorStability(adaptive.newStability);
-          lastColorChangeTimeRef.current = now;
-          colorStabilityRef.current = adaptive.newStability;
-        }
-
+        // In idle we keep colors stable (idle visuals are handled separately).
         if (!idleRef.current) {
+          const adaptive = computeAdaptiveColorCycle({
+            energy: reactive.energy,
+            beatDetected: beatDetectedRef.current,
+            lastColorChangeTime: lastColorChangeTimeRef.current,
+            colorStability: colorStabilityRef.current,
+            nowMs: now,
+          });
+          if (adaptive) {
+            setBaseColor(adaptive.swordColor);
+            setBgColor(adaptive.bgColor);
+            setLastColorChangeTime(now);
+            setColorStability(adaptive.newStability);
+            lastColorChangeTimeRef.current = now;
+            colorStabilityRef.current = adaptive.newStability;
+          }
+
           const optimized = computeOptimizedColorCycle({
             energy: reactive.energy,
             beatDetected: beatDetectedRef.current,
@@ -910,7 +911,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       }
       
       // Generiere vordefinierte Vein-Sequenz für den aktuellen Schritt
-      const idleVeins = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
+      const idleVeinsRaw = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
+      // Idle should be subtle: thin out + dim the accent colors
+      const idleVeins = idleVeinsRaw
+        .filter((_, i) => i % 2 === 0)
+        .map((v) => ({ ...v, color: getDarkerColor(getDarkerColor(v.color)) }));
       
       // Ersetze alle bestehenden Veins mit der Idle-Sequenz
       const currentTime = Date.now();
@@ -925,6 +930,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
   // In der useEffect für die Vein-Generierung:
   useEffect(() => {
+    // Only drive frequency veins during playback; idle has its own calmer vein sequence.
+    if (idle || !isMusicPlaying) return;
     if (!frequencyData) return;
     const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
     const now = Date.now();
@@ -936,7 +943,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       beatDetected,
     });
     setColoredVeins(veins);
-  }, [frequencyData, beatDetected, getBackgroundDimensions]);
+  }, [frequencyData, beatDetected, getBackgroundDimensions, idle, isMusicPlaying]);
   
   // OPTIMIERT: Memoisierte Berechnungen für Rendering
   const shadowSize = useMemo(() => Math.floor(glowIntensity * 20), [glowIntensity]);
