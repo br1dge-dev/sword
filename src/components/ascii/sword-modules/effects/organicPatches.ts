@@ -36,6 +36,10 @@ function randInt(min: number, maxInclusive: number) {
   return Math.floor(min + Math.random() * (maxInclusive - min + 1));
 }
 
+function chance(p01: number) {
+  return Math.random() < clamp(p01, 0, 1);
+}
+
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -176,9 +180,14 @@ export function tickOrganicPatches(
   state.lastNowMs = nowMs;
 
   // --- Macro pattern blending (no hard cuts) ---
-  const MACRO_SWAP_COOLDOWN_MS = 1500;
-  const MACRO_BLEND_MS = 2600;
-  const wantsSwap = beatDetected && (energy > 0.22 || onset > 0.04) && nowMs - state.macroLastSwapMs > MACRO_SWAP_COOLDOWN_MS;
+  const MACRO_SWAP_COOLDOWN_MS = 20000; // slower / calmer
+  const MACRO_BLEND_MS = 4500; // longer "sickering" transition
+  const wantsSwap =
+    nowMs - state.macroLastSwapMs > MACRO_SWAP_COOLDOWN_MS &&
+    (
+      (beatDetected && beat > 0.75 && energy > 0.22) ||
+      (onset > 0.07 && energy > 0.35 && chance(0.08))
+    );
   if (wantsSwap) {
     state.macroLastSwapMs = nowMs;
     state.macroMode = state.nextMacroMode;
@@ -190,12 +199,22 @@ export function tickOrganicPatches(
   }
 
   // Ensure a few persistent patches exist.
-  const desired = clamp(Math.floor(3 + energy * 5), 3, 7);
-  const spawnCooldown = 850;
+  const desired = clamp(Math.floor(2 + energy * 3), 2, 5); // fewer, but larger/more readable
+  const spawnCooldown = 1200;
   let patches = state.patches.slice();
 
   if (patches.length < desired && nowMs - state.lastSpawnMs > spawnCooldown) {
-    const pos = spawnPositionStratified(width, height, state.spawnIndex++);
+    // First patches spawn near the center (behind sword), later ones spread out.
+    const centerX = Math.floor(width * 0.5);
+    const centerY = Math.floor(height * 0.5);
+    const spawnNearCenter = state.spawnIndex < 2;
+    const pos = spawnNearCenter
+      ? {
+          x: clamp(centerX + randInt(-Math.floor(width * 0.18), Math.floor(width * 0.18)), 0, Math.max(0, width - 1)),
+          y: clamp(centerY + randInt(-Math.floor(height * 0.18), Math.floor(height * 0.18)), 0, Math.max(0, height - 1)),
+        }
+      : spawnPositionStratified(width, height, state.spawnIndex);
+    state.spawnIndex++;
     const p: OrganicPatch = {
       x: pos.x,
       y: pos.y,
@@ -214,6 +233,31 @@ export function tickOrganicPatches(
   const beatKick = beatDetected ? 1 : 0;
   const intensity = clamp(0.12 + energy * 1.1 + onset * 1.6 + beat * 1.25, 0, 2.2);
   const emitted: ColoredVein[] = [];
+
+  const centerX = width * 0.5;
+  const centerY = height * 0.5;
+
+  const stepOutward = (wx: number, wy: number, fromX: number, fromY: number) => {
+    // Bias steps away from center to create center-out “growth”.
+    const dx = fromX - centerX;
+    const dy = fromY - centerY;
+    const biasX = dx >= 0 ? 1 : -1;
+    const biasY = dy >= 0 ? 1 : -1;
+    const r = Math.random();
+    // Prefer stepping along the dominant axis, but keep it organic.
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (r < 0.55) wx += biasX;
+      else if (r < 0.75) wy += biasY;
+      else if (r < 0.88) wy -= biasY;
+      else wx -= biasX;
+    } else {
+      if (r < 0.55) wy += biasY;
+      else if (r < 0.75) wx += biasX;
+      else if (r < 0.88) wx -= biasX;
+      else wy -= biasY;
+    }
+    return { wx, wy };
+  };
 
   // Emit helper: tint a few nearby "monochrome" veins, plus a small random walk for organic bleed.
   const emitFrom = (cx: number, cy: number, color: string, radius: number, count: number) => {
@@ -239,18 +283,32 @@ export function tickOrganicPatches(
       count--;
 
       // Organic bleed: 1-3 step random walk to neighbor tiles
-      const steps = 1 + randInt(0, 2);
+      const steps = 1 + randInt(0, 4);
       let wx = x;
       let wy = y;
       for (let s = 0; s < steps && emitted.length < maxEmits; s++) {
-        const dir = randInt(0, 3);
-        if (dir === 0) wx++;
-        if (dir === 1) wx--;
-        if (dir === 2) wy++;
-        if (dir === 3) wy--;
+        const stepped = stepOutward(wx, wy, cx, cy);
+        wx = stepped.wx;
+        wy = stepped.wy;
         if (!withinBounds(wx, wy, width, height)) break;
         emitted.push({ x: wx, y: wy, color });
       }
+    }
+  };
+
+  const emitWash = (cx: number, cy: number, color: string, radius: number, count: number) => {
+    // Dense fill inside patch radius to create visible “big areas”.
+    const r2 = radius * radius;
+    let i = 0;
+    while (emitted.length < maxEmits && i < count) {
+      i++;
+      // Sample within circle (approx)
+      const x = clamp(cx + randInt(-Math.floor(radius), Math.floor(radius)), 0, Math.max(0, width - 1));
+      const y = clamp(cy + randInt(-Math.floor(radius), Math.floor(radius)), 0, Math.max(0, height - 1));
+      const dx = x - cx;
+      const dy = y - cy;
+      if (dx * dx + dy * dy > r2) continue;
+      emitted.push({ x, y, color });
     }
   };
 
@@ -263,21 +321,27 @@ export function tickOrganicPatches(
 
     // Expand targets under “intense passages”
     const baseTarget = 10 + idx * 2;
-    const targetRadius = clamp(baseTarget + intensity * 20 * breath + beatKick * 14, 10, 54);
+    const targetRadius = clamp(baseTarget + intensity * 26 * breath + beatKick * 18, 18, 78);
     const radius = smooth(p.radius, targetRadius, 0.07 + energy * 0.14 + beat * 0.12);
 
     // Occasional hue shift on strong events
-    const color = (beatDetected && Math.random() < 0.38) || (onset > 0.04 && Math.random() < 0.18)
+    const color = (beatDetected && Math.random() < 0.45) || (onset > 0.04 && Math.random() < 0.22)
       ? pick(accentColors)
       : p.color;
 
     // Emit rate: more when strong, but capped.
     // Tie “macro” emission to beat/onset pulses: low idle trickle, big kick on beat.
-    const baseEmit = 4 + Math.floor(intensity * 8);
-    const beatEmit = beatDetected ? Math.floor(26 + intensity * 24) : 0;
-    const onsetEmit = onset > 0.035 ? Math.floor(10 + intensity * 14) : 0;
-    const emitCount = clamp(baseEmit + beatEmit + onsetEmit, 0, 90);
+    const baseEmit = 2 + Math.floor(intensity * 6);
+    const beatEmit = beatDetected ? Math.floor(20 + intensity * 22) : 0;
+    const onsetEmit = onset > 0.035 ? Math.floor(8 + intensity * 14) : 0;
+    const emitCount = clamp(baseEmit + beatEmit + onsetEmit, 0, 80);
     emitFrom(p.x, p.y, color, radius, emitCount);
+
+    // Big patch “wash” (stronger on beat/onset) to make areas read as large organic blobs.
+    if (beatDetected || onset > 0.04) {
+      const wash = beatDetected ? Math.floor(120 + intensity * 120) : Math.floor(40 + intensity * 60);
+      emitWash(p.x, p.y, color, radius * (beatDetected ? 1.05 : 0.9), wash);
+    }
 
     // Flow-field motion with blending between macro modes (“sickering” transitions).
     const a = flowVecForMode(state.macroMode, p.x, p.y, width, height, nowMs, wobble, energy, onset, beat);
