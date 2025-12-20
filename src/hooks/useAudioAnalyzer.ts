@@ -80,19 +80,18 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   // Initialize analyzer with options
   useEffect(() => {
     // NEU: Optimierte Standard-Optionen für bessere Beat-Erkennung
+    const externalOnBeat = options?.onBeat;
+    const externalOnEnergy = options?.onEnergy;
+    const externalOnFrequency = options?.onFrequency;
+
     const defaultOptions = {
       analyzeInterval: 33, // ~30Hz for smoother reactivity (energy still throttled in store)
       energyThreshold: 0.015, // Reduziert von 0.03 für empfindlichere Reaktion
       beatSensitivity: 1.2, // Erhöht von 0.8 für bessere Beat-Erkennung
       ...options,
-      onFrequency: (frequencies: Uint8Array) => {
-        const now = Date.now();
-        const interval = options?.frequencyInterval ?? 50; // default ~20Hz for frequency-driven visuals
-        if (now - lastFrequencyUpdateRef.current < interval) return;
-        lastFrequencyUpdateRef.current = now;
-        setFrequencyData(frequencies);
-      }
     };
+
+    const energyThreshold = defaultOptions.energyThreshold ?? 0.02;
     
     // Prüfen, ob bereits ein globaler Analyzer existiert
     if (!globalAnalyzer) {
@@ -104,6 +103,9 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
           
           // Audio als aktiv markieren
           setAudioActive(true);
+
+          // Zusätzlich: UI/Caller Callback
+          externalOnBeat?.(time);
         },
         onEnergy: (e) => {
           setEnergy(e);
@@ -115,7 +117,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
           }
           
           // NEU: Verbesserte Beat-Erkennung mit niedrigeren Schwellenwerten
-          if (e > (analyzerOptions.energyThreshold || 0.02)) { // Reduziert von 0.05 für empfindlichere Reaktion
+          if (e > energyThreshold) { // Reduziert von 0.05 für empfindlichere Reaktion
             const now = Date.now();
             const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
             
@@ -125,6 +127,19 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
               triggerBeat();
             }
           }
+
+          // Zusätzlich: UI/Caller Callback
+          externalOnEnergy?.(e);
+        },
+        onFrequency: (frequencies: Uint8Array) => {
+          const now = Date.now();
+          const interval = options?.frequencyInterval ?? 50; // default ~20Hz for frequency-driven visuals
+          if (now - lastFrequencyUpdateRef.current < interval) return;
+          lastFrequencyUpdateRef.current = now;
+          setFrequencyData(frequencies);
+
+          // Zusätzlich: UI/Caller Callback
+          externalOnFrequency?.(frequencies);
         },
         ...defaultOptions
       };
@@ -137,7 +152,38 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       // Verwende den existierenden globalen Analyzer
       analyzerRef.current = globalAnalyzer;
       // Keep global analyzer options in sync (intervals/callbacks/thresholds) with this hook.
-      globalAnalyzer.updateOptions(defaultOptions);
+      globalAnalyzer.updateOptions({
+        ...defaultOptions,
+        // Ensure global analyzer always keeps store updates AND forwards to UI callbacks.
+        onBeat: (time) => {
+          setBeatDetected(true);
+          triggerBeat();
+          setAudioActive(true);
+          externalOnBeat?.(time);
+        },
+        onEnergy: (e) => {
+          setEnergy(e);
+          updateEnergy(e);
+          if (e > 0.015) setAudioActive(true);
+          if (e > energyThreshold) {
+            const now = Date.now();
+            const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
+            if (timeSinceLastBeat > 80) {
+              setBeatDetected(true);
+              triggerBeat();
+            }
+          }
+          externalOnEnergy?.(e);
+        },
+        onFrequency: (frequencies: Uint8Array) => {
+          const now = Date.now();
+          const interval = options?.frequencyInterval ?? 50;
+          if (now - lastFrequencyUpdateRef.current < interval) return;
+          lastFrequencyUpdateRef.current = now;
+          setFrequencyData(frequencies);
+          externalOnFrequency?.(frequencies);
+        },
+      });
     }
     
     return () => {
@@ -159,11 +205,10 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       }
       
       // Vermeide mehrfache Initialisierungsversuche
-      if (initializeAttemptedRef.current || initializingRef.current || isGlobalInitializing) {
+      if (initializingRef.current || isGlobalInitializing) {
         return;
       }
       
-      initializeAttemptedRef.current = true;
       initializingRef.current = true;
       isGlobalInitializing = true;
       audioElementRef.current = audioElement;
@@ -171,6 +216,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       try {
         await analyzerRef.current.initialize(audioElement);
         setIsInitialized(true);
+        initializeAttemptedRef.current = true;
         // throttledLog('Audio analyzer initialized successfully', true);
         
         // Audio als aktiv markieren
@@ -196,6 +242,8 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
       setError(error);
+      // Allow retry on next user gesture (important for mobile Safari).
+      initializeAttemptedRef.current = false;
       // DEAKTIVIERT: Logging
       // console.error('Failed to initialize audio analyzer:', error);
       throw error;

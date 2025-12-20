@@ -26,6 +26,7 @@ export default function HomePage() {
   const baseSwordLevel = 1;
   
   const [isClient, setIsClient] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUIVisible, setIsUIVisible] = useState(true);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
@@ -84,6 +85,24 @@ export default function HomePage() {
       // KEIN Cleanup beim Unmount, da die Idle-Animation im Layout läuft
     };
   }, [setMusicPlaying]);
+
+  // IMPORTANT: Only render ONE audio UI at a time (desktop OR mobile).
+  // With multiple AudioControlPanels mounted, the global analyzer can attach to the wrong <audio> element,
+  // causing “music plays but sword stays idle”.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia('(min-width: 640px)'); // Tailwind `sm`
+    const update = () => setIsDesktop(!!mql.matches);
+    update();
+    try {
+      mql.addEventListener('change', update);
+      return () => mql.removeEventListener('change', update);
+    } catch {
+      // Safari fallback
+      (mql as any).addListener(update);
+      return () => (mql as any).removeListener(update);
+    }
+  }, []);
   
   // OPTIMIERT: Reduzierte Energie- und Beat-Logs
   useEffect(() => {
@@ -154,38 +173,51 @@ export default function HomePage() {
           />
         </div>
         
-        {/* NEU: AudioControlPanel immer sichtbar - Desktop: rechts, Mobile: oben */}
-        <div className={`absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 top-4 left-1/2 -translate-x-1/2 sm:bottom-auto transition-opacity duration-300 ${
-          isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}>
-          <div className="scale-125 origin-center ui-caps">
-            <AudioControlPanel 
-              onBeat={handleBeat} 
-              onEnergyChange={handleEnergyChange} 
-            />
+        {/* AudioControlPanel: Desktop only. Mobile lives behind the gear overlay so the sword stays the hero. */}
+        {isClient && isDesktop && (
+          <div className={`absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 transition-opacity duration-300 ${
+            isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}>
+            <div className="scale-125 origin-center ui-caps">
+              <AudioControlPanel 
+                onBeat={handleBeat} 
+                onEnergyChange={handleEnergyChange} 
+              />
+            </div>
           </div>
-        </div>
+        )}
         
         {/* SideButtons - Desktop: links, Mobile: im Modal */}
-        <div className={`hidden sm:flex absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10 transition-opacity duration-300 ${
-          isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}>
-          <div className="scale-125 origin-center ui-caps">
-            <SideButtons />
+        {isClient && isDesktop && (
+          <div className={`absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10 transition-opacity duration-300 ${
+            isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}>
+            <div className="scale-125 origin-center ui-caps">
+              <SideButtons />
+            </div>
           </div>
-        </div>
+        )}
         
-        {/* Mobile Steuerelemente - nur noch für SideButtons */}
-        <div className={`sm:hidden absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-300 ${
-          isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}>
-          <MobileControlsOverlay 
-            isOpen={isModalOpen}
-            onToggle={(open: boolean) => setIsModalOpen(open)}
-          />
-        </div>
+        {/* Mobile Steuerelemente - Gear overlay for all controls */}
+        {isClient && !isDesktop && (
+          <div className={`absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-300 ${
+            isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}>
+            <MobileControlsOverlay 
+              isOpen={isModalOpen}
+              onToggle={(open: boolean) => setIsModalOpen(open)}
+              onBeat={handleBeat}
+              onEnergyChange={handleEnergyChange}
+              onToggleUI={() => setIsUIVisible((v) => !v)}
+              onOpenWtf={() => setIsWtfOpen(true)}
+              onToggleLeaderboard={() => setIsLeaderboardOpen((v) => !v)}
+              isUIVisible={isUIVisible}
+            />
+          </div>
+        )}
 
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
+        {isClient && isDesktop && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0 ui-caps">
           {/* HIDE Button */}
           <button
@@ -200,18 +232,6 @@ export default function HomePage() {
             ) : (
               <IoMdEye className="text-grifter-blue text-3xl" />
             )}
-          </button>
-
-          {/* Config Button (MobileControlsOverlay Trigger) */}
-          <button
-            onClick={() => setIsModalOpen(!isModalOpen)}
-            className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue sm:hidden"
-            style={{
-              boxShadow: '0 0 16px rgba(62, 230, 255, 0.75)',
-            }}
-            aria-label="Config"
-          >
-            <svg className={`text-grifter-blue text-2xl transition-transform duration-300 ${isModalOpen ? 'rotate-90' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5C13.933 15.5 15.5 13.933 15.5 12C15.5 10.067 13.933 8.5 12 8.5C10.067 8.5 8.5 10.067 8.5 12C8.5 13.933 10.067 15.5 12 15.5Z" stroke="#3EE6FF" strokeWidth="2"/><path d="M19.4 15A1.65 1.65 0 0 0 21 13.35V10.65A1.65 1.65 0 0 0 19.4 9L18.13 7.13A1.65 1.65 0 0 0 16.35 6.6L13.65 6.6A1.65 1.65 0 0 0 12 5A1.65 1.65 0 0 0 10.35 6.6L7.65 6.6A1.65 1.65 0 0 0 5.87 7.13L4.6 9A1.65 1.65 0 0 0 3 10.65V13.35A1.65 1.65 0 0 0 4.6 15L5.87 16.87A1.65 1.65 0 0 0 7.65 17.4L10.35 17.4A1.65 1.65 0 0 0 12 19A1.65 1.65 0 0 0 13.65 17.4L16.35 17.4A1.65 1.65 0 0 0 18.13 16.87L19.4 15Z" stroke="#3EE6FF" strokeWidth="2"/></svg>
           </button>
 
           {/* WTF is this? */}
@@ -237,6 +257,7 @@ export default function HomePage() {
             <IoMdTrophy className="text-grifter-blue text-3xl" />
           </button>
         </div>
+        )}
 
         <WtfIsThisModal open={isWtfOpen} onClose={() => setIsWtfOpen(false)} />
 

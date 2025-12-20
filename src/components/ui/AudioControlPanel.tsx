@@ -218,6 +218,16 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     if (!audioRef.current) return;
     
     try {
+      // On mobile Safari, initialization sometimes needs to happen *after* a user gesture.
+      // If the auto-init failed earlier, retry here (safe: useAudioAnalyzer now allows retries).
+      if (!isInitialized) {
+        try {
+          await initialize(audioRef.current);
+        } catch {
+          // If it still fails, we still allow audio playback; visuals may remain idle.
+        }
+      }
+
       await resumeAudioContext();
       
       if (isPlaying) {
@@ -357,7 +367,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       </div>
 
       {/* Track Info */}
-      <div className="mb-2 w-full flex justify-center">
+      <div className="mb-2 w-full justify-center hidden sm:flex">
         <div className="text-xs font-bold font-press-start-2p track-label-style sm:text-sm text-center">
           {tracks[currentTrackIndex].name.split("").map((char, i) => {
             const { idx, color } = highlightPattern[highlightStep];
@@ -374,7 +384,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       </div>
 
       {/* Progress Bar direkt unter Trackname */}
-      <div className="mb-3 w-full flex justify-center">
+      <div className="mb-3 w-full justify-center hidden sm:flex">
         <div className="relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden"
              style={{ 
                boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
@@ -393,7 +403,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       </div>
 
       {/* Header mit Titel und Dankness */}
-      <div className="flex flex-col items-center mb-3 w-full">
+      <div className="hidden sm:flex flex-col items-center mb-3 w-full">
         <div className="mb-1 text-xs font-bold font-press-start-2p text-[#3EE6FF] sm:text-sm text-center" 
              style={{ 
                textShadow: '0 0 1px #3EE6FF',
