@@ -336,7 +336,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     });
     return positions;
   }, [currentLevel, level]);
-  
+
   // OPTIMIERT: Memoisierte Edge-Positionen
   const edgePositions = useMemo(() => {
     const positions: Array<EdgePosition> = [];
@@ -363,6 +363,25 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       centeredSwordLines: centerAsciiArt(art)
     };
   }, [currentLevel, level]);
+
+  // For power-up effects: treat blade as the primary “impact” area (handle/hilt should stay calmer).
+  const bladePositions = useMemo(() => {
+    return swordPositions.filter((p) => !isHandlePosition(p.x, p.y, centeredSwordLines));
+  }, [swordPositions, centeredSwordLines]);
+
+  const handlePositionsMemo = useMemo(() => {
+    return swordPositions.filter((p) => isHandlePosition(p.x, p.y, centeredSwordLines));
+  }, [swordPositions, centeredSwordLines]);
+
+  // Keep refs so the rAF scheduler can read without re-subscribing.
+  const bladePositionsRef = useRef<Array<SwordPosition>>(bladePositions);
+  const handlePositionsRef = useRef<Array<SwordPosition>>(handlePositionsMemo);
+  useEffect(() => {
+    bladePositionsRef.current = bladePositions;
+  }, [bladePositions]);
+  useEffect(() => {
+    handlePositionsRef.current = handlePositionsMemo;
+  }, [handlePositionsMemo]);
   
   // Zustände für visuelle Effekte
   const [glowIntensity, setGlowIntensity] = useState(0);
@@ -822,7 +841,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
           if ((beatStrength > 0.85 || onset > 0.03) && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
             const tempGlitchLevel = Math.min(3, Math.floor(glitchTier + (currentEnergy * 1.2)));
-            setUnicodeGlitches(generateUnicodeGlitches(swordPositions, tempGlitchLevel));
+            // Glitch L3 should primarily affect the blade; handle/hilt get only subtle echoes.
+            const unicodeBase = tempGlitchLevel >= 3 ? bladePositionsRef.current : swordPositions;
+            const unicode = generateUnicodeGlitches(unicodeBase, tempGlitchLevel);
+            // Add a tiny handle “echo” so it’s not completely dead, but stays subtle.
+            const handleEcho =
+              tempGlitchLevel >= 3 && handlePositionsRef.current.length
+                ? generateUnicodeGlitches(handlePositionsRef.current, 1).slice(0, 3)
+                : [];
+            setUnicodeGlitches([...unicode, ...handleEcho]);
               unicodeGlitchActiveRef.current = true;
             unicodeGlitchUntilRef.current = now + (beatStrength > 0.85 ? (glitchTier >= 3 ? 900 : 520) : (glitchTier >= 3 ? 650 : 360));
             effectsTriggered++;
@@ -843,7 +870,13 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             const freq = { ...glitchFrequency } as any;
             // boost level 3 frequency without exploding level 1/2
             freq[3] = Math.min(0.92, (freq[3] ?? 0.48) * freqMul);
-            setGlitchChars(generateGlitchChars(swordPositions, glitchTier, freq, glitchSymbols));
+            const glitchBase = glitchTier >= 3 ? bladePositionsRef.current : swordPositions;
+            const bladeGlitch = generateGlitchChars(glitchBase, glitchTier, freq, glitchSymbols);
+            const handleGlitch =
+              glitchTier >= 3 && handlePositionsRef.current.length
+                ? generateGlitchChars(handlePositionsRef.current, 1, freq, glitchSymbols).slice(0, 6)
+                : [];
+            setGlitchChars([...bladeGlitch, ...handleGlitch]);
             glitchCharsActiveRef.current = true;
             glitchCharsUntilRef.current = now + (glitchTier >= 3 ? 520 : 320);
             effectsTriggered++;
@@ -866,19 +899,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           const wantsSkew = glitchTier >= 2 && (currentBeat || beatStrength > 0.7) && now >= skewUntilRef.current;
           const wantsFade = glitchTier >= 3 && (currentBeat || onset > 0.05) && now >= fadeUntilRef.current;
           if (wantsBlur && effectsTriggered < MAX_EFFECTS_PER_UPDATE) {
-            setBlurredChars(generateBlurredChars(swordPositions, glitchTier));
+            setBlurredChars(generateBlurredChars(glitchTier >= 3 ? bladePositionsRef.current : swordPositions, glitchTier));
             blurActiveRef.current = true;
             blurUntilRef.current = now + (glitchTier >= 3 ? 520 : 340);
             effectsTriggered++;
           }
           if (wantsSkew && effectsTriggered < MAX_EFFECTS_PER_UPDATE) {
-            setSkewedChars(generateSkewedChars(swordPositions, glitchTier));
+            setSkewedChars(generateSkewedChars(glitchTier >= 3 ? bladePositionsRef.current : swordPositions, glitchTier));
             skewActiveRef.current = true;
             skewUntilRef.current = now + (glitchTier >= 3 ? 520 : 340);
             effectsTriggered++;
           }
           if (wantsFade && effectsTriggered < MAX_EFFECTS_PER_UPDATE) {
-            setFadedChars(generateFadedChars(swordPositions, glitchTier));
+            setFadedChars(generateFadedChars(bladePositionsRef.current, glitchTier));
             fadeActiveRef.current = true;
             fadeUntilRef.current = now + 650;
             effectsTriggered++;
