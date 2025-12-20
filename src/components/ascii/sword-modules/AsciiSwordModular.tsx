@@ -392,9 +392,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const [staticBackgroundNext, setStaticBackgroundNext] = useState<string[][] | null>(null);
   const [staticBackgroundBlend, setStaticBackgroundBlend] = useState<number>(0);
   const bgBlendStartRef = useRef<number>(0);
-  const BG_PATTERN_BLEND_MS = 2600;
+  const BG_PATTERN_BLEND_MS = 3200;
 
-  // Pattern-Wechsel: alle 10s (as a slow crossfade)
+  // Pattern-Wechsel: alle 20s (as a slow crossfade; calmer)
   useEffect(() => {
     const interval = setInterval(() => {
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
@@ -405,7 +405,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setStaticBackgroundBlend(0);
       bgBlendStartRef.current = Date.now();
       throttledLog('Background pattern blending to next');
-    }, 10000);
+    }, 20000);
     return () => clearInterval(interval);
   }, [getBackgroundDimensions]);
 
@@ -612,7 +612,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               beat: reactive.beat,
               beatDetected: beatDetectedRef.current,
               baseVeinPositions: baseBgPositionsRef.current,
-              maxEmits: 220,
+              maxEmits: 380,
             });
             organicPatchesRef.current = res.state;
             if (res.emitted.length) {
@@ -820,12 +820,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             }
 
             // --- Rare background regen (as a smooth blend, not a hard cut) ---
-            const BG_REGEN_COOLDOWN_MS = 4500;
+            const BG_REGEN_COOLDOWN_MS = 15000;
             if (
               now - lastBgRegenAtRef.current >= BG_REGEN_COOLDOWN_MS &&
               (
                 currentEnergy > 0.97 ||
-                (beatStrength > 0.9 && onset > 0.015 && Math.random() < 0.08)
+                (currentBeat && beatStrength > 0.92 && onset > 0.02 && Math.random() < 0.06)
               )
             ) {
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
