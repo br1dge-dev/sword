@@ -15,8 +15,9 @@ import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import BuildBadge from '@/components/ui/BuildBadge';
-import { IoMdEye, IoMdEyeOff, IoMdTrophy } from 'react-icons/io';
+import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle } from 'react-icons/io';
 import { useShallow } from 'zustand/react/shallow';
+import WtfIsThisModal from '@/components/ui/WtfIsThisModal';
 
 const HIGHLIGHT_COLORS = ['#F8E16C', '#FF3EC8', '#3EE6FF'] as const;
 
@@ -28,6 +29,7 @@ export default function HomePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUIVisible, setIsUIVisible] = useState(true);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isWtfOpen, setIsWtfOpen] = useState(false);
   const { energy, beatDetected, setMusicPlaying, swordColor } = useAudioReactionStore(
     useShallow((s) => ({
       energy: s.energy,
@@ -156,17 +158,21 @@ export default function HomePage() {
         <div className={`absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 top-4 left-1/2 -translate-x-1/2 sm:bottom-auto transition-opacity duration-300 ${
           isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}>
-          <AudioControlPanel 
-            onBeat={handleBeat} 
-            onEnergyChange={handleEnergyChange} 
-          />
+          <div className="scale-125 origin-center ui-caps">
+            <AudioControlPanel 
+              onBeat={handleBeat} 
+              onEnergyChange={handleEnergyChange} 
+            />
+          </div>
         </div>
         
         {/* SideButtons - Desktop: links, Mobile: im Modal */}
         <div className={`hidden sm:flex absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10 transition-opacity duration-300 ${
           isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}>
-          <SideButtons />
+          <div className="scale-125 origin-center ui-caps">
+            <SideButtons />
+          </div>
         </div>
         
         {/* Mobile Steuerelemente - nur noch für SideButtons */}
@@ -180,45 +186,59 @@ export default function HomePage() {
         </div>
 
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0 ui-caps">
           {/* HIDE Button */}
           <button
             onClick={() => setIsUIVisible(!isUIVisible)}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue"
             style={{
-              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+              boxShadow: '0 0 16px rgba(62, 230, 255, 0.75)',
             }}
           >
             {isUIVisible ? (
-              <IoMdEyeOff className="text-grifter-blue text-2xl" />
+              <IoMdEyeOff className="text-grifter-blue text-3xl" />
             ) : (
-              <IoMdEye className="text-grifter-blue text-2xl" />
+              <IoMdEye className="text-grifter-blue text-3xl" />
             )}
           </button>
 
           {/* Config Button (MobileControlsOverlay Trigger) */}
           <button
             onClick={() => setIsModalOpen(!isModalOpen)}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue sm:hidden"
+            className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue sm:hidden"
             style={{
-              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+              boxShadow: '0 0 16px rgba(62, 230, 255, 0.75)',
             }}
             aria-label="Config"
           >
             <svg className={`text-grifter-blue text-2xl transition-transform duration-300 ${isModalOpen ? 'rotate-90' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5C13.933 15.5 15.5 13.933 15.5 12C15.5 10.067 13.933 8.5 12 8.5C10.067 8.5 8.5 10.067 8.5 12C8.5 13.933 10.067 15.5 12 15.5Z" stroke="#3EE6FF" strokeWidth="2"/><path d="M19.4 15A1.65 1.65 0 0 0 21 13.35V10.65A1.65 1.65 0 0 0 19.4 9L18.13 7.13A1.65 1.65 0 0 0 16.35 6.6L13.65 6.6A1.65 1.65 0 0 0 12 5A1.65 1.65 0 0 0 10.35 6.6L7.65 6.6A1.65 1.65 0 0 0 5.87 7.13L4.6 9A1.65 1.65 0 0 0 3 10.65V13.35A1.65 1.65 0 0 0 4.6 15L5.87 16.87A1.65 1.65 0 0 0 7.65 17.4L10.35 17.4A1.65 1.65 0 0 0 12 19A1.65 1.65 0 0 0 13.65 17.4L16.35 17.4A1.65 1.65 0 0 0 18.13 16.87L19.4 15Z" stroke="#3EE6FF" strokeWidth="2"/></svg>
           </button>
 
+          {/* WTF is this? */}
+          <button
+            onClick={() => setIsWtfOpen(true)}
+            className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            style={{
+              boxShadow: '0 0 16px rgba(62, 230, 255, 0.75)',
+            }}
+            aria-label="WTF is this?"
+          >
+            <IoMdHelpCircle className="text-grifter-blue text-3xl" />
+          </button>
+
           {/* Leaderboard Button */}
           <button
             onClick={() => setIsLeaderboardOpen(!isLeaderboardOpen)}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue"
             style={{
-              boxShadow: '0 0 10px rgba(62, 230, 255, 0.5)',
+              boxShadow: '0 0 16px rgba(62, 230, 255, 0.75)',
             }}
           >
-            <IoMdTrophy className="text-grifter-blue text-2xl" />
+            <IoMdTrophy className="text-grifter-blue text-3xl" />
           </button>
         </div>
+
+        <WtfIsThisModal open={isWtfOpen} onClose={() => setIsWtfOpen(false)} />
 
         {/* Leaderboard Modal */}
         {isLeaderboardOpen && (

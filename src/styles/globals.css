@@ -83,7 +83,8 @@
 
 @layer base {
   body {
-    @apply font-mono antialiased;
+    @apply antialiased;
+    font-family: var(--font-ui), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     background-color: var(--color-bg-primary);
     color: var(--color-neon-green);
     overflow: hidden;
@@ -100,6 +101,16 @@
 }
 
 @layer components {
+  /* Use the UI pixel font explicitly where needed */
+  .font-ui {
+    font-family: var(--font-ui), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+
+  /* Uppercase everywhere in UI (do NOT apply this to ASCII sword containers) */
+  .ui-caps {
+    text-transform: uppercase;
+  }
+
   .ascii-container {
     @apply whitespace-pre font-mono leading-none;
     text-rendering: geometricPrecision;
