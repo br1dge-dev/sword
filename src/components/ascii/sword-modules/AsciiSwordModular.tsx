@@ -127,7 +127,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setDebugReactiveEnabled(false);
     }
   }, []);
-
+  
   const [debugReactive, setDebugReactive] = useState<{
     energy: number;
     bass: number;
@@ -385,94 +385,26 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     tileColors: null
   });
   
-  // OPTIMIERT: Hintergrund initialisieren mit Lazy-Rendering
-  useEffect(() => {
-    const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-    setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-    setBackgroundGenerated(false);
-    // Initialisiere Lebensdauer-Tracking für alle initialen Veins
-    const currentTime = Date.now();
-    const baseVeins = Math.floor(10 + (glitchLevel * 5));
-    const maxVeins = Math.min(50, baseVeins);
-    const initialVeins = generateColoredVeins(bgWidth, bgHeight, maxVeins, viewportWidth, viewportHeight);
-    initialVeins.forEach(vein => {
-      const key = `${vein.x}-${vein.y}`;
-      if (!veinsMapRef.current.has(key)) {
-        veinsMapRef.current.set(key, { vein, birth: currentTime });
-      }
-    });
-    // KEIN setColoredVeins mehr hier!
-    return () => {
-      clearAllIntervals();
-      clearBackgroundCache();
-    };
-    // Intentionally run only on mount: re-running on `glitchLevel` changes would
-    // reset background/veins mid-session and can feel jarring.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getBackgroundDimensions, clearAllIntervals, clearBackgroundCache]);
+  // NOTE: Legacy background init/resize effects removed.
+  // They duplicated the scaffold+patch background system and caused hard “cuts” / overrides.
   
-  // OPTIMIERT: Resize-Handler mit besserer Performance
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  // Smooth background pattern transitions (no hard cuts).
+  const [staticBackgroundNext, setStaticBackgroundNext] = useState<string[][] | null>(null);
+  const [staticBackgroundBlend, setStaticBackgroundBlend] = useState<number>(0);
+  const bgBlendStartRef = useRef<number>(0);
+  const BG_PATTERN_BLEND_MS = 2600;
 
-    let resizeTimeout: NodeJS.Timeout | null = null;
-
-    const handleResize = () => {
-      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-
-      // OPTIMIERT: Verwende aktuelle Viewport-Dimensionen für Lazy-Rendering
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-      
-      // OPTIMIERT: Statischen Hintergrund zurücksetzen, damit er neu generiert wird
-      setBackgroundGenerated(false);
-
-      const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
-      const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
-      const currentTime = Date.now();
-      const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins, viewportWidth, viewportHeight);
-      newVeins.forEach(vein => {
-        const key = `${vein.x}-${vein.y}`;
-        if (!veinsMapRef.current.has(key)) {
-          veinsMapRef.current.set(key, { vein, birth: currentTime });
-        }
-      });
-      // KEIN setColoredVeins mehr hier!
-    };
-
-    const debouncedResize = () => {
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-      }
-      resizeTimeout = setTimeout(handleResize, 250);
-    };
-
-    window.addEventListener('resize', debouncedResize);
-
-    return () => {
-      window.removeEventListener('resize', debouncedResize);
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-      }
-    };
-  }, [glitchLevel, getBackgroundDimensions]);
-  
-  // Pattern-Wechsel: alle 10s
+  // Pattern-Wechsel: alle 10s (as a slow crossfade)
   useEffect(() => {
     const interval = setInterval(() => {
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-      setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-      
-      // OPTIMIERT: Statischen Hintergrund zurücksetzen, damit er neu generiert wird
-      setBackgroundGenerated(false);
-      
-      throttledLog('Background pattern changed');
+      const next = padBackgroundRows(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+      setStaticBackgroundNext(next);
+      setStaticBackgroundBlend(0);
+      bgBlendStartRef.current = Date.now();
+      throttledLog('Background pattern blending to next');
     }, 10000);
     return () => clearInterval(interval);
   }, [getBackgroundDimensions]);
@@ -490,17 +422,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
   // OPTIMIERT: Statischer Hintergrund - nur einmal generieren und dann konstant halten
   const [staticBackground, setStaticBackground] = useState<string[][]>([]);
-  const [backgroundGenerated, setBackgroundGenerated] = useState(false);
   const idleVeinsLastUpdateRef = useRef<number>(0);
 
   // OPTIMIERT: Statischen Hintergrund nur einmal generieren
   useEffect(() => {
-    if (caveBackground.length > 0 && !backgroundGenerated) {
+    if (staticBackground.length === 0 && caveBackground.length > 0) {
       const paddedBackground = padBackgroundRows(caveBackground);
       setStaticBackground(paddedBackground);
-      setBackgroundGenerated(true);
     }
-  }, [caveBackground, backgroundGenerated]);
+  }, [caveBackground, staticBackground.length]);
 
   // OPTIMIERT: Reaktive Audio-Effekte für visuellen Impact
   const effectsRafIdRef = useRef<number | null>(null);
@@ -540,11 +470,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // When playback stops, immediately clear playback-driven visuals (no "keep going" state leak).
   useEffect(() => {
     if (isMusicPlaying) return;
-    tileLockedRef.current = false;
-    tileBirthTimeRef.current = 0;
-    currentTilesRef.current = [];
-    setColoredTiles([]);
-    setUnicodeGlitches([]);
+            tileLockedRef.current = false;
+                tileBirthTimeRef.current = 0;
+        currentTilesRef.current = [];
+        setColoredTiles([]);
+        setUnicodeGlitches([]);
     setEdgeEffects([]);
     setGlitchChars([]);
     setBlurredChars([]);
@@ -584,6 +514,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
         // --- Color cycle (moved into scheduler; avoids extra effect bursts) ---
         const now = Date.now();
+
+        // --- Background pattern crossfade step ---
+        if (staticBackgroundNext && staticBackgroundNext.length > 0) {
+          const start = bgBlendStartRef.current || now;
+          const t = Math.max(0, Math.min(1, (now - start) / BG_PATTERN_BLEND_MS));
+          // Ease-in-out (smoother than linear)
+          const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          setStaticBackgroundBlend(ease);
+          if (t >= 1) {
+            setStaticBackground(staticBackgroundNext);
+            setStaticBackgroundNext(null);
+            setStaticBackgroundBlend(0);
+          }
+        }
 
         const reactive = reactivityControllerRef.current!.update({
           nowMs,
@@ -654,7 +598,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
         // --- BACKGROUND: organic patches + afterglow (less “flashy”, more persistent) ---
         {
-          const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
           const playing = isMusicPlayingRef.current && !idleRef.current;
 
           // Emit colored “particles” from a few organic patches during playback.
@@ -844,7 +788,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             // --- Unicode glitches (no setTimeout; expiry handled here) ---
             if (unicodeGlitchActiveRef.current && now >= unicodeGlitchUntilRef.current) {
               unicodeGlitchActiveRef.current = false;
-              setUnicodeGlitches([]);
+      setUnicodeGlitches([]);
             }
 
             if ((beatStrength > 0.85 || onset > 0.03) && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
@@ -875,8 +819,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               }
             }
 
-            // --- Rare background regen ---
-            const BG_REGEN_COOLDOWN_MS = 4000;
+            // --- Rare background regen (as a smooth blend, not a hard cut) ---
+            const BG_REGEN_COOLDOWN_MS = 4500;
             if (
               now - lastBgRegenAtRef.current >= BG_REGEN_COOLDOWN_MS &&
               (
@@ -884,11 +828,13 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                 (beatStrength > 0.9 && onset > 0.015 && Math.random() < 0.08)
               )
             ) {
-              const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-              const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-              const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-              setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-              setBackgroundGenerated(false);
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
+              const next = padBackgroundRows(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+              setStaticBackgroundNext(next);
+              setStaticBackgroundBlend(0);
+              bgBlendStartRef.current = Date.now();
               lastBgRegenAtRef.current = now;
             }
           }
@@ -1051,6 +997,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         >
           <AsciiBackgroundCanvas
             pattern={staticBackground.length > 0 ? staticBackground : caveBackground}
+            patternB={staticBackgroundNext ?? undefined}
+            patternBlend={staticBackgroundBlend}
             veins={coloredVeins}
             width={((staticBackground.length > 0 ? staticBackground[0].length : caveBackground[0]?.length) || 160) * 10}
             height={((staticBackground.length > 0 ? staticBackground.length : caveBackground.length) || 100) * 14}
