@@ -834,11 +834,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
     const handlePositions = swordPositions.filter((p) => isHandlePosition(p.x, p.y, centeredSwordLines));
     const base = handlePositions.length ? handlePositions : swordPositions;
-    const pickSubset = (color: string) =>
-      base
-        .filter((p) => ((p.x * 19 + p.y * 11) % 23) === 0)
-        .slice(0, 16)
-        .map((p) => ({ ...p, color }));
+
+    // Ensure we ALWAYS render something visible (previous hash filter could yield 0 tiles depending on geometry).
+    const middleX = centeredSwordLines[0]?.length ? Math.floor(centeredSwordLines[0].length / 2) : 0;
+    const sorted = [...base].sort((a, b) => {
+      // prefer lower parts + closer to center
+      if (b.y !== a.y) return b.y - a.y;
+      return Math.abs(a.x - middleX) - Math.abs(b.x - middleX);
+    });
+
+    const pickSubset = (color: string) => {
+      const hashed = base.filter((p) => ((p.x * 19 + p.y * 11) % 23) === 0);
+      const seed = (hashed.length ? hashed : sorted).slice(0, 16);
+      return seed.map((p) => ({ ...p, color }));
+    };
 
     let phase = 0;
     const renderPilot = () => {
@@ -855,7 +864,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setColoredTiles(tiles);
 
       // gentle breathing glow
-      const glow = 0.012 + (phase % 4) * 0.006; // 0.012..0.030
+      const glow = 0.016 + (phase % 5) * 0.006; // 0.016..0.040 (still subtle but visible)
       setGlowIntensity(glow);
       phase++;
     };
