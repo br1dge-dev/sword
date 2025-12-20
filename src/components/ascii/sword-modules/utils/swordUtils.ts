@@ -209,10 +209,13 @@ export function getDarkerColor(hexColor: string, factor: number = 0.08): string 
   const g = parseInt(hex.slice(2, 4), 16);
   const b = parseInt(hex.slice(4, 6), 16);
   
-  // Erzeuge eine dunklere Version
-  const darkR = Math.floor(r * factor);
-  const darkG = Math.floor(g * factor);
-  const darkB = Math.floor(b * factor);
+  // IMPORTANT:
+  // `factor` is the *amount to darken* (0..1), e.g. 0.08 = 8% darker.
+  // Previous implementation multiplied by `factor` which made colors almost black by default.
+  const f = Math.max(0, Math.min(1, factor));
+  const darkR = Math.floor(r * (1 - f));
+  const darkG = Math.floor(g * (1 - f));
+  const darkB = Math.floor(b * (1 - f));
   
   // Konvertiere zurück in Hex
   return `rgb(${darkR}, ${darkG}, ${darkB})`;
