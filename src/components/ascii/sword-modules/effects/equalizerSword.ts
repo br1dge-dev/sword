@@ -13,19 +13,25 @@ export type EqGeometry = {
   bars: EqBar[];
 };
 
+export type EqGeometryOptions = {
+  includeHandle?: boolean;
+  includeEdges?: boolean;
+};
+
 export function buildEqualizerGeometry(
   centeredSwordLines: string[],
   swordPositions: SwordPosition[],
   barCount: number,
+  opts: EqGeometryOptions = {},
 ): EqGeometry {
   const positions = swordPositions.filter((p) => {
     const line = centeredSwordLines[p.y] ?? '';
     const ch = line[p.x] ?? ' ';
     if (ch === ' ') return false;
     // Prefer inner “fill” cells (exclude edges).
-    if (isEdgeChar(ch)) return false;
+    if (!opts.includeEdges && isEdgeChar(ch)) return false;
     // Avoid handle area for the bar fill (keeps a cleaner blade-like EQ).
-    if (isHandlePosition(p.x, p.y, centeredSwordLines)) return false;
+    if (!opts.includeHandle && isHandlePosition(p.x, p.y, centeredSwordLines)) return false;
     return true;
   });
 

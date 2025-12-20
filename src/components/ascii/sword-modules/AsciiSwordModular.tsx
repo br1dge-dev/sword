@@ -622,7 +622,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   }, [isMusicPlaying]);
 
   const eqGeom = useMemo(() => {
-    return buildEqualizerGeometry(centeredSwordLines, swordPositions, 16);
+    // Include handle/knob so the whole sword can “play” as a display.
+    return buildEqualizerGeometry(centeredSwordLines, swordPositions, 16, { includeHandle: true, includeEdges: false });
   }, [centeredSwordLines, swordPositions]);
 
   useEffect(() => {
@@ -748,12 +749,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                 peakHoldMs: 280,
                 peakDecayPerSec: 0.9,
               });
+              // Boost reactivity: amplify low/mid energy and compress highs for punchy bars.
+              const gain = 2.2;
+              const gamma = 0.65;
+              const boosted = raw.map((v) => Math.min(1, Math.pow(Math.min(1, v * gain), gamma)));
               const stepped = stepEqState(
                 eqStateRef.current,
-                raw,
+                boosted,
                 nowMs,
                 eqLastMsRef.current,
-                { barCount: 16, attackMs: 60, releaseMs: 220, peakHoldMs: 280, peakDecayPerSec: 0.9 },
+                { barCount: 16, attackMs: 55, releaseMs: 260, peakHoldMs: 420, peakDecayPerSec: 0.7 },
                 eqPeakHoldUntilRef.current,
               );
               eqLastMsRef.current = nowMs;
@@ -761,8 +766,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               eqStateRef.current = stepped.state;
 
               const eqTiles = renderEqTiles(eqGeom, stepped.state);
-              currentTilesRef.current = eqTiles;
-              setColoredTiles(eqTiles);
+              // Add a bit of “old chaos” on top (controlled) so it doesn’t feel too sterile.
+              let mergedTiles = eqTiles;
+              const chaosChance = Math.min(0.28, 0.06 + onset * 2.2 + beatStrength * 0.12);
+              if ((currentBeat || onset > 0.02) && Math.random() < chaosChance) {
+                const chaos = generateColoredTiles(swordPositions, currentGlitchLevel, colorEffectIntensity, Math.min(1, currentEnergy + onset));
+                // Merge with cap (avoid huge arrays); chaos overlays EQ where it overlaps.
+                const byKey = new Map<string, { x: number; y: number; color: string }>();
+                for (const t of eqTiles) byKey.set(`${t.x},${t.y}`, t);
+                for (const t of chaos.slice(0, 80)) byKey.set(`${t.x},${t.y}`, t);
+                mergedTiles = Array.from(byKey.values());
+              }
+
+              currentTilesRef.current = mergedTiles;
+              setColoredTiles(mergedTiles);
               tileLockedRef.current = true;
               tileBirthTimeRef.current = now;
             }
