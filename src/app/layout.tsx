@@ -7,7 +7,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Inter, Press_Start_2P, VT323 } from 'next/font/google';
+import { Inter, Press_Start_2P, Silkscreen } from 'next/font/google';
 import { useAudioReactionStore, useIdleAnimation } from '@/store/audioReactionStore';
 import '../styles/globals.css';
 import { useShallow } from 'zustand/react/shallow';
@@ -23,11 +23,11 @@ const pressStart2P = Press_Start_2P({
   display: 'swap',
 });
 
-// Console / DOS-style font for most UI text (less “modern” than Inter).
-const vt323 = VT323({
+// NES-ish pixel font for UI text (chunkier, less condensed than VT323).
+const silkscreen = Silkscreen({
   weight: '400',
   subsets: ['latin'],
-  variable: '--font-console',
+  variable: '--font-ui',
   display: 'swap',
 });
 
@@ -59,7 +59,7 @@ export default function RootLayout({
   }, [startIdle, stopIdle]);
   
   return (
-    <html lang="en" className={`dark overflow-hidden ${pressStart2P.variable} ${vt323.variable}`}>
+    <html lang="en" className={`dark overflow-hidden ${pressStart2P.variable} ${silkscreen.variable}`}>
       <head>
         <title>GR1FTSWORD – ASCII Art & Music Experience</title>
         <meta name="description" content="GR1FTSWORD brings ASCII art and music together. Created by br1dge, with a lot of help from Cursor AI and Suno." />
@@ -82,7 +82,7 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/android-chrome-192x192.png" />
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/android-chrome-512x512.png" />
       </head>
-      <body className={`min-h-screen overflow-hidden font-console`} style={{
+      <body className={`min-h-screen overflow-hidden font-ui`} style={{
         backgroundColor: 'var(--color-bg-primary)',
         backgroundImage: 'radial-gradient(circle at 50% 50%, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%)',
       }}>
