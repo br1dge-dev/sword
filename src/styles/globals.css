@@ -129,6 +129,73 @@
     pointer-events: none;
     z-index: 10;
   }
+
+  /* Light scanlines (requested: leicht sichtbar) */
+  .scanlines-light::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.12),
+      rgba(0, 0, 0, 0.12) 1px,
+      rgba(0, 0, 0, 0) 1px,
+      rgba(0, 0, 0, 0) 3px
+    );
+    pointer-events: none;
+    z-index: 20;
+    mix-blend-mode: multiply;
+    animation: scanlineFlicker 6s linear infinite;
+  }
+
+  @keyframes scanlineFlicker {
+    0% { opacity: 0.85; transform: translateY(0px); }
+    50% { opacity: 1; transform: translateY(1px); }
+    100% { opacity: 0.85; transform: translateY(0px); }
+  }
+
+  /* CRT glow + tube feel */
+  .crt-glow {
+    position: relative;
+  }
+
+  .crt-glow::before {
+    content: "";
+    position: absolute;
+    inset: -6%;
+    pointer-events: none;
+    z-index: 18;
+    background:
+      radial-gradient(ellipse at center,
+        rgba(62, 230, 255, 0.10) 0%,
+        rgba(255, 62, 200, 0.06) 28%,
+        rgba(0, 252, 166, 0.05) 52%,
+        rgba(0, 0, 0, 0) 70%);
+    filter: blur(10px);
+    mix-blend-mode: screen;
+    opacity: 0.55;
+  }
+
+  .crt-tube {
+    position: relative;
+    transform: perspective(900px) rotateX(2deg);
+    transform-origin: center;
+  }
+
+  .crt-tube::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 19;
+    background:
+      radial-gradient(ellipse at center,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(0, 0, 0, 0) 55%,
+        rgba(0, 0, 0, 0.35) 85%,
+        rgba(0, 0, 0, 0.55) 100%);
+    border-radius: inherit;
+  }
   
   /* Horizontale Scanlines nur für den Hintergrund */
   .horizontal-scanlines {
