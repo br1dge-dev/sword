@@ -65,6 +65,13 @@ import { generateFrequencyVeins } from './effects/frequencyVeins';
 import { getIdleTilesForIndex, nextIdleTilesColorIndex } from './effects/idleTiles';
 import { generateReactiveEdgeEffects } from './effects/edgeEffects';
 import { createReactivityController } from './effects/reactivityController';
+import {
+  buildEqualizerGeometry,
+  computeEqBands,
+  renderEqTiles,
+  stepEqState,
+  type EqState,
+} from './effects/equalizerSword';
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
 import { useSwordAudioState, useSwordPowerUpState } from './hooks/useSwordStores';
@@ -576,6 +583,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const colorStabilityRef = useRef<number>(colorStability);
   const lastBgRegenAtRef = useRef<number>(0);
   const isMusicPlayingRef = useRef<boolean>(isMusicPlaying);
+  const eqLastMsRef = useRef<number>(0);
+  const eqPeakHoldUntilRef = useRef<number[]>(Array.from({ length: 16 }, () => 0));
+  const eqStateRef = useRef<EqState>({ levels: Array.from({ length: 16 }, () => 0), peaks: Array.from({ length: 16 }, () => 0) });
 
   // “Reactivity Controller”: stable audio features (bands + onset) for more immersive mapping
   const reactivityControllerRef = useRef<ReturnType<typeof createReactivityController> | null>(null);
@@ -610,6 +620,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     setFadedChars([]);
     setGlowIntensity(0);
   }, [isMusicPlaying]);
+
+  const eqGeom = useMemo(() => {
+    // Include handle/knob so the whole sword can “play” as a display.
+    return buildEqualizerGeometry(centeredSwordLines, swordPositions, 16, { includeHandle: true, includeEdges: false });
+  }, [centeredSwordLines, swordPositions]);
 
   useEffect(() => {
     lastColorChangeTimeRef.current = lastColorChangeTime;
@@ -724,12 +739,60 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               effectsTriggered++;
             }
 
+            // --- Sword Equalizer (16 bars) ---
+            // Drives coloredTiles as the main “display” during playback (no intervals; same scheduler).
+            if (frequencyDataRef.current && frequencyDataRef.current.length) {
+              const raw = computeEqBands(frequencyDataRef.current, {
+                barCount: 16,
+                attackMs: 60,
+                releaseMs: 220,
+                peakHoldMs: 280,
+                peakDecayPerSec: 0.9,
+              });
+              // Boost reactivity: amplify low/mid energy and compress highs for punchy bars.
+              const gain = 2.2;
+              const gamma = 0.65;
+              const boosted = raw.map((v) => Math.min(1, Math.pow(Math.min(1, v * gain), gamma)));
+              const stepped = stepEqState(
+                eqStateRef.current,
+                boosted,
+                nowMs,
+                eqLastMsRef.current,
+                { barCount: 16, attackMs: 55, releaseMs: 260, peakHoldMs: 420, peakDecayPerSec: 0.7 },
+                eqPeakHoldUntilRef.current,
+              );
+              eqLastMsRef.current = nowMs;
+              eqPeakHoldUntilRef.current = stepped.peakHoldUntilMs;
+              eqStateRef.current = stepped.state;
+
+              const eqTiles = renderEqTiles(eqGeom, stepped.state);
+              // Add a bit of “old chaos” on top (controlled) so it doesn’t feel too sterile.
+              let mergedTiles = eqTiles;
+              const chaosChance = Math.min(0.28, 0.06 + onset * 2.2 + beatStrength * 0.12);
+              if ((currentBeat || onset > 0.02) && Math.random() < chaosChance) {
+                const chaos = generateColoredTiles(swordPositions, currentGlitchLevel, colorEffectIntensity, Math.min(1, currentEnergy + onset));
+                // Merge with cap (avoid huge arrays); chaos overlays EQ where it overlaps.
+                const byKey = new Map<string, { x: number; y: number; color: string }>();
+                for (const t of eqTiles) byKey.set(`${t.x},${t.y}`, t);
+                for (const t of chaos.slice(0, 80)) byKey.set(`${t.x},${t.y}`, t);
+                mergedTiles = Array.from(byKey.values());
+              }
+
+              currentTilesRef.current = mergedTiles;
+              setColoredTiles(mergedTiles);
+              tileLockedRef.current = true;
+              tileBirthTimeRef.current = now;
+            }
+
             // --- Tiles (no setTimeout; lifecycle handled here) ---
             if (tileLockedRef.current && tileBirthTimeRef.current > 0) {
               const age = now - tileBirthTimeRef.current;
               if (age >= TILE_LOCK_MS) {
-                currentTilesRef.current = [];
-                setColoredTiles([]);
+                // If equalizer is active, we keep tiles alive (they are refreshed each tick).
+                if (!(isMusicPlayingRef.current && frequencyDataRef.current && frequencyDataRef.current.length)) {
+                  currentTilesRef.current = [];
+                  setColoredTiles([]);
+                }
                 tileBirthTimeRef.current = 0;
                 tileLockedRef.current = false;
               }
@@ -739,7 +802,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               currentBeat ||
               (onset > 0.012 && (bass > 0.05 || mid > 0.05)) ||
               currentEnergy > 0.03;
-            if (shouldTriggerTiles && !tileLockedRef.current) {
+            // If equalizer is active, don't spam random tile clusters.
+            if (shouldTriggerTiles && !tileLockedRef.current && !(frequencyDataRef.current && frequencyDataRef.current.length)) {
               const tempIntensity = { ...colorEffectIntensity };
               for (const level in tempIntensity) {
                 if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
@@ -823,7 +887,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       if (effectsRafIdRef.current !== null) cancelAnimationFrame(effectsRafIdRef.current);
       effectsRafIdRef.current = null;
     };
-  }, [chargeLevel, debugReactiveEnabled, edgePositions, getBackgroundDimensions, swordPositions]);
+  }, [chargeLevel, debugReactiveEnabled, edgePositions, eqGeom, getBackgroundDimensions, swordPositions]);
   
   // Edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
   
