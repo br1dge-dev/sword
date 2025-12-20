@@ -52,7 +52,15 @@ import {
 import { generateCaveBackground, generateColoredVeins, generateIdleVeinSequence, generateBeatVeins } from './effects/backgroundEffects';
 import { generateHarmonicColorPair } from './effects/colorEffects';
 import { computeAdaptiveColorCycle, computeOptimizedColorCycle } from './effects/colorCycle';
-import { computeBeatVeinLifetimeMs, mapToVeins, pruneVeinsByLifetime, replaceVeinsInMap } from './effects/veinLifecycle';
+import {
+  computeBeatVeinLifetimeMs,
+  mapToVeins,
+  mapToVeinsWithFade,
+  pruneVeinsByLifetime,
+  pruneVeinsByLifetimeWithFade,
+  replaceVeinsInMap,
+  upsertVeinsInMap,
+} from './effects/veinLifecycle';
 import {
   generateEdgeGlitches,
   generateUnicodeGlitches,
@@ -65,6 +73,7 @@ import { generateFrequencyVeins } from './effects/frequencyVeins';
 import { getIdleTilesForIndex, nextIdleTilesColorIndex } from './effects/idleTiles';
 import { generateReactiveEdgeEffects } from './effects/edgeEffects';
 import { createReactivityController } from './effects/reactivityController';
+import { createOrganicPatchState, tickOrganicPatches } from './effects/organicPatches';
 import {
   buildEqualizerGeometry,
   computeEqBands,
@@ -118,7 +127,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setDebugReactiveEnabled(false);
     }
   }, []);
-
+  
   const [debugReactive, setDebugReactive] = useState<{
     energy: number;
     bass: number;
@@ -173,6 +182,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
   // Vein-Handling als Map
   const veinsMapRef = useRef(new Map<string, {vein: {x: number, y: number, color: string}, birth: number}>());
+  // Stable “monochrome scaffold” veins; overlay veins live in `veinsMapRef` (and fade out).
+  const [baseBgVeins, setBaseBgVeins] = useState<Array<{ x: number; y: number; color: string }>>([]);
+  const baseBgVeinsRef = useRef<Array<{ x: number; y: number; color: string }>>([]);
+  const baseBgPositionsRef = useRef<Array<{ x: number; y: number }>>([]);
+  const organicPatchesRef = useRef(createOrganicPatchState());
+
+  useEffect(() => {
+    baseBgVeinsRef.current = baseBgVeins;
+    baseBgPositionsRef.current = baseBgVeins.map((v) => ({ x: v.x, y: v.y }));
+  }, [baseBgVeins]);
 
   // OPTIMIERT: Memoisierte Berechnungen für bessere Performance
   const getBackgroundDimensions = useCallback(() => {
@@ -225,16 +244,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
     const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
     setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-    const currentTime = Date.now();
-    const baseVeins = Math.floor(10 + (glitchLevel * 5));
-    const maxVeins = Math.min(50, baseVeins);
-    const initialVeins = generateColoredVeins(bgWidth, bgHeight, maxVeins, viewportWidth, viewportHeight);
-    initialVeins.forEach(vein => {
-      const key = `${vein.x}-${vein.y}`;
-      // Wenn schon vorhanden, Zeitstempel aktualisieren
-      veinsMapRef.current.set(key, { vein, birth: currentTime });
-    });
-    setColoredVeins(mapToVeins(veinsMapRef.current));
+    // Stable, slightly dim scaffold (monochrome), so reactive patches can “colorize” neighbors.
+    const scaffoldCount = Math.min(1600, Math.max(750, Math.floor((bgWidth * bgHeight) / 16)));
+    const scaffold = generateColoredVeins(bgWidth, bgHeight, scaffoldCount, viewportWidth, viewportHeight)
+      .map((v) => ({ ...v, color: '#646B74' }));
+    setBaseBgVeins(scaffold);
+
+    // Reset overlay state on init for determinism.
+    veinsMapRef.current.clear();
+    organicPatchesRef.current = createOrganicPatchState();
+    setColoredVeins(scaffold);
     return () => {
       clearAllIntervals();
       clearBackgroundCache();
@@ -250,15 +269,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-      const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
-      const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
-      const currentTime = Date.now();
-      const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins, viewportWidth, viewportHeight);
-      newVeins.forEach(vein => {
-        const key = `${vein.x}-${vein.y}`;
-        veinsMapRef.current.set(key, { vein, birth: currentTime });
-      });
-      setColoredVeins(mapToVeins(veinsMapRef.current));
+      const scaffoldCount = Math.min(1600, Math.max(750, Math.floor((bgWidth * bgHeight) / 16)));
+      const scaffold = generateColoredVeins(bgWidth, bgHeight, scaffoldCount, viewportWidth, viewportHeight)
+        .map((v) => ({ ...v, color: '#646B74' }));
+      setBaseBgVeins(scaffold);
+
+      // Keep overlay, but re-render combined output after resize.
+      const now = Date.now();
+      const overlay = mapToVeinsWithFade(veinsMapRef.current as any, now, 9000, 6500);
+      setColoredVeins([...scaffold, ...overlay]);
     };
     const debouncedResize = () => {
       if (resizeTimeout) {
@@ -275,9 +294,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     };
   }, [glitchLevel, getBackgroundDimensions]);
 
-  // Vein-Generierung: Mehr Aktivität, Debug-Log
-  const veinLoopRafIdRef = useRef<number | null>(null);
-  const veinLoopLastTickRef = useRef<number>(0);
+  // Vein-Generierung: handled by the main rAF scheduler (organic patches + afterglow).
+  // Keep these refs for reactive reads (used by scheduler).
   const energyRef = useRef<number>(energy);
   const beatDetectedRef = useRef<boolean>(beatDetected);
 
@@ -289,102 +307,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     beatDetectedRef.current = beatDetected;
   }, [beatDetected]);
 
-  useEffect(() => {
-    // Keep the previous effective cadence (~100ms), but schedule via rAF to reduce timer jitter.
-    const TICK_MS = 100;
-    const VEIN_TTL_MS = 10000;
-
-    let cancelled = false;
-
-    const tick = (nowMs: number) => {
-      if (cancelled) return;
-
-      if (nowMs - veinLoopLastTickRef.current >= TICK_MS) {
-        veinLoopLastTickRef.current = nowMs;
-
-        const now = Date.now();
-        const currentEnergy = energyRef.current;
-        const currentBeatDetected = beatDetectedRef.current;
-
-        // Hole aktuelle Background-Dimensionen
-        const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-
-        let changed = false;
-
-        // Entferne abgelaufene Veins
-        veinsMapRef.current.forEach((value, key) => {
-          if (now - value.birth > VEIN_TTL_MS) {
-            veinsMapRef.current.delete(key);
-            changed = true;
-          }
-        });
-
-        // Dynamische Vein-Generierung
-        let newVeins = 0;
-        if (currentEnergy > 0.05 && veinsMapRef.current.size < maxVeinsRef.current) {
-          const count = Math.floor(Math.random() * 11) + 10; // 10–20 neue Veins
-          for (let i = 0; i < count; i++) {
-            let x, y, pos, tries = 0;
-            do {
-              x = Math.floor(Math.random() * bgWidth);
-              y = Math.floor(Math.random() * bgHeight);
-              pos = `${x}_${y}`;
-              tries++;
-            } while (veinsMapRef.current.has(pos) && tries < 10);
-            if (!veinsMapRef.current.has(pos)) {
-              const color = accentColors[Math.floor(Math.random() * accentColors.length)];
-              veinsMapRef.current.set(pos, { vein: { x, y, color }, birth: now });
-              newVeins++;
-              changed = true;
-            }
-          }
-        }
-
-        if (currentBeatDetected && veinsMapRef.current.size < maxVeinsRef.current) {
-          const count = Math.floor(Math.random() * 21) + 30; // 30–50 neue Veins
-          for (let i = 0; i < count; i++) {
-            let x, y, pos, tries = 0;
-            do {
-              x = Math.floor(Math.random() * bgWidth);
-              y = Math.floor(Math.random() * bgHeight);
-              pos = `${x}_${y}`;
-              tries++;
-            } while (veinsMapRef.current.has(pos) && tries < 10);
-            if (!veinsMapRef.current.has(pos)) {
-              const color = accentColors[Math.floor(Math.random() * accentColors.length)];
-              veinsMapRef.current.set(pos, { vein: { x, y, color }, birth: now });
-              newVeins++;
-              changed = true;
-            }
-          }
-        }
-
-        if (changed) {
-          setColoredVeins(mapToVeins(veinsMapRef.current));
-        }
-
-        // Debug-Log nur bei signifikanten Änderungen
-        if (newVeins > 0) {
-          if (now - lastVeinLogTimeRef.current > 10000) {
-            throttledLog(`Veins active: ${veinsMapRef.current.size}, new: ${newVeins}, energy: ${currentEnergy.toFixed(2)}`);
-            lastVeinLogTimeRef.current = now;
-          }
-        }
-      }
-
-      veinLoopRafIdRef.current = requestAnimationFrame(tick);
-    };
-
-    veinLoopRafIdRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      cancelled = true;
-      if (veinLoopRafIdRef.current !== null) {
-        cancelAnimationFrame(veinLoopRafIdRef.current);
-      }
-      veinLoopRafIdRef.current = null;
-    };
-  }, [getBackgroundDimensions]);
+  // NOTE: Removed old background vein loop (it overwrote the new patch/afterglow system and caused “flashy” resets).
 
   // NOTE: Removed duplicate 100ms prune-only interval.
   // The interval above (Vein-Generierung) already prunes expired veins and updates the overlay.
@@ -462,95 +385,27 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     tileColors: null
   });
   
-  // OPTIMIERT: Hintergrund initialisieren mit Lazy-Rendering
-  useEffect(() => {
-    const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-    setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-    setBackgroundGenerated(false);
-    // Initialisiere Lebensdauer-Tracking für alle initialen Veins
-    const currentTime = Date.now();
-    const baseVeins = Math.floor(10 + (glitchLevel * 5));
-    const maxVeins = Math.min(50, baseVeins);
-    const initialVeins = generateColoredVeins(bgWidth, bgHeight, maxVeins, viewportWidth, viewportHeight);
-    initialVeins.forEach(vein => {
-      const key = `${vein.x}-${vein.y}`;
-      if (!veinsMapRef.current.has(key)) {
-        veinsMapRef.current.set(key, { vein, birth: currentTime });
-      }
-    });
-    // KEIN setColoredVeins mehr hier!
-    return () => {
-      clearAllIntervals();
-      clearBackgroundCache();
-    };
-    // Intentionally run only on mount: re-running on `glitchLevel` changes would
-    // reset background/veins mid-session and can feel jarring.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getBackgroundDimensions, clearAllIntervals, clearBackgroundCache]);
+  // NOTE: Legacy background init/resize effects removed.
+  // They duplicated the scaffold+patch background system and caused hard “cuts” / overrides.
   
-  // OPTIMIERT: Resize-Handler mit besserer Performance
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  // Smooth background pattern transitions (no hard cuts).
+  const [staticBackgroundNext, setStaticBackgroundNext] = useState<string[][] | null>(null);
+  const [staticBackgroundBlend, setStaticBackgroundBlend] = useState<number>(0);
+  const bgBlendStartRef = useRef<number>(0);
+  const BG_PATTERN_BLEND_MS = 3200;
 
-    let resizeTimeout: NodeJS.Timeout | null = null;
-
-    const handleResize = () => {
-      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-
-      // OPTIMIERT: Verwende aktuelle Viewport-Dimensionen für Lazy-Rendering
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-      
-      // OPTIMIERT: Statischen Hintergrund zurücksetzen, damit er neu generiert wird
-      setBackgroundGenerated(false);
-
-      const veinMultiplier = veinIntensity[glitchLevel as keyof typeof veinIntensity] || 1;
-      const numVeins = Math.floor((bgWidth * bgHeight) / (300 / veinMultiplier));
-      const currentTime = Date.now();
-      const newVeins = generateColoredVeins(bgWidth, bgHeight, numVeins, viewportWidth, viewportHeight);
-      newVeins.forEach(vein => {
-        const key = `${vein.x}-${vein.y}`;
-        if (!veinsMapRef.current.has(key)) {
-          veinsMapRef.current.set(key, { vein, birth: currentTime });
-        }
-      });
-      // KEIN setColoredVeins mehr hier!
-    };
-
-    const debouncedResize = () => {
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-      }
-      resizeTimeout = setTimeout(handleResize, 250);
-    };
-
-    window.addEventListener('resize', debouncedResize);
-
-    return () => {
-      window.removeEventListener('resize', debouncedResize);
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-      }
-    };
-  }, [glitchLevel, getBackgroundDimensions]);
-  
-  // Pattern-Wechsel: alle 10s
+  // Pattern-Wechsel: alle 20s (as a slow crossfade; calmer)
   useEffect(() => {
     const interval = setInterval(() => {
       const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-      setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-      
-      // OPTIMIERT: Statischen Hintergrund zurücksetzen, damit er neu generiert wird
-      setBackgroundGenerated(false);
-      
-      throttledLog('Background pattern changed');
-    }, 10000);
+      const next = padBackgroundRows(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+      setStaticBackgroundNext(next);
+      setStaticBackgroundBlend(0);
+      bgBlendStartRef.current = Date.now();
+      throttledLog('Background pattern blending to next');
+    }, 20000);
     return () => clearInterval(interval);
   }, [getBackgroundDimensions]);
 
@@ -567,17 +422,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
   // OPTIMIERT: Statischer Hintergrund - nur einmal generieren und dann konstant halten
   const [staticBackground, setStaticBackground] = useState<string[][]>([]);
-  const [backgroundGenerated, setBackgroundGenerated] = useState(false);
   const idleVeinsLastUpdateRef = useRef<number>(0);
 
   // OPTIMIERT: Statischen Hintergrund nur einmal generieren
   useEffect(() => {
-    if (caveBackground.length > 0 && !backgroundGenerated) {
+    if (staticBackground.length === 0 && caveBackground.length > 0) {
       const paddedBackground = padBackgroundRows(caveBackground);
       setStaticBackground(paddedBackground);
-      setBackgroundGenerated(true);
     }
-  }, [caveBackground, backgroundGenerated]);
+  }, [caveBackground, staticBackground.length]);
 
   // OPTIMIERT: Reaktive Audio-Effekte für visuellen Impact
   const effectsRafIdRef = useRef<number | null>(null);
@@ -617,11 +470,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // When playback stops, immediately clear playback-driven visuals (no "keep going" state leak).
   useEffect(() => {
     if (isMusicPlaying) return;
-    tileLockedRef.current = false;
-    tileBirthTimeRef.current = 0;
-    currentTilesRef.current = [];
-    setColoredTiles([]);
-    setUnicodeGlitches([]);
+            tileLockedRef.current = false;
+                tileBirthTimeRef.current = 0;
+        currentTilesRef.current = [];
+        setColoredTiles([]);
+        setUnicodeGlitches([]);
     setEdgeEffects([]);
     setGlitchChars([]);
     setBlurredChars([]);
@@ -661,6 +514,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
         // --- Color cycle (moved into scheduler; avoids extra effect bursts) ---
         const now = Date.now();
+
+        // --- Background pattern crossfade step ---
+        if (staticBackgroundNext && staticBackgroundNext.length > 0) {
+          const start = bgBlendStartRef.current || now;
+          const t = Math.max(0, Math.min(1, (now - start) / BG_PATTERN_BLEND_MS));
+          // Ease-in-out (smoother than linear)
+          const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          setStaticBackgroundBlend(ease);
+          if (t >= 1) {
+            setStaticBackground(staticBackgroundNext);
+            setStaticBackgroundNext(null);
+            setStaticBackgroundBlend(0);
+          }
+        }
 
         const reactive = reactivityControllerRef.current!.update({
           nowMs,
@@ -727,6 +594,75 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             lastColorChangeTimeRef.current = now;
             colorStabilityRef.current = optimized.newStability;
           }
+        }
+
+        // --- BACKGROUND: organic patches + afterglow (less “flashy”, more persistent) ---
+        {
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+          const playing = isMusicPlayingRef.current && !idleRef.current;
+
+          // Emit colored “particles” from a few organic patches during playback.
+          if (playing) {
+            const res = tickOrganicPatches(organicPatchesRef.current, {
+              nowMs,
+              width: bgWidth,
+              height: bgHeight,
+              energy: reactive.energy,
+              onset: reactive.onset,
+              beat: reactive.beat,
+              beatDetected: beatDetectedRef.current,
+              baseVeinPositions: baseBgPositionsRef.current,
+              maxEmits: 380,
+            });
+            organicPatchesRef.current = res.state;
+            if (res.emitted.length) {
+              upsertVeinsInMap(veinsMapRef.current as any, res.emitted, now);
+            }
+
+            // Occasional extra “burst” on beat/onset (feels like patches breathe + cough color).
+            if (beatDetectedRef.current || reactive.onset > 0.28) {
+              const burst = generateBeatVeins(
+                bgWidth,
+                bgHeight,
+                Math.min(1, reactive.energy * 1.15),
+                beatDetectedRef.current,
+                typeof window !== 'undefined' ? window.innerWidth : bgWidth,
+                typeof window !== 'undefined' ? window.innerHeight : bgHeight,
+              ).slice(0, 160);
+              if (burst.length) upsertVeinsInMap(veinsMapRef.current as any, burst, now);
+            }
+          }
+
+          // Afterglow: longer life + fade-out, no hard cut.
+          const lifetimeMs = playing ? Math.floor(9000 + reactive.energy * 9000) : 2500;
+          const fadeMs = playing ? 7000 : 2500;
+
+          // Hard cap overlay size (prevent runaway)
+          const MAX_OVERLAY = 2200;
+          if (veinsMapRef.current.size > MAX_OVERLAY) {
+            // First pass: delete older half-life entries
+            const softAge = Math.floor(lifetimeMs * 0.55);
+            Array.from(veinsMapRef.current.entries()).forEach(([k, v]) => {
+              if (now - v.birth > softAge) veinsMapRef.current.delete(k);
+            });
+            // Still too big: delete arbitrary until under cap
+            if (veinsMapRef.current.size > MAX_OVERLAY) {
+              let toDrop = veinsMapRef.current.size - MAX_OVERLAY;
+              // Avoid iterating MapIterator directly (TS downlevelIteration/target mismatch in this project).
+              for (const key of Array.from(veinsMapRef.current.keys())) {
+                veinsMapRef.current.delete(key);
+                toDrop--;
+                if (toDrop <= 0) break;
+              }
+            }
+          }
+
+          pruneVeinsByLifetimeWithFade(veinsMapRef.current as any, now, lifetimeMs, fadeMs);
+          const overlay = mapToVeinsWithFade(veinsMapRef.current as any, now, lifetimeMs, fadeMs);
+
+          // Combine stable scaffold + overlay (overlay wins on same cell).
+          const combined = baseBgVeinsRef.current.length ? [...baseBgVeinsRef.current, ...overlay] : overlay;
+          setColoredVeins(combined);
         }
 
         // Only generate playback effects when music is actually playing.
@@ -852,7 +788,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             // --- Unicode glitches (no setTimeout; expiry handled here) ---
             if (unicodeGlitchActiveRef.current && now >= unicodeGlitchUntilRef.current) {
               unicodeGlitchActiveRef.current = false;
-              setUnicodeGlitches([]);
+      setUnicodeGlitches([]);
             }
 
             if ((beatStrength > 0.85 || onset > 0.03) && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
@@ -883,20 +819,22 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               }
             }
 
-            // --- Rare background regen ---
-            const BG_REGEN_COOLDOWN_MS = 4000;
+            // --- Rare background regen (as a smooth blend, not a hard cut) ---
+            const BG_REGEN_COOLDOWN_MS = 15000;
             if (
               now - lastBgRegenAtRef.current >= BG_REGEN_COOLDOWN_MS &&
               (
                 currentEnergy > 0.97 ||
-                (beatStrength > 0.9 && onset > 0.015 && Math.random() < 0.08)
+                (currentBeat && beatStrength > 0.92 && onset > 0.02 && Math.random() < 0.06)
               )
             ) {
-              const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-              const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-              const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-              setCaveBackground(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
-              setBackgroundGenerated(false);
+      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
+              const next = padBackgroundRows(generateCaveBackground(bgWidth, bgHeight, viewportWidth, viewportHeight));
+              setStaticBackgroundNext(next);
+              setStaticBackgroundBlend(0);
+              bgBlendStartRef.current = Date.now();
               lastBgRegenAtRef.current = now;
             }
           }
@@ -982,104 +920,21 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     };
   }, [idleVisual, swordPositions, centeredSwordLines]);
 
-  // --- ALLE ANIMATIONEN NUR WENN NICHT IDLE ---
-  useEffect(() => {
-    if (idle) return;
-    // OPTIMIERT: Dynamische Beat-Vein-Generierung für bessere Visualisierung
-    if (beatDetected || energy > 0.05) { // Empfindlicher: ab 0.05 Energy
-      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-      
-      // OPTIMIERT: Verwende neue Beat-Vein-Funktion für bessere Performance
-      const currentTime = Date.now();
-      
-      // Generiere Beat-Veins basierend auf Energy und Beat
-      const beatVeins = generateBeatVeins(bgWidth, bgHeight, energy, beatDetected, viewportWidth, viewportHeight);
-      
-      // Ersetze alle bestehenden Veins mit den neuen Beat-Veins
-      replaceVeinsInMap(veinsMapRef.current, beatVeins, currentTime);
-      
-      // Setze das State-Array für das Rendering
-      setColoredVeins(mapToVeins(veinsMapRef.current));
-      
-      // OPTIMIERT: Längere Lebensdauer für Beat-Veins (4-10 Sekunden)
-      const veinLifetime = computeBeatVeinLifetimeMs(energy, beatDetected);
-      
-      // Cleanup nach der Lebensdauer
-      const timeout = setTimeout(() => {
-        const now = Date.now();
-        const changed = pruneVeinsByLifetime(veinsMapRef.current, now, veinLifetime);
-        
-        if (changed) {
-          setColoredVeins(mapToVeins(veinsMapRef.current));
-        }
-      }, veinLifetime);
-      
-      cleanupTimeoutsRef.current.add(timeout);
-    }
-    
-  }, [beatDetected, energy, glitchLevel, swordPositions, getBackgroundDimensions, idle]);
+  // NOTE: Beat/energy background veins are handled by the main rAF scheduler (patches + afterglow).
   
-  // OPTIMIERT: Separater useEffect für Idle-Animation (nur wenn Musik NICHT spielt)
-  useEffect(() => {
-    if (idle) {
-      // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
-      if (isMusicPlaying) {
-        return;
-      }
-      
-      const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : bgWidth;
-      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : bgHeight;
-      
-      // Idle cadence: do NOT advance on every idle beat; keep it slow and calm.
-      const now = Date.now();
-      const IDLE_VEINS_STEP_MS = 9000;
-      if (now - idleVeinsLastUpdateRef.current < IDLE_VEINS_STEP_MS) return;
-      idleVeinsLastUpdateRef.current = now;
-      idleStepRef.current = (idleStepRef.current + 1) % 10; // 10 steps per loop
-      
-      // Generiere vordefinierte Vein-Sequenz für den aktuellen Schritt
-      const idleVeinsRaw = generateIdleVeinSequence(bgWidth, bgHeight, idleStepRef.current, viewportWidth, viewportHeight);
-      // Idle should be subtle: thin out + dim the accent colors
-      const idleVeins = idleVeinsRaw
-        .filter((_, i) => i % 4 === 0)
-        .map((v) => ({ ...v, color: getDarkerColor(getDarkerColor(getDarkerColor(v.color))) }));
-      
-      // Ersetze alle bestehenden Veins mit der Idle-Sequenz
-      const currentTime = Date.now();
-      replaceVeinsInMap(veinsMapRef.current, idleVeins, currentTime);
-      
-      // Setze das State-Array für das Rendering
-      setColoredVeins(mapToVeins(veinsMapRef.current));
-    }
-  }, [idle, getBackgroundDimensions, isMusicPlaying, beatDetected]);
+  // NOTE: Idle background veins are now the stable scaffold + fading overlay decay (no extra timers).
   
   // Color cycle + edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
 
-  // In der useEffect für die Vein-Generierung:
-  useEffect(() => {
-    // Only drive frequency veins during playback; idle has its own calmer vein sequence.
-    if (idle || !isMusicPlaying) return;
-    if (!frequencyData) return;
-    const { width: bgWidth, height: bgHeight } = getBackgroundDimensions();
-    const now = Date.now();
-    const veins = generateFrequencyVeins({
-      frequencyData,
-      bgWidth,
-      bgHeight,
-      nowMs: now,
-      beatDetected,
-    });
-    setColoredVeins(veins);
-  }, [frequencyData, beatDetected, getBackgroundDimensions, idle, isMusicPlaying]);
+  // NOTE: Frequency-reactive background visuals are handled by the patch controller (onset/beat/energy),
+  // so we don’t overwrite the afterglow system with a direct setColoredVeins().
   
   // OPTIMIERT: Memoisierte Berechnungen für Rendering
   const shadowSize = useMemo(() => Math.floor(glowIntensity * 20), [glowIntensity]);
   const textShadow = useMemo(() => `0 0 ${shadowSize + (glitchLevel * 2)}px ${baseColor}`, [shadowSize, glitchLevel, baseColor]);
   // Background should stay dark even when bgColor is a vivid complementary neon.
-  const backgroundColor = useMemo(() => getDarkerColor(bgColor, 0.88), [bgColor]);
+  // Slightly lighter than “near-black”, still dark: makes veins readable without neon wash.
+  const backgroundColor = useMemo(() => getDarkerColor(bgColor, 0.45), [bgColor]);
   const lighterBgColor = useMemo(() => getLighterColor(bgColor), [bgColor]);
 
   const setSwordColor = useAudioReactionStore(state => state.setSwordColor);
@@ -1142,6 +997,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         >
           <AsciiBackgroundCanvas
             pattern={staticBackground.length > 0 ? staticBackground : caveBackground}
+            patternB={staticBackgroundNext ?? undefined}
+            patternBlend={staticBackgroundBlend}
             veins={coloredVeins}
             width={((staticBackground.length > 0 ? staticBackground[0].length : caveBackground[0]?.length) || 160) * 10}
             height={((staticBackground.length > 0 ? staticBackground.length : caveBackground.length) || 100) * 14}
