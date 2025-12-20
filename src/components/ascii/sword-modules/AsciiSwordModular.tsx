@@ -96,6 +96,14 @@ const EQ_PALETTES: EqPalette[] = [
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
   const { currentLevel, chargeLevel, glitchLevel } = useSwordPowerUpState();
+  const currentLevelRef2 = useRef<number>(currentLevel);
+  const levelPropRef = useRef<number>(level);
+  useEffect(() => {
+    currentLevelRef2.current = currentLevel;
+  }, [currentLevel]);
+  useEffect(() => {
+    levelPropRef.current = level;
+  }, [level]);
   
   // Audio-Reaktionsdaten abrufen
   const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying, idle } = useSwordAudioState();
@@ -328,7 +336,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     });
     return positions;
   }, [currentLevel, level]);
-  
+
   // OPTIMIERT: Memoisierte Edge-Positionen
   const edgePositions = useMemo(() => {
     const positions: Array<EdgePosition> = [];
@@ -355,6 +363,25 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       centeredSwordLines: centerAsciiArt(art)
     };
   }, [currentLevel, level]);
+
+  // For power-up effects: treat blade as the primary “impact” area (handle/hilt should stay calmer).
+  const bladePositions = useMemo(() => {
+    return swordPositions.filter((p) => !isHandlePosition(p.x, p.y, centeredSwordLines));
+  }, [swordPositions, centeredSwordLines]);
+
+  const handlePositionsMemo = useMemo(() => {
+    return swordPositions.filter((p) => isHandlePosition(p.x, p.y, centeredSwordLines));
+  }, [swordPositions, centeredSwordLines]);
+
+  // Keep refs so the rAF scheduler can read without re-subscribing.
+  const bladePositionsRef = useRef<Array<SwordPosition>>(bladePositions);
+  const handlePositionsRef = useRef<Array<SwordPosition>>(handlePositionsMemo);
+  useEffect(() => {
+    bladePositionsRef.current = bladePositions;
+  }, [bladePositions]);
+  useEffect(() => {
+    handlePositionsRef.current = handlePositionsMemo;
+  }, [handlePositionsMemo]);
   
   // Zustände für visuelle Effekte
   const [glowIntensity, setGlowIntensity] = useState(0);
@@ -393,6 +420,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const [staticBackgroundBlend, setStaticBackgroundBlend] = useState<number>(0);
   const bgBlendStartRef = useRef<number>(0);
   const BG_PATTERN_BLEND_MS = 3200;
+  const staticBackgroundNextRef = useRef<string[][] | null>(null);
+  useEffect(() => {
+    staticBackgroundNextRef.current = staticBackgroundNext;
+  }, [staticBackgroundNext]);
 
   // Pattern-Wechsel: alle 20s (as a slow crossfade; calmer)
   useEffect(() => {
@@ -441,6 +472,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const unicodeGlitchActiveRef = useRef<boolean>(false);
   const edgeEffectsUntilRef = useRef<number>(0);
   const edgeEffectsActiveRef = useRef<boolean>(false);
+  const glitchCharsUntilRef = useRef<number>(0);
+  const glitchCharsActiveRef = useRef<boolean>(false);
+  const blurUntilRef = useRef<number>(0);
+  const blurActiveRef = useRef<boolean>(false);
+  const skewUntilRef = useRef<number>(0);
+  const skewActiveRef = useRef<boolean>(false);
+  const fadeUntilRef = useRef<number>(0);
+  const fadeActiveRef = useRef<boolean>(false);
   const lastColorChangeTimeRef = useRef<number>(lastColorChangeTime);
   const colorStabilityRef = useRef<number>(colorStability);
   const lastBgRegenAtRef = useRef<number>(0);
@@ -516,14 +555,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         const now = Date.now();
 
         // --- Background pattern crossfade step ---
-        if (staticBackgroundNext && staticBackgroundNext.length > 0) {
+        const nextBg = staticBackgroundNextRef.current;
+        if (nextBg && nextBg.length > 0) {
           const start = bgBlendStartRef.current || now;
           const t = Math.max(0, Math.min(1, (now - start) / BG_PATTERN_BLEND_MS));
           // Ease-in-out (smoother than linear)
           const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
           setStaticBackgroundBlend(ease);
           if (t >= 1) {
-            setStaticBackground(staticBackgroundNext);
+            setStaticBackground(nextBg);
             setStaticBackgroundNext(null);
             setStaticBackgroundBlend(0);
           }
@@ -681,13 +721,18 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             // Track last tick time (kept for debugging/consistency with existing code)
             lastUpdateTimeRef.current = now;
 
-            let effectsTriggered = 0;
-            const MAX_EFFECTS_PER_UPDATE = 1;
+          let effectsTriggered = 0;
+          const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
+          const chargeTier = Math.max(1, Math.min(3, chargeLevel || 1));
+          const glitchTier = Math.max(0, Math.min(3, currentGlitchLevel || 0));
+          // L1 subtle, L2 ~current, L3 much more stacked.
+          const MAX_EFFECTS_PER_UPDATE = forgeTier === 1 ? 1 : forgeTier === 2 ? 2 : 3;
 
-            // --- Glow ---
-            if ((currentBeat && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || onset > 0.01 || currentEnergy > 0.03) {
-              const base = 0.03 + 0.22 * Math.min(1, (bass * 0.7 + currentEnergy * 0.3) + beatStrength * 0.25);
-              const randomIntensity = base + Math.random() * 0.04;
+          // --- Glow (forge-tiered) ---
+          if ((currentBeat && effectsTriggered < MAX_EFFECTS_PER_UPDATE) || onset > 0.01 || currentEnergy > 0.03) {
+            const forgeGlowMul = forgeTier === 1 ? 0.65 : forgeTier === 2 ? 1.0 : 1.35;
+            const base = (0.025 + 0.22 * Math.min(1, (bass * 0.7 + currentEnergy * 0.3) + beatStrength * 0.25)) * forgeGlowMul;
+            const randomIntensity = base + Math.random() * (forgeTier === 1 ? 0.02 : forgeTier === 2 ? 0.04 : 0.06);
               setGlowIntensity(randomIntensity);
               effectsTriggered++;
             }
@@ -730,13 +775,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               const eqTiles = renderEqTiles(eqGeom, stepped.state, palette);
               // Add a bit of “old chaos” on top (controlled) so it doesn’t feel too sterile.
               let mergedTiles = eqTiles;
-              const chaosChance = Math.min(0.28, 0.06 + onset * 2.2 + beatStrength * 0.12);
+              const forgeChaosMul = forgeTier === 1 ? 0.55 : forgeTier === 2 ? 1.0 : 1.45;
+              const chaosChance = Math.min(0.5, (0.05 + onset * 2.2 + beatStrength * 0.12) * forgeChaosMul);
               if ((currentBeat || onset > 0.02) && Math.random() < chaosChance) {
-                const chaos = generateColoredTiles(swordPositions, currentGlitchLevel, colorEffectIntensity, Math.min(1, currentEnergy + onset));
+                const chaos = generateColoredTiles(swordPositions, glitchTier, colorEffectIntensity, Math.min(1, currentEnergy + onset));
                 // Merge with cap (avoid huge arrays); chaos overlays EQ where it overlaps.
                 const byKey = new Map<string, { x: number; y: number; color: string }>();
                 for (const t of eqTiles) byKey.set(`${t.x},${t.y}`, t);
-                for (const t of chaos.slice(0, 80)) byKey.set(`${t.x},${t.y}`, t);
+                const chaosCap = forgeTier === 1 ? 35 : forgeTier === 2 ? 90 : 170;
+                for (const t of chaos.slice(0, chaosCap)) byKey.set(`${t.x},${t.y}`, t);
                 mergedTiles = Array.from(byKey.values());
               }
 
@@ -760,24 +807,25 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               }
             }
 
-            const shouldTriggerTiles =
+          const shouldTriggerTiles =
               currentBeat ||
               (onset > 0.012 && (bass > 0.05 || mid > 0.05)) ||
               currentEnergy > 0.03;
             // If equalizer is active, don't spam random tile clusters.
-            if (shouldTriggerTiles && !tileLockedRef.current && !(frequencyDataRef.current && frequencyDataRef.current.length)) {
+          if (shouldTriggerTiles && !tileLockedRef.current && !(frequencyDataRef.current && frequencyDataRef.current.length)) {
               const tempIntensity = { ...colorEffectIntensity };
               for (const level in tempIntensity) {
                 if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
                   const numLevel = Number(level) as keyof typeof colorEffectIntensity;
-                  tempIntensity[numLevel] = Math.min(
-                    2,
-                    tempIntensity[numLevel] + Math.floor(currentEnergy * (currentBeat ? 1 : 0.5)),
-                  );
+                const cap = forgeTier === 1 ? 2 : forgeTier === 2 ? 4 : 8;
+                tempIntensity[numLevel] = Math.min(
+                  cap,
+                  tempIntensity[numLevel] + Math.floor(currentEnergy * (currentBeat ? 1.2 : 0.6)),
+                );
                 }
               }
 
-              const generatedTiles = generateColoredTiles(swordPositions, currentGlitchLevel, tempIntensity, currentEnergy);
+            const generatedTiles = generateColoredTiles(swordPositions, glitchTier, tempIntensity, currentEnergy);
               currentTilesRef.current = generatedTiles;
               tileBirthTimeRef.current = now;
               setColoredTiles(generatedTiles);
@@ -791,12 +839,83 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setUnicodeGlitches([]);
             }
 
-            if ((beatStrength > 0.85 || onset > 0.03) && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
-              const tempGlitchLevel = Math.min(1, Math.floor(currentGlitchLevel + (currentEnergy * 1.0)));
-              setUnicodeGlitches(generateUnicodeGlitches(swordPositions, tempGlitchLevel));
+          if ((beatStrength > 0.85 || onset > 0.03) && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
+            const tempGlitchLevel = Math.min(3, Math.floor(glitchTier + (currentEnergy * 1.2)));
+            // Glitch L3 should primarily affect the blade; handle/hilt get only subtle echoes.
+            const unicodeBase = tempGlitchLevel >= 3 ? bladePositionsRef.current : swordPositions;
+            const unicode = generateUnicodeGlitches(unicodeBase, tempGlitchLevel);
+            // Add a tiny handle “echo” so it’s not completely dead, but stays subtle.
+            const handleEcho =
+              tempGlitchLevel >= 3 && handlePositionsRef.current.length
+                ? generateUnicodeGlitches(handlePositionsRef.current, 1).slice(0, 3)
+                : [];
+            setUnicodeGlitches([...unicode, ...handleEcho]);
               unicodeGlitchActiveRef.current = true;
-              unicodeGlitchUntilRef.current = now + (beatStrength > 0.85 ? 520 : 360);
+            unicodeGlitchUntilRef.current = now + (beatStrength > 0.85 ? (glitchTier >= 3 ? 900 : 520) : (glitchTier >= 3 ? 650 : 360));
+            effectsTriggered++;
             }
+
+          // --- DOS glitch chars (reintroduced, tiered) ---
+          if (glitchCharsActiveRef.current && now >= glitchCharsUntilRef.current) {
+            glitchCharsActiveRef.current = false;
+      setGlitchChars([]);
+          }
+          const wantsGlitchChars =
+            glitchTier >= 2 &&
+            (currentBeat || beatStrength > 0.7 || onset > 0.04) &&
+            effectsTriggered < MAX_EFFECTS_PER_UPDATE &&
+            now >= glitchCharsUntilRef.current;
+          if (wantsGlitchChars) {
+            const freqMul = glitchTier === 2 ? 1.0 : 1.45;
+            const freq = { ...glitchFrequency } as any;
+            // boost level 3 frequency without exploding level 1/2
+            freq[3] = Math.min(0.92, (freq[3] ?? 0.48) * freqMul);
+            const glitchBase = glitchTier >= 3 ? bladePositionsRef.current : swordPositions;
+            const bladeGlitch = generateGlitchChars(glitchBase, glitchTier, freq, glitchSymbols);
+            const handleGlitch =
+              glitchTier >= 3 && handlePositionsRef.current.length
+                ? generateGlitchChars(handlePositionsRef.current, 1, freq, glitchSymbols).slice(0, 6)
+                : [];
+            setGlitchChars([...bladeGlitch, ...handleGlitch]);
+            glitchCharsActiveRef.current = true;
+            glitchCharsUntilRef.current = now + (glitchTier >= 3 ? 520 : 320);
+            effectsTriggered++;
+          }
+
+          // --- Blur / Skew / Fade layers (glitch-tiered, makes L3 feel “unhinged”) ---
+          if (blurActiveRef.current && now >= blurUntilRef.current) {
+            blurActiveRef.current = false;
+      setBlurredChars([]);
+          }
+          if (skewActiveRef.current && now >= skewUntilRef.current) {
+            skewActiveRef.current = false;
+      setSkewedChars([]);
+          }
+          if (fadeActiveRef.current && now >= fadeUntilRef.current) {
+            fadeActiveRef.current = false;
+      setFadedChars([]);
+          }
+          const wantsBlur = glitchTier >= 2 && (onset > 0.03 || beatStrength > 0.55) && now >= blurUntilRef.current;
+          const wantsSkew = glitchTier >= 2 && (currentBeat || beatStrength > 0.7) && now >= skewUntilRef.current;
+          const wantsFade = glitchTier >= 3 && (currentBeat || onset > 0.05) && now >= fadeUntilRef.current;
+          if (wantsBlur && effectsTriggered < MAX_EFFECTS_PER_UPDATE) {
+            setBlurredChars(generateBlurredChars(glitchTier >= 3 ? bladePositionsRef.current : swordPositions, glitchTier));
+            blurActiveRef.current = true;
+            blurUntilRef.current = now + (glitchTier >= 3 ? 520 : 340);
+            effectsTriggered++;
+          }
+          if (wantsSkew && effectsTriggered < MAX_EFFECTS_PER_UPDATE) {
+            setSkewedChars(generateSkewedChars(glitchTier >= 3 ? bladePositionsRef.current : swordPositions, glitchTier));
+            skewActiveRef.current = true;
+            skewUntilRef.current = now + (glitchTier >= 3 ? 520 : 340);
+            effectsTriggered++;
+          }
+          if (wantsFade && effectsTriggered < MAX_EFFECTS_PER_UPDATE) {
+            setFadedChars(generateFadedChars(bladePositionsRef.current, glitchTier));
+            fadeActiveRef.current = true;
+            fadeUntilRef.current = now + 650;
+            effectsTriggered++;
+          }
 
             // --- Edge effects (no setTimeout; expiry handled here) ---
             if (edgeEffectsActiveRef.current && now >= edgeEffectsUntilRef.current) {
@@ -804,18 +923,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               setEdgeEffects([]);
             }
 
-            if ((beatStrength > 0.6 || onset > 0.02 || currentEnergy > 0.03) && edgePositions.length > 0) {
+          if ((beatStrength > 0.6 || onset > 0.02 || currentEnergy > 0.03) && edgePositions.length > 0) {
               // Regenerate if expired or on new beat.
               if (!edgeEffectsActiveRef.current || currentBeat) {
                 const { effects, cleanupMs } = generateReactiveEdgeEffects({
                   edgePositions,
                   chargeLevel,
-                  energy: Math.min(1, currentEnergy + onset * 0.8),
+                energy: Math.min(1, currentEnergy + onset * 0.9 + (chargeTier >= 3 ? beatStrength * 0.25 : 0)),
                   beatDetected: currentBeat,
                 });
                 setEdgeEffects(effects);
                 edgeEffectsActiveRef.current = true;
-                edgeEffectsUntilRef.current = now + cleanupMs;
+              // L3 charge: let it linger slightly longer
+              edgeEffectsUntilRef.current = now + (chargeTier >= 3 ? Math.floor(cleanupMs * 1.35) : cleanupMs);
               }
             }
 
