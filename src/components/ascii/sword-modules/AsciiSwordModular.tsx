@@ -75,6 +75,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // Audio-Reaktionsdaten abrufen
   const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying, idle } = useSwordAudioState();
+
+  // Treat "paused" as idle-visual state immediately (store idle starts after delay; visuals shouldn't keep raging).
+  const idleVisual = idle || !isMusicPlaying;
   
   // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
   const energy = directEnergy !== undefined ? directEnergy : storeEnergy;
@@ -568,6 +571,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const lastColorChangeTimeRef = useRef<number>(lastColorChangeTime);
   const colorStabilityRef = useRef<number>(colorStability);
   const lastBgRegenAtRef = useRef<number>(0);
+  const isMusicPlayingRef = useRef<boolean>(isMusicPlaying);
 
   // “Reactivity Controller”: stable audio features (bands + onset) for more immersive mapping
   const reactivityControllerRef = useRef<ReturnType<typeof createReactivityController> | null>(null);
@@ -582,6 +586,26 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     idleRef.current = idle;
   }, [idle]);
+
+  useEffect(() => {
+    isMusicPlayingRef.current = isMusicPlaying;
+  }, [isMusicPlaying]);
+
+  // When playback stops, immediately clear playback-driven visuals (no "keep going" state leak).
+  useEffect(() => {
+    if (isMusicPlaying) return;
+    tileLockedRef.current = false;
+    tileBirthTimeRef.current = 0;
+    currentTilesRef.current = [];
+    setColoredTiles([]);
+    setUnicodeGlitches([]);
+    setEdgeEffects([]);
+    setGlitchChars([]);
+    setBlurredChars([]);
+    setSkewedChars([]);
+    setFadedChars([]);
+    setGlowIntensity(0);
+  }, [isMusicPlaying]);
 
   useEffect(() => {
     lastColorChangeTimeRef.current = lastColorChangeTime;
@@ -665,8 +689,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }
         }
 
-        // Stop effect generation during idle (idle system has its own visuals).
-        if (!idleRef.current) {
+        // Only generate playback effects when music is actually playing.
+        // (Paused state should not keep spawning tiles/glow/glitches.)
+        if (!idleRef.current && isMusicPlayingRef.current) {
           const currentEnergy = reactive.energy;
           const currentBeat = beatDetectedRef.current;
           const currentGlitchLevel = glitchLevelRef.current;
@@ -794,66 +819,54 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   
   // Edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
   
-  // --- IDLE TILE COLOR CYCLE ---
+  // --- IDLE SWORD "SPARFLAMME" (pilot light) ---
+  // Goal: subtle, slow, visible; and also used during the pause->idle transition (idleVisual).
   useEffect(() => {
-    if (idle) {
-      // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
-      if (isMusicPlaying) {
-        // ENTFERNT: Sofortiges Entfernen der Tiles - Musik-Effekte sollen leben bleiben
-        return;
-      }
-      
-      // Im Idle: Alle Animationen stoppen
-      setGlowIntensity(0);
-      setGlitchChars([]);
-      setUnicodeGlitches([]);
-      setEdgeEffects([]);
-      setBlurredChars([]);
-      setSkewedChars([]);
-      setFadedChars([]);
-      // Starte sanften Farbwechsel für Tiles
-      let colorIndex = 0;
+    if (!idleVisual) return;
 
-      // Subtle idle tiles: only a small deterministic subset + dimmed colors (previously this colored the whole sword).
-      const buildIdleTiles = (idx: number) => {
-        const full = getIdleTilesForIndex(swordPositions, idx);
-        if (!full.length) return full;
-        // dim the chosen accent color (twice) for less intensity in idle
-        const dimColor = getDarkerColor(getDarkerColor(getDarkerColor(full[0].color ?? '#00FCA6')));
-        // deterministic ~6% subset to avoid flicker (stable across renders)
-        return full
-          .filter((p) => ((p.x * 13 + p.y * 7) % 17) === 0)
-          .map((p) => ({ ...p, color: dimColor }));
-      };
-      
-      // Always set idle tiles (subtle) while idle; music tiles will overwrite when playback starts.
-      const initialIdleTiles = buildIdleTiles(colorIndex);
-      currentTilesRef.current = initialIdleTiles;
-      tileBirthTimeRef.current = Date.now();
-      setColoredTiles(initialIdleTiles);
-      
-      const interval = setInterval(() => {
-        // Prüfe nochmal, ob Musik läuft
-        if (isMusicPlaying) {
-          clearInterval(interval);
-          // ENTFERNT: Sofortiges Entfernen der Tiles - Musik-Effekte sollen leben bleiben
-          return;
-        }
-        
-        colorIndex = nextIdleTilesColorIndex(colorIndex);
-        const idleTiles = buildIdleTiles(colorIndex);
-        currentTilesRef.current = idleTiles;
-        tileBirthTimeRef.current = Date.now();
-        setColoredTiles(idleTiles);
-      }, 3500); // slower + calmer in idle
-      return () => {
-        clearInterval(interval);
-        // ENTFERNT: Sofortiges Entfernen der Tiles beim Cleanup
-      };
-    }
-    // ENTFERNT: Sofortiges Entfernen der Tiles wenn Idle verlassen wird
-    // Musik-Effekte sollen ihre natürliche Lebensdauer haben
-  }, [swordPositions, isMusicPlaying, idle]);
+    // Stop any aggressive visuals during idle/pause and show only a tiny pilot light.
+    setUnicodeGlitches([]);
+    setEdgeEffects([]);
+    setGlitchChars([]);
+    setBlurredChars([]);
+    setSkewedChars([]);
+    setFadedChars([]);
+
+    const handlePositions = swordPositions.filter((p) => isHandlePosition(p.x, p.y, centeredSwordLines));
+    const base = handlePositions.length ? handlePositions : swordPositions;
+    const pickSubset = (color: string) =>
+      base
+        .filter((p) => ((p.x * 19 + p.y * 11) % 23) === 0)
+        .slice(0, 16)
+        .map((p) => ({ ...p, color }));
+
+    let phase = 0;
+    const renderPilot = () => {
+      // color: mostly dim green/cyan, occasionally pink (very rare)
+      const color =
+        phase % 12 === 0
+          ? getDarkerColor(getDarkerColor('#FF3EC8'))
+          : phase % 3 === 0
+            ? getDarkerColor(getDarkerColor('#3EE6FF'))
+            : getDarkerColor(getDarkerColor('#00FCA6'));
+
+      const tiles = pickSubset(color);
+      currentTilesRef.current = tiles;
+      setColoredTiles(tiles);
+
+      // gentle breathing glow
+      const glow = 0.012 + (phase % 4) * 0.006; // 0.012..0.030
+      setGlowIntensity(glow);
+      phase++;
+    };
+
+    renderPilot();
+    const interval = setInterval(renderPilot, 2200); // slow, subtle
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [idleVisual, swordPositions, centeredSwordLines]);
 
   // --- ALLE ANIMATIONEN NUR WENN NICHT IDLE ---
   useEffect(() => {
