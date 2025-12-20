@@ -213,10 +213,10 @@
     background:
       repeating-linear-gradient(
         0deg,
-        rgba(0, 0, 0, 0.18),
-        rgba(0, 0, 0, 0.18) 1px,
+        rgba(0, 0, 0, 0.30),
+        rgba(0, 0, 0, 0.30) 1px,
         rgba(0, 0, 0, 0) 1px,
-        rgba(0, 0, 0, 0) 3px
+        rgba(0, 0, 0, 0) 4px
       ),
       /* subtle RGB mask */
       repeating-linear-gradient(
@@ -229,7 +229,7 @@
         rgba(62, 230, 255, 0.02) 3px
       );
     mix-blend-mode: multiply;
-    opacity: 0.95;
+    opacity: 1;
     animation: crtScanDrift 8s linear infinite;
   }
 
