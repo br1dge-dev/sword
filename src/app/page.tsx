@@ -26,6 +26,7 @@ export default function HomePage() {
   const baseSwordLevel = 1;
   
   const [isClient, setIsClient] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUIVisible, setIsUIVisible] = useState(true);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
@@ -84,6 +85,24 @@ export default function HomePage() {
       // KEIN Cleanup beim Unmount, da die Idle-Animation im Layout läuft
     };
   }, [setMusicPlaying]);
+
+  // IMPORTANT: Only render ONE audio UI at a time (desktop OR mobile).
+  // With multiple AudioControlPanels mounted, the global analyzer can attach to the wrong <audio> element,
+  // causing “music plays but sword stays idle”.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia('(min-width: 640px)'); // Tailwind `sm`
+    const update = () => setIsDesktop(!!mql.matches);
+    update();
+    try {
+      mql.addEventListener('change', update);
+      return () => mql.removeEventListener('change', update);
+    } catch {
+      // Safari fallback
+      (mql as any).addListener(update);
+      return () => (mql as any).removeListener(update);
+    }
+  }, []);
   
   // OPTIMIERT: Reduzierte Energie- und Beat-Logs
   useEffect(() => {
@@ -155,44 +174,51 @@ export default function HomePage() {
         </div>
         
         {/* AudioControlPanel: Desktop only. Mobile lives behind the gear overlay so the sword stays the hero. */}
-        <div className={`hidden sm:block absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 transition-opacity duration-300 ${
-          isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}>
-          <div className="scale-125 origin-center ui-caps">
-            <AudioControlPanel 
-              onBeat={handleBeat} 
-              onEnergyChange={handleEnergyChange} 
-            />
+        {isClient && isDesktop && (
+          <div className={`absolute z-10 sm:top-1/2 sm:left-[75vw] sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 transition-opacity duration-300 ${
+            isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}>
+            <div className="scale-125 origin-center ui-caps">
+              <AudioControlPanel 
+                onBeat={handleBeat} 
+                onEnergyChange={handleEnergyChange} 
+              />
+            </div>
           </div>
-        </div>
+        )}
         
         {/* SideButtons - Desktop: links, Mobile: im Modal */}
-        <div className={`hidden sm:flex absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10 transition-opacity duration-300 ${
-          isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}>
-          <div className="scale-125 origin-center ui-caps">
-            <SideButtons />
+        {isClient && isDesktop && (
+          <div className={`absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10 transition-opacity duration-300 ${
+            isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}>
+            <div className="scale-125 origin-center ui-caps">
+              <SideButtons />
+            </div>
           </div>
-        </div>
+        )}
         
         {/* Mobile Steuerelemente - Gear overlay for all controls */}
-        <div className={`sm:hidden absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-300 ${
-          isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}>
-          <MobileControlsOverlay 
-            isOpen={isModalOpen}
-            onToggle={(open: boolean) => setIsModalOpen(open)}
-            onBeat={handleBeat}
-            onEnergyChange={handleEnergyChange}
-            onToggleUI={() => setIsUIVisible((v) => !v)}
-            onOpenWtf={() => setIsWtfOpen(true)}
-            onToggleLeaderboard={() => setIsLeaderboardOpen((v) => !v)}
-            isUIVisible={isUIVisible}
-          />
-        </div>
+        {isClient && !isDesktop && (
+          <div className={`absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-300 ${
+            isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}>
+            <MobileControlsOverlay 
+              isOpen={isModalOpen}
+              onToggle={(open: boolean) => setIsModalOpen(open)}
+              onBeat={handleBeat}
+              onEnergyChange={handleEnergyChange}
+              onToggleUI={() => setIsUIVisible((v) => !v)}
+              onOpenWtf={() => setIsWtfOpen(true)}
+              onToggleLeaderboard={() => setIsLeaderboardOpen((v) => !v)}
+              isUIVisible={isUIVisible}
+            />
+          </div>
+        )}
 
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 hidden sm:flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0 ui-caps">
+        {isClient && isDesktop && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0 ui-caps">
           {/* HIDE Button */}
           <button
             onClick={() => setIsUIVisible(!isUIVisible)}
@@ -231,6 +257,7 @@ export default function HomePage() {
             <IoMdTrophy className="text-grifter-blue text-3xl" />
           </button>
         </div>
+        )}
 
         <WtfIsThisModal open={isWtfOpen} onClose={() => setIsWtfOpen(false)} />
 
