@@ -118,7 +118,9 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
           
           // NEU: Verbesserte Beat-Erkennung mit niedrigeren Schwellenwerten
           if (e > energyThreshold) { // Reduziert von 0.05 für empfindlichere Reaktion
-            const now = Date.now();
+            // IMPORTANT: AudioAnalyzer uses `performance.now()` for beat timing.
+            // Using `Date.now()` here would break the min-interval gate and spam beats.
+            const now = performance.now();
             const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
             
             // Mindestens 80ms zwischen Beats (reduziert von 100ms für schnellere Beats)
@@ -166,7 +168,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
           updateEnergy(e);
           if (e > 0.015) setAudioActive(true);
           if (e > energyThreshold) {
-            const now = Date.now();
+            const now = performance.now();
             const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
             if (timeSinceLastBeat > 80) {
               setBeatDetected(true);
