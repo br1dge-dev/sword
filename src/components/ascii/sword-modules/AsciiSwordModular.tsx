@@ -710,10 +710,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const idleRef = useRef<boolean>(idle);
   const unicodeGlitchUntilRef = useRef<number>(0);
   const unicodeGlitchActiveRef = useRef<boolean>(false);
+  const unicodeGlitchMorphAtRef = useRef<number>(0);
   const edgeEffectsUntilRef = useRef<number>(0);
   const edgeEffectsActiveRef = useRef<boolean>(false);
   const glitchCharsUntilRef = useRef<number>(0);
   const glitchCharsActiveRef = useRef<boolean>(false);
+  const glitchCharsMorphAtRef = useRef<number>(0);
   const blurUntilRef = useRef<number>(0);
   const blurActiveRef = useRef<boolean>(false);
   const skewUntilRef = useRef<number>(0);
@@ -1160,6 +1162,42 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           const MAX_SPAWNS_PER_UPDATE = forgeTier === 1 ? 1 : forgeTier === 2 ? 2 : 3;
           const canSpawn = () => spawnsUsed < MAX_SPAWNS_PER_UPDATE;
 
+          // --- Living Glitches: morph a few characters while a glitch window is active ---
+          // This restores the intended “alive” feel: individual chars tick/change inside the sword
+          // instead of a frozen snapshot that only swaps on re-trigger.
+          if (unicodeGlitchActiveRef.current && now < unicodeGlitchUntilRef.current && now >= unicodeGlitchMorphAtRef.current) {
+            const morphEveryMs = glitchTier >= 3 ? 55 : 85;
+            const morphCount = glitchTier >= 3 ? 14 : 8;
+            unicodeGlitchMorphAtRef.current = now + morphEveryMs;
+            const tierKey = (Math.max(1, Math.min(3, glitchTier || 1)) as 1 | 2 | 3);
+            const unicodePool = unicodeGlitchChars[tierKey] ?? unicodeGlitchChars[1];
+            setUnicodeGlitches((prev) => {
+              if (!prev.length) return prev;
+              const next = prev.slice();
+              for (let i = 0; i < morphCount; i++) {
+                const idx = (Math.random() * next.length) | 0;
+                const sym = unicodePool[(Math.random() * unicodePool.length) | 0];
+                next[idx] = { ...next[idx], char: sym };
+              }
+              return next;
+            });
+          }
+          if (glitchCharsActiveRef.current && now < glitchCharsUntilRef.current && now >= glitchCharsMorphAtRef.current) {
+            const morphEveryMs = glitchTier >= 3 ? 65 : 95;
+            const morphCount = glitchTier >= 3 ? 12 : 7;
+            glitchCharsMorphAtRef.current = now + morphEveryMs;
+            setGlitchChars((prev) => {
+              if (!prev.length) return prev;
+              const next = prev.slice();
+              for (let i = 0; i < morphCount; i++) {
+                const idx = (Math.random() * next.length) | 0;
+                const sym = glitchSymbols[(Math.random() * glitchSymbols.length) | 0];
+                next[idx] = { ...next[idx], char: sym };
+              }
+              return next;
+            });
+          }
+
           // --- Glow (forge-tiered) ---
           // Glow is continuous + cheap: do not consume the spawn budget.
           if (currentBeat || onset > 0.01 || currentEnergy > 0.03) {
@@ -1289,6 +1327,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             setUnicodeGlitches([...unicode, ...handleEcho]);
               unicodeGlitchActiveRef.current = true;
             unicodeGlitchUntilRef.current = now + (beatStrength > 0.85 ? (glitchTier >= 3 ? 900 : 520) : (glitchTier >= 3 ? 650 : 360));
+            unicodeGlitchMorphAtRef.current = now + 60;
             spawnsUsed++;
             }
 
@@ -1316,6 +1355,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             setGlitchChars([...bladeGlitch, ...handleGlitch]);
             glitchCharsActiveRef.current = true;
             glitchCharsUntilRef.current = now + (glitchTier >= 3 ? 520 : 320);
+            glitchCharsMorphAtRef.current = now + 70;
             spawnsUsed++;
           }
 
