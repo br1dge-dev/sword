@@ -273,16 +273,7 @@
     animation: crtRoll 3.8s linear infinite;
   }
 
-  /* X-RAY / Overdrive layer.
-     Driven by CSS var --xray (0..1). This allows smooth fades and hysteresis-based auto mode. */
-  .xray-power {
-    --xray: 0;
-    filter:
-      invert(var(--xray))
-      hue-rotate(calc(180deg * var(--xray)))
-      contrast(calc(1 + 0.35 * var(--xray)))
-      brightness(calc(1 + 0.15 * var(--xray)));
-  }
+  /* (removed) X-RAY / Overdrive layer */
 
   @keyframes crtRoll {
     0% { background-position: 0% -120%; }
