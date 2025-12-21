@@ -143,6 +143,12 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       
       const nextIndex = (currentTrackIndex + 1) % tracks.length;
       setCurrentTrackIndex(nextIndex);
+      // Reset per-track adaptive analyzer state so sensitivities recalibrate for the new track.
+      try {
+        globalAnalyzer?.resetTrackAnalysis?.();
+      } catch {
+        // ignore
+      }
       
       await new Promise(resolve => setTimeout(resolve, 100));
       
@@ -267,6 +273,12 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       
       const prevIndex = currentTrackIndex === 0 ? tracks.length - 1 : currentTrackIndex - 1;
       setCurrentTrackIndex(prevIndex);
+      // Reset per-track adaptive analyzer state so sensitivities recalibrate for the new track.
+      try {
+        globalAnalyzer?.resetTrackAnalysis?.();
+      } catch {
+        // ignore
+      }
       
       await new Promise(resolve => setTimeout(resolve, 100));
       

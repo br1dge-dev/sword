@@ -34,6 +34,18 @@ export default function HomePage() {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isWtfOpen, setIsWtfOpen] = useState(false);
   const [showFps, setShowFps] = useState(false);
+  const [debugXrayEnabled, setDebugXrayEnabled] = useState(false);
+  const [debugXray, setDebugXray] = useState<{
+    intensity: number;
+    score: number;
+    onTh: number;
+    offTh: number;
+    energy: number;
+    high: number;
+    onset: number;
+    active: boolean;
+    cooldownMs: number;
+  } | null>(null);
   const { energy, beatDetected, setMusicPlaying, swordColor, frequencyData } = useAudioReactionStore(
     useShallow((s) => ({
       energy: s.energy,
@@ -75,6 +87,17 @@ export default function HomePage() {
     activeSince: number;
     cooldownUntil: number;
     prevSpectrum: Uint8Array | null;
+    // adaptive thresholds
+    rb: number[];
+    rbIdx: number;
+    rbCount: number;
+    onTh: number;
+    offTh: number;
+    lastThreshUpdate: number;
+    // debug
+    lastScore: number;
+    lastHigh: number;
+    lastOnset: number;
   }>({
     lastNow: 0,
     intensity: 0,
@@ -82,15 +105,38 @@ export default function HomePage() {
     activeSince: 0,
     cooldownUntil: 0,
     prevSpectrum: null,
+    rb: new Array(120).fill(0),
+    rbIdx: 0,
+    rbCount: 0,
+    onTh: 0.7,
+    offTh: 0.5,
+    lastThreshUpdate: 0,
+    lastScore: 0,
+    lastHigh: 0,
+    lastOnset: 0,
   });
+
+  // Debug toggle: ?debug=xray
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.href);
+      setDebugXrayEnabled(url.searchParams.get('debug') === 'xray');
+    } catch {
+      setDebugXrayEnabled(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isClient) return;
     let raf: number | null = null;
     let cancelled = false;
 
-    const ON_TH = 0.78;
-    const OFF_TH = 0.55;
+    // Thresholds will adapt, but these are safe clamps.
+    const ON_TH_MIN = 0.55;
+    const ON_TH_MAX = 0.92;
+    const OFF_TH_MIN = 0.38;
+    const OFF_TH_MAX = 0.78;
     const MIN_ON_MS = 2600; // keep on long enough to feel like a “mode”
     const MIN_COOLDOWN_MS = 6000;
     const MAX_COOLDOWN_MS = 10000;
@@ -98,6 +144,7 @@ export default function HomePage() {
     const RELEASE_MS = 520;
     const TICK_MS = 50; // ~20 FPS logic (no need to run at 60)
     let lastTick = 0;
+    let lastDebugSet = 0;
 
     const clamp01 = (v: number) => (v <= 0 ? 0 : v >= 1 ? 1 : v);
 
@@ -117,7 +164,16 @@ export default function HomePage() {
         const d = curr[i] - prev[i];
         if (d > 0) flux += d;
       }
-      return clamp01(flux / (curr.length * 255));
+      // This normalization tends to be very small in practice. Boost it to a usable 0..1 trigger-like signal.
+      // Empirically: divide by len*32 ~ gives nicer range for onset on these tracks.
+      return clamp01(flux / (curr.length * 32));
+    };
+
+    const percentile = (arr: number[], count: number, p01: number) => {
+      if (count <= 0) return 0;
+      const copy = arr.slice(0, count).sort((a, b) => a - b);
+      const idx = Math.max(0, Math.min(copy.length - 1, Math.floor(copy.length * p01)));
+      return copy[idx] ?? 0;
     };
 
     const step = (now: number) => {
@@ -175,23 +231,45 @@ export default function HomePage() {
         st.prevSpectrum = null;
       }
 
-      // Overdrive score: emphasize onset + highs; include overall energy.
-      let score = (0.55 * onset) + (0.35 * hi) + (0.20 * e);
-      if (beat) score = clamp01(score + 0.08);
-      score = clamp01(score);
+      // Overdrive score: onset + highs dominate; energy supports it.
+      // This should produce occasional “spikes” on hits without staying high.
+      let score = clamp01((0.70 * onset) + (0.45 * hi) + (0.18 * e));
+      if (beat) score = clamp01(score + 0.10);
+
+      st.lastScore = score;
+      st.lastHigh = hi;
+      st.lastOnset = onset;
+
+      // Update ring buffer for adaptive thresholding
+      st.rb[st.rbIdx] = score;
+      st.rbIdx = (st.rbIdx + 1) % st.rb.length;
+      st.rbCount = Math.min(st.rb.length, st.rbCount + 1);
+
+      // Recompute thresholds every ~1s once we have enough samples.
+      if (st.rbCount >= 30 && now - st.lastThreshUpdate > 1000) {
+        st.lastThreshUpdate = now;
+        const p90 = percentile(st.rb, st.rbCount, 0.9);
+        const p60 = percentile(st.rb, st.rbCount, 0.6);
+        // Keep a minimum gap so hysteresis works.
+        const onTh = Math.max(ON_TH_MIN, Math.min(ON_TH_MAX, Math.max(p90, p60 + 0.12)));
+        const offTh = Math.max(OFF_TH_MIN, Math.min(OFF_TH_MAX, Math.min(p60, onTh - 0.10)));
+        st.onTh = onTh;
+        st.offTh = offTh;
+      }
 
       // Hysteresis state machine + cooldown
       if (!st.active) {
-        if (now >= st.cooldownUntil && score > ON_TH) {
+        if (now >= st.cooldownUntil && score > st.onTh) {
           // Require a “moment” signal to avoid slow/ambient enabling too often.
-          if (beat || onset > 0.18) {
+          // Onset threshold lowered because our normalized onset is smaller.
+          if (beat || onset > 0.08 || hi > 0.22) {
             st.active = true;
             st.activeSince = now;
           }
         }
       } else {
         const onFor = now - st.activeSince;
-        if (onFor >= MIN_ON_MS && score < OFF_TH) {
+        if (onFor >= MIN_ON_MS && score < st.offTh) {
           st.active = false;
           const cd = MIN_COOLDOWN_MS + Math.random() * (MAX_COOLDOWN_MS - MIN_COOLDOWN_MS);
           st.cooldownUntil = now + cd;
@@ -204,6 +282,21 @@ export default function HomePage() {
       st.intensity = st.intensity + (target - st.intensity) * alpha;
 
       el.style.setProperty('--xray', st.intensity.toFixed(3));
+
+      if (debugXrayEnabled && now - lastDebugSet > 250) {
+        lastDebugSet = now;
+        setDebugXray({
+          intensity: st.intensity,
+          score: st.lastScore,
+          onTh: st.onTh,
+          offTh: st.offTh,
+          energy: e,
+          high: st.lastHigh,
+          onset: st.lastOnset,
+          active: st.active,
+          cooldownMs: Math.max(0, st.cooldownUntil - now),
+        });
+      }
     };
 
     raf = requestAnimationFrame(step);
@@ -211,7 +304,7 @@ export default function HomePage() {
       cancelled = true;
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [isClient, invertPowerMode, autoXrayEnabled]);
+  }, [isClient, invertPowerMode, autoXrayEnabled, debugXrayEnabled]);
   
   // Für den Titel: Random Highlight
   const leaderboardTitle = 'L3ADERBOARD';
@@ -360,6 +453,22 @@ export default function HomePage() {
     >
       <BuildBadge />
       {isClient && showFps ? <FpsCounter /> : null}
+      {isClient && debugXrayEnabled ? (
+        <div
+          className="fixed top-2 right-2 z-[9999] rounded border border-grifter-blue bg-black/80 px-3 py-2 text-[10px] text-grifter-blue ui-caps"
+          style={{ backdropFilter: 'blur(6px)' }}
+        >
+          <div className="font-bold">X-RAY DEBUG</div>
+          <div>auto: {autoXrayEnabled ? 'on' : 'off'}</div>
+          <div>manual: {invertPowerMode ? 'on' : 'off'}</div>
+          <div>active: {debugXray?.active ? 'yes' : 'no'}</div>
+          <div>int: {(debugXray?.intensity ?? 0).toFixed(2)}</div>
+          <div>score: {(debugXray?.score ?? 0).toFixed(2)}</div>
+          <div>on/off: {(debugXray?.onTh ?? 0).toFixed(2)} / {(debugXray?.offTh ?? 0).toFixed(2)}</div>
+          <div>e/hi/onset: {(debugXray?.energy ?? 0).toFixed(2)} / {(debugXray?.high ?? 0).toFixed(2)} / {(debugXray?.onset ?? 0).toFixed(2)}</div>
+          <div>cd: {Math.round((debugXray?.cooldownMs ?? 0) / 1000)}s</div>
+        </div>
+      ) : null}
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
         isModalOpen || isLeaderboardOpen ? 'backdrop-blur-modal' : ''
       }`}>
