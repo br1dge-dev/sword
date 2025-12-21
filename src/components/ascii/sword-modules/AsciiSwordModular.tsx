@@ -167,13 +167,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // NOTE: This must be "mount-gated" to avoid hydration mismatches in Next.js
   // (server-rendered HTML must match the client's first render).
   const [debugReactiveEnabled, setDebugReactiveEnabled] = useState(false);
+  const [debugEffectsEnabled, setDebugEffectsEnabled] = useState(false);
 
   useEffect(() => {
     try {
       const url = new URL(window.location.href);
       setDebugReactiveEnabled(url.searchParams.get('debug') === 'reactive');
+      setDebugEffectsEnabled(url.searchParams.get('debug') === 'effects');
     } catch {
       setDebugReactiveEnabled(false);
+      setDebugEffectsEnabled(false);
     }
   }, []);
   
@@ -191,6 +194,30 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     tilesLen: number;
   } | null>(null);
   const debugReactiveLastSetRef = useRef<number>(0);
+
+  const [debugEffects, setDebugEffects] = useState<{
+    idle: boolean;
+    isMusicPlaying: boolean;
+    beatDetected: boolean;
+    energy: number;
+    bass: number;
+    mid: number;
+    high: number;
+    onset: number;
+    beat: number;
+    entropyLastImpulseMs: number;
+    entropyAmp01: number;
+    entropyPx: number;
+    entropyLatch: boolean;
+    tilesLen: number;
+    unicodeLen: number;
+    glitchCharsLen: number;
+    edgeLen: number;
+    blurActive: boolean;
+    skewActive: boolean;
+    fadeActive: boolean;
+  } | null>(null);
+  const debugEffectsLastSetRef = useRef<number>(0);
   
   // Automatisches Beat-Reset aktivieren
   useBeatReset(500);
@@ -521,6 +548,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const [skewedChars, setSkewedChars] = useState<Array<{x: number, y: number, angle: number}>>([]);
   const [fadedChars, setFadedChars] = useState<Array<{x: number, y: number, opacity: number}>>([]);
 
+  // PERF/DEBUG: keep lightweight refs for array sizes so the rAF scheduler doesn't depend on state arrays.
+  const unicodeLenRef = useRef(0);
+  const glitchCharsLenRef = useRef(0);
+  const edgeLenRef = useRef(0);
+  useEffect(() => {
+    unicodeLenRef.current = unicodeGlitches.length;
+  }, [unicodeGlitches.length]);
+  useEffect(() => {
+    glitchCharsLenRef.current = glitchChars.length;
+  }, [glitchChars.length]);
+  useEffect(() => {
+    edgeLenRef.current = edgeEffects.length;
+  }, [edgeEffects.length]);
+
   // PERF: Build O(1) lookup maps/sets for per-character overlays to avoid repeated `.find()` scans.
   const glitchCharMap = useMemo(() => {
     const m = new Map<string, { x: number; y: number; char: string }>();
@@ -725,6 +766,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     high: 0,
     beat: 0,
   });
+  const reactiveLatestRef = useRef<{ energy: number; bass: number; mid: number; high: number; onset: number; beat: number }>({
+    energy: 0,
+    bass: 0,
+    mid: 0,
+    high: 0,
+    onset: 0,
+    beat: 0,
+  });
   const baseColorRgb = useMemo(() => parseColorToRgbFast(baseColor) ?? { r: 0, g: 252, b: 166 }, [baseColor]);
   const baseColorRgbRef = useRef(baseColorRgb);
   useEffect(() => {
@@ -756,6 +805,43 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
     const frame = (nowMs: number) => {
       if (cancelled) return;
+
+      // Per-frame time update for smooth render-time modulation (avoid 50ms quantization).
+      shimmerRef.current.nowMs = nowMs;
+
+      // ENTROPY should be latency-free: update latch + amplitude at rAF rate.
+      {
+        const entropy = entropyRef.current;
+        const playing = isMusicPlayingRef.current && !idleRef.current;
+        if (!playing) {
+          entropy.amp01 = 0;
+          entropy.lastImpulseMs = -1;
+          entropy.beatLatch = false;
+        } else {
+          const snap = reactiveLatestRef.current;
+          // Main-beat gate (but tolerant): requires beatDetected plus some low-end / beat strength.
+          const mainBeat = !!beatDetectedRef.current && (snap.beat > 0.38 || snap.onset > 0.06) && snap.bass > 0.06 && snap.energy > 0.05;
+          const minGapMs = 260;
+          if (mainBeat && !entropy.beatLatch && (entropy.lastImpulseMs < 0 || nowMs - entropy.lastImpulseMs >= minGapMs)) {
+            entropy.beatLatch = true;
+            entropy.lastImpulseMs = nowMs;
+          } else if (!mainBeat) {
+            entropy.beatLatch = false;
+          }
+
+          const t = entropy.lastImpulseMs > 0 ? nowMs - entropy.lastImpulseMs : 1e9;
+          const attackMs = 35;
+          const decayMs = 190;
+          const a = t <= 0 ? 0 : t < attackMs ? t / attackMs : 1;
+          const d = Math.exp(-Math.max(0, t - attackMs) / decayMs);
+          entropy.amp01 = Math.max(0, Math.min(1, a * d));
+
+          const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
+          const tierPx = forgeTier === 1 ? 6 : forgeTier === 2 ? 10 : 14;
+          const mod = 0.85 + snap.beat * 0.3 + snap.energy * 0.2;
+          entropy.px = tierPx * mod;
+        }
+      }
 
       if (nowMs - effectsLastTickRef.current >= TICK_MS) {
         effectsLastTickRef.current = nowMs;
@@ -792,6 +878,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           bass: reactive.bass,
           mid: reactive.mid,
           high: reactive.high,
+          beat: reactive.beat,
+        };
+        reactiveLatestRef.current = {
+          energy: reactive.energy,
+          bass: reactive.bass,
+          mid: reactive.mid,
+          high: reactive.high,
+          onset: reactive.onset,
           beat: reactive.beat,
         };
 
@@ -832,40 +926,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         }
         waveMapRef.current = waveMap;
 
-        // --- ENTROPY: beat-latched impact impulse ---
-        // Main beat only: use beatDetectedRef but latch so we trigger once per pulse (beatDetected lasts ~500ms).
-        const entropy = entropyRef.current;
-        const playing = isMusicPlayingRef.current && !idleRef.current;
-        // "Main beat" gating: avoid firing on tiny spikes / weak detections.
-        const mainBeat =
-          !!beatDetectedRef.current && reactive.beat > 0.55 && reactive.bass > 0.09 && reactive.energy > 0.08;
-        if (!playing) {
-          entropy.amp01 = 0;
-          entropy.lastImpulseMs = -1;
-          entropy.beatLatch = false;
-        } else {
-          const minGapMs = 260; // ensures "one punch" per beat even if beatDetected stays high for ~500ms
-          if (mainBeat && !entropy.beatLatch && (entropy.lastImpulseMs < 0 || nowMs - entropy.lastImpulseMs >= minGapMs)) {
-            entropy.beatLatch = true;
-            entropy.lastImpulseMs = nowMs;
-          } else if (!mainBeat) {
-            entropy.beatLatch = false;
-          }
-
-          // Fast attack + decay for punch
-          const t = entropy.lastImpulseMs > 0 ? nowMs - entropy.lastImpulseMs : 1e9;
-          const attackMs = 40;
-          const decayMs = 220;
-          const a = t <= 0 ? 0 : t < attackMs ? t / attackMs : 1;
-          const d = Math.exp(-Math.max(0, t - attackMs) / decayMs);
-          entropy.amp01 = Math.max(0, Math.min(1, a * d));
-
-          // Scale by forge tier and a touch by beat strength / energy (keeps it “main beat” but responsive).
-          const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
-          const tierPx = forgeTier === 1 ? 6 : forgeTier === 2 ? 10 : 14;
-          const mod = 0.85 + reactive.beat * 0.35 + reactive.energy * 0.25;
-          entropy.px = tierPx * mod;
-        }
+        // NOTE: Entropy is updated per-frame above to avoid latency / dying from 50ms scheduling.
 
         // Debug overlay (only when enabled; low refresh rate to avoid perf impact)
         if (debugReactiveEnabled) {
@@ -884,6 +945,36 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               isMusicPlaying: isMusicPlayingRef.current,
               idleVisual: idleRef.current || !isMusicPlayingRef.current,
               tilesLen: currentTilesRef.current.length,
+            });
+          }
+        }
+
+        if (debugEffectsEnabled) {
+          const last = debugEffectsLastSetRef.current;
+          if (nowMs - last >= 200) {
+            debugEffectsLastSetRef.current = nowMs;
+            const ent = entropyRef.current;
+            setDebugEffects({
+              idle: idleRef.current,
+              isMusicPlaying: isMusicPlayingRef.current,
+              beatDetected: !!beatDetectedRef.current,
+              energy: reactive.energy,
+              bass: reactive.bass,
+              mid: reactive.mid,
+              high: reactive.high,
+              onset: reactive.onset,
+              beat: reactive.beat,
+              entropyLastImpulseMs: ent.lastImpulseMs,
+              entropyAmp01: ent.amp01,
+              entropyPx: ent.px,
+              entropyLatch: ent.beatLatch,
+              tilesLen: currentTilesRef.current.length,
+              unicodeLen: unicodeLenRef.current,
+              glitchCharsLen: glitchCharsLenRef.current,
+              edgeLen: edgeLenRef.current,
+              blurActive: blurActiveRef.current,
+              skewActive: skewActiveRef.current,
+              fadeActive: fadeActiveRef.current,
             });
           }
         }
@@ -1275,7 +1366,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       if (effectsRafIdRef.current !== null) cancelAnimationFrame(effectsRafIdRef.current);
       effectsRafIdRef.current = null;
     };
-  }, [chargeLevel, debugReactiveEnabled, edgePositions, eqGeom, getBackgroundDimensions, swordPositions]);
+  }, [chargeLevel, debugEffectsEnabled, debugReactiveEnabled, edgePositions, eqGeom, getBackgroundDimensions, swordPositions]);
   
   // Edge effects are driven by the rAF scheduler above (avoids stacked timeouts).
   
@@ -1394,6 +1485,28 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           <div>beat: {(debugReactive?.beat ?? 0).toFixed(3)}</div>
         </div>
       )}
+      {debugEffectsEnabled && (
+        <div
+          className="fixed left-2 bottom-32 z-[9999] rounded border border-grifter-blue bg-black/80 px-3 py-2 text-[10px] font-mono text-grifter-blue"
+          style={{ backdropFilter: 'blur(6px)' }}
+        >
+          <div className="font-bold">EFFECTS</div>
+          <div>idle: {debugEffects?.idle ? '1' : '0'}</div>
+          <div>music: {debugEffects?.isMusicPlaying ? '1' : '0'}</div>
+          <div>beatDetected: {debugEffects?.beatDetected ? '1' : '0'}</div>
+          <div>energy: {(debugEffects?.energy ?? 0).toFixed(3)}</div>
+          <div>bass: {(debugEffects?.bass ?? 0).toFixed(3)}</div>
+          <div>onset: {(debugEffects?.onset ?? 0).toFixed(3)}</div>
+          <div>beat: {(debugEffects?.beat ?? 0).toFixed(3)}</div>
+          <div>entropy: {(debugEffects?.entropyAmp01 ?? 0).toFixed(3)} px:{(debugEffects?.entropyPx ?? 0).toFixed(1)} latch:{debugEffects?.entropyLatch ? '1' : '0'}</div>
+          <div>lastImpulseMs: {debugEffects?.entropyLastImpulseMs ? Math.floor(debugEffects.entropyLastImpulseMs) : -1}</div>
+          <div>tiles: {debugEffects?.tilesLen ?? 0}</div>
+          <div>unicode: {debugEffects?.unicodeLen ?? 0}</div>
+          <div>dos: {debugEffects?.glitchCharsLen ?? 0}</div>
+          <div>edge: {debugEffects?.edgeLen ?? 0}</div>
+          <div>blur/skew/fade: {(debugEffects?.blurActive ? '1' : '0')}/{(debugEffects?.skewActive ? '1' : '0')}/{(debugEffects?.fadeActive ? '1' : '0')}</div>
+        </div>
+      )}
       {/* Höhlen-Hintergrund */}
       <div 
         className="absolute inset-0"
@@ -1501,7 +1614,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
               // ENTROPY: beat-impact “explosion drawing” that makes the sword briefly fly apart.
               // Keep it cheap: use precomputed direction vectors + a single global amplitude ref.
-              if (isMusicPlaying && !idle) {
+              if (isMusicPlayingRef.current && !idleRef.current) {
                 const ent = entropyRef.current;
                 if (ent.amp01 > 0.001) {
                   const v = entropyVecMap.get(k);
