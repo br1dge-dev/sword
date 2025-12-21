@@ -849,18 +849,18 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           // ENTROPY should be kick/bass driven, not "beatDetected" driven.
           // We gate purely on bass dominance + bass transient, so melodic/synth spikes won't trigger it.
           const crashScore = clamp01(
-            bassDelta * 22 +
-              energyDelta * 10 +
-              Math.max(0, snap.onset - 0.06) * 2.2 +
-              Math.max(0, snap.bass - snap.mid) * 2.8,
+            bassDelta * 20 +
+              energyDelta * 8 +
+              Math.max(0, snap.onset - 0.07) * 1.8 +
+              Math.max(0, snap.bass - snap.mid) * 2.4,
           );
           const mainBeat =
             bassDominant &&
-            snap.bass > 0.13 &&
-            snap.energy > 0.09 &&
-            bassDelta > 0.045 &&
-            crashScore > 0.35;
-          const minGapMs = 620; // much less frequent (avoid "always on")
+            snap.bass > 0.16 &&
+            snap.energy > 0.11 &&
+            bassDelta > 0.06 &&
+            crashScore > 0.6;
+          const minGapMs = 900; // rare + deliberate (kick only)
           if (mainBeat && !entropy.beatLatch && (entropy.lastImpulseMs < 0 || nowMs - entropy.lastImpulseMs >= minGapMs)) {
             entropy.beatLatch = true;
             entropy.lastImpulseMs = nowMs;
@@ -879,11 +879,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
           // Default: smaller displacement. Only go big on real “crash/crescendo”.
           // Default: very compact. Explode hard only when crashScore is high.
-          const tierPx = forgeTier === 1 ? 12 : forgeTier === 2 ? 18 : 26;
+          const tierPx = forgeTier === 1 ? 10 : forgeTier === 2 ? 14 : 18;
           const crash = crashScore;
           // Nonlinear ramp: small most of the time; big on crescendos/crashes.
-          const big = Math.pow(crash, 1.6);
-          entropy.px = tierPx * (0.18 + big * 2.35);
+          const big = Math.pow(crash, 2.1);
+          const rawPx = tierPx * (0.10 + big * 1.65);
+          // Hard cap so it never gets "too far" even on extreme passages.
+          const maxPx = forgeTier === 1 ? 14 : forgeTier === 2 ? 18 : 24;
+          entropy.px = Math.min(maxPx, rawPx);
         }
       }
 
