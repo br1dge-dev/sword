@@ -16,9 +16,10 @@ import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import BuildBadge from '@/components/ui/BuildBadge';
-import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle, IoMdFlash } from 'react-icons/io';
+import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle } from 'react-icons/io';
 import { useShallow } from 'zustand/react/shallow';
 import WtfIsThisModal from '@/components/ui/WtfIsThisModal';
+import FpsCounter from '@/components/ui/FpsCounter';
 
 const HIGHLIGHT_COLORS = ['#F8E16C', '#FF3EC8', '#3EE6FF'] as const;
 
@@ -32,6 +33,7 @@ export default function HomePage() {
   const [isUIVisible, setIsUIVisible] = useState(true);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isWtfOpen, setIsWtfOpen] = useState(false);
+  const [showFps, setShowFps] = useState(false);
   const { energy, beatDetected, setMusicPlaying, swordColor } = useAudioReactionStore(
     useShallow((s) => ({
       energy: s.energy,
@@ -40,12 +42,8 @@ export default function HomePage() {
       swordColor: s.swordColor,
     })),
   );
-  const { invertPowerMode, toggleInvertPowerMode } = usePowerUpStore(
-    useShallow((s) => ({
-      invertPowerMode: s.invertPowerMode,
-      toggleInvertPowerMode: s.toggleInvertPowerMode,
-    })),
-  );
+  // keep store import to preserve future usage patterns; currently no X-RAY / POWER modes
+  usePowerUpStore(useShallow(() => ({})));
   const swordColorSafe = swordColor ?? '#00FCA6';
   
   // Für den Titel: Random Highlight
@@ -92,6 +90,29 @@ export default function HomePage() {
       // KEIN Cleanup beim Unmount, da die Idle-Animation im Layout läuft
     };
   }, [setMusicPlaying]);
+
+  // Persist FPS toggle (dev-friendly)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const v = window.localStorage.getItem('griftsword_show_fps');
+      setShowFps(v === '1');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleFps = () => {
+    setShowFps((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem('griftsword_show_fps', next ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   // IMPORTANT: Only render ONE audio UI at a time (desktop OR mobile).
   // With multiple AudioControlPanels mounted, the global analyzer can attach to the wrong <audio> element,
@@ -166,8 +187,9 @@ export default function HomePage() {
   };
 
   return (
-    <main className={`flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden ${invertPowerMode ? 'invert-power' : ''}`}>
+    <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
       <BuildBadge />
+      {isClient && showFps ? <FpsCounter /> : null}
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
         isModalOpen || isLeaderboardOpen ? 'backdrop-blur-modal' : ''
       }`}>
@@ -219,6 +241,8 @@ export default function HomePage() {
               onOpenWtf={() => setIsWtfOpen(true)}
               onToggleLeaderboard={() => setIsLeaderboardOpen((v) => !v)}
               isUIVisible={isUIVisible}
+              isFpsEnabled={showFps}
+              onToggleFps={toggleFps}
             />
           </div>
         )}
@@ -226,21 +250,6 @@ export default function HomePage() {
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
         {isClient && isDesktop && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0 ui-caps">
-          {/* POWER (invert) */}
-          <button
-            onClick={toggleInvertPowerMode}
-            className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue"
-            style={{
-              boxShadow: invertPowerMode
-                ? '0 0 22px rgba(255, 255, 255, 0.85)'
-                : '0 0 16px rgba(62, 230, 255, 0.75)',
-            }}
-            aria-label="Power (invert)"
-            title="POWER"
-          >
-            <IoMdFlash className={`${invertPowerMode ? 'text-black' : 'text-grifter-blue'} text-3xl`} />
-          </button>
-
           {/* HIDE Button */}
           <button
             onClick={() => setIsUIVisible(!isUIVisible)}
@@ -266,6 +275,19 @@ export default function HomePage() {
             aria-label="WTF is this?"
           >
             <IoMdHelpCircle className="text-grifter-blue text-3xl" />
+          </button>
+
+          {/* FPS */}
+          <button
+            onClick={toggleFps}
+            className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            style={{
+              boxShadow: showFps ? '0 0 22px rgba(62, 230, 255, 0.95)' : '0 0 16px rgba(62, 230, 255, 0.55)',
+            }}
+            aria-label="Toggle FPS counter"
+            title="FPS"
+          >
+            <span className="text-grifter-blue text-[12px] font-press-start-2p">FPS</span>
           </button>
 
           {/* Leaderboard Button */}
