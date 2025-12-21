@@ -55,7 +55,7 @@ export default function BuildBadge() {
 
   return (
     <div
-      className="fixed bottom-2 right-2 z-[9999] rounded border border-grifter-blue bg-black/80 px-3 py-2 text-[10px] font-mono text-grifter-blue"
+      className="fixed bottom-10 right-2 z-[9999] rounded border border-grifter-blue bg-black/80 px-3 py-2 text-[10px] font-mono text-grifter-blue"
       style={{ backdropFilter: "blur(6px)" }}
     >
       <div className="font-bold">BUILD</div>
