@@ -41,10 +41,16 @@ interface AudioReactionState {
   isAudioActive: boolean;
   idleEnabled: boolean;
   isMusicPlaying: boolean;
+  currentTrackName: string | null;
+  currentTrackSrc: string | null;
+  currentTimeSec: number;
+  durationSec: number;
   swordColor: string; // HEX
   setSwordColor: (color: string) => void;
   frequencyData: Uint8Array | null;
   setFrequencyData: (data: Uint8Array) => void;
+  setTrackInfo: (info: { name: string; src: string } | null) => void;
+  setPlaybackTime: (t: { currentTimeSec: number; durationSec: number }) => void;
   
   // Aktionen
   updateEnergy: (energy: number, opts?: UpdateEnergyOptions) => void;
@@ -66,10 +72,16 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   isAudioActive: false,
   idleEnabled: true,
   isMusicPlaying: false,
+  currentTrackName: null,
+  currentTrackSrc: null,
+  currentTimeSec: 0,
+  durationSec: 0,
   swordColor: '#00FCA6',
   frequencyData: null,
   setSwordColor: (color) => set({ swordColor: color }),
   setFrequencyData: (data) => set({ frequencyData: data }),
+  setTrackInfo: (info) => set({ currentTrackName: info?.name ?? null, currentTrackSrc: info?.src ?? null }),
+  setPlaybackTime: ({ currentTimeSec, durationSec }) => set({ currentTimeSec, durationSec }),
   
   updateEnergy: (energy, opts = {}) => {
     const now = Date.now();
