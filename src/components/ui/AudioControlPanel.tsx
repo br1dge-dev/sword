@@ -62,10 +62,12 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   // };
   
   // Audio-Reaction-Store
-  const { setMusicPlaying, setAudioActive, isIdleActive, swordColor } = useAudioReactionStore(
+  const { setMusicPlaying, setAudioActive, setTrackInfo, setPlaybackTime, isIdleActive, swordColor } = useAudioReactionStore(
     useShallow((state) => ({
       setMusicPlaying: state.setMusicPlaying,
       setAudioActive: state.setAudioActive,
+      setTrackInfo: state.setTrackInfo,
+      setPlaybackTime: state.setPlaybackTime,
       isIdleActive: state.isIdleActive(),
       swordColor: state.swordColor,
     })),
@@ -185,6 +187,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       if (audio.duration) {
         setProgress((audio.currentTime / audio.duration) * 100);
       }
+      setPlaybackTime({ currentTimeSec: audio.currentTime || 0, durationSec: audio.duration || 0 });
     };
     
     const handleEnded = () => {
@@ -194,12 +197,15 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('ended', handleEnded);
     audio.volume = 0.5; // Feste Lautstärke
+
+    // Keep track info in the store (used for deterministic choreo per track).
+    setTrackInfo({ name: tracks[currentTrackIndex].name, src: tracks[currentTrackIndex].src });
     
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [nextTrack]);
+  }, [currentTrackIndex, nextTrack, setPlaybackTime, setTrackInfo]);
   
   // AudioContext aktivieren
   const resumeAudioContext = useCallback(async () => {
