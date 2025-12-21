@@ -147,7 +147,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   }, [level]);
   
   // Audio-Reaktionsdaten abrufen
-  const { energy: storeEnergy, beatDetected: storeBeat, isMusicPlaying, idle } = useSwordAudioState();
+  const { energy: storeEnergy, beatDetected: storeBeat, lastBeatTimeMs: storeLastBeatMs, isMusicPlaying, idle } = useSwordAudioState();
 
   // Treat "paused" as idle-visual state immediately (store idle starts after delay; visuals shouldn't keep raging).
   const idleVisual = idle || !isMusicPlaying;
@@ -155,6 +155,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // Verwende direkte Werte, wenn verfügbar, sonst aus dem Store
   const energy = directEnergy !== undefined ? directEnergy : storeEnergy;
   const beatDetected = directBeat !== undefined ? directBeat : storeBeat;
+  const lastBeatTimeMs = storeLastBeatMs;
 
   // Frequenzdaten aus dem Store holen (für band/onset-basierte Reaktivität)
   const frequencyData = useAudioReactionStore((s) => s.frequencyData);
@@ -374,6 +375,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // Keep these refs for reactive reads (used by scheduler).
   const energyRef = useRef<number>(energy);
   const beatDetectedRef = useRef<boolean>(beatDetected);
+  const lastBeatTimeMsRef = useRef<number>(lastBeatTimeMs);
 
   useEffect(() => {
     energyRef.current = energy;
@@ -382,6 +384,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     beatDetectedRef.current = beatDetected;
   }, [beatDetected]);
+
+  useEffect(() => {
+    lastBeatTimeMsRef.current = lastBeatTimeMs;
+  }, [lastBeatTimeMs]);
 
   // NOTE: Removed old background vein loop (it overwrote the new patch/afterglow system and caused “flashy” resets).
 
@@ -817,6 +823,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       // Per-frame time update for smooth render-time modulation (avoid 50ms quantization).
       shimmerRef.current.nowMs = nowMs;
 
+      // Beat pulse derived from timestamp (short, deterministic).
+      const BEAT_PULSE_MS = 120;
+      const beatPulse = lastBeatTimeMsRef.current > 0 && nowMs - lastBeatTimeMsRef.current <= BEAT_PULSE_MS;
+
       // ENTROPY should be latency-free: update latch + amplitude at rAF rate.
       {
         const entropy = entropyRef.current;
@@ -901,7 +911,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         const reactive = reactivityControllerRef.current!.update({
           nowMs,
           energy: energyRef.current,
-          beatDetected: beatDetectedRef.current,
+          beatDetected: beatPulse,
           frequencyData: frequencyDataRef.current,
         });
 
@@ -925,7 +935,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
         // Deterministic traveling edge wave on beat (replaces “random pulse spam”).
         // Wave runs from hilt -> tip; width scales with energy/beatStrength.
-        if (beatDetectedRef.current) {
+        if (beatPulse) {
           waveStartMsRef.current = nowMs;
         }
         const waveStart = waveStartMsRef.current;
@@ -991,7 +1001,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             setDebugEffects({
               idle: idleRef.current,
               isMusicPlaying: isMusicPlayingRef.current,
-              beatDetected: !!beatDetectedRef.current,
+              beatDetected: beatPulse,
               energy: reactive.energy,
               bass: reactive.bass,
               mid: reactive.mid,
@@ -1021,7 +1031,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         if (!idleRef.current) {
           const adaptive = computeAdaptiveColorCycle({
             energy: reactive.energy,
-            beatDetected: beatDetectedRef.current,
+            beatDetected: beatPulse,
             lastColorChangeTime: lastColorChangeTimeRef.current,
             colorStability: colorStabilityRef.current,
             nowMs: now,
@@ -1037,7 +1047,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
           const optimized = computeOptimizedColorCycle({
             energy: reactive.energy,
-            beatDetected: beatDetectedRef.current,
+            beatDetected: beatPulse,
             lastColorChangeTime: lastColorChangeTimeRef.current,
             colorStability: colorStabilityRef.current,
             nowMs: now,
@@ -1066,7 +1076,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               energy: reactive.energy,
               onset: reactive.onset,
               beat: reactive.beat,
-              beatDetected: beatDetectedRef.current,
+              beatDetected: beatPulse,
               baseVeinPositions: baseBgPositionsRef.current,
               maxEmits: 380,
             });
@@ -1076,12 +1086,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             }
 
             // Occasional extra “burst” on beat/onset (feels like patches breathe + cough color).
-            if (beatDetectedRef.current || reactive.onset > 0.28) {
+            if (beatPulse || reactive.onset > 0.28) {
               const burst = generateBeatVeins(
                 bgWidth,
                 bgHeight,
                 Math.min(1, reactive.energy * 1.15),
-                beatDetectedRef.current,
+                beatPulse,
                 typeof window !== 'undefined' ? window.innerWidth : bgWidth,
                 typeof window !== 'undefined' ? window.innerHeight : bgHeight,
               ).slice(0, 160);
@@ -1125,7 +1135,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         // (Paused state should not keep spawning tiles/glow/glitches.)
         if (!idleRef.current && isMusicPlayingRef.current) {
           const currentEnergy = reactive.energy;
-          const currentBeat = beatDetectedRef.current;
+          const currentBeat = beatPulse;
           const currentGlitchLevel = glitchLevelRef.current;
           const onset = reactive.onset;
           const beatStrength = reactive.beat;
