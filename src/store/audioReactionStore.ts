@@ -33,6 +33,11 @@ interface AudioReactionState {
   energy: number;
   beatDetected: boolean;
   lastBeatTime: number;
+  /**
+   * Beat time in the same timebase as our visual schedulers (performance.now()).
+   * This avoids "sticky beat" semantics and enables short beat-pulse windows.
+   */
+  lastBeatTimeMs: number;
   isAudioActive: boolean;
   idleEnabled: boolean;
   isMusicPlaying: boolean;
@@ -43,7 +48,7 @@ interface AudioReactionState {
   
   // Aktionen
   updateEnergy: (energy: number, opts?: UpdateEnergyOptions) => void;
-  triggerBeat: () => void;
+  triggerBeat: (timeMs?: number) => void;
   resetBeat: () => void;
   setAudioActive: (active: boolean) => void;
   setIdleEnabled: (enabled: boolean) => void;
@@ -57,6 +62,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   energy: 0,
   beatDetected: false,
   lastBeatTime: 0,
+  lastBeatTimeMs: 0,
   isAudioActive: false,
   idleEnabled: true,
   isMusicPlaying: false,
@@ -92,12 +98,15 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     }));
   },
   
-  triggerBeat: () => {
+  triggerBeat: (timeMs?: number) => {
     const currentState = get();
+    const perfNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const beatMs = typeof timeMs === 'number' ? timeMs : perfNow;
     // OPTIMIERT: Setze isAudioActive nur wenn keine Idle-Animation läuft oder Musik spielt
     set({ 
       beatDetected: true,
       lastBeatTime: Date.now(),
+      lastBeatTimeMs: beatMs,
       isAudioActive: !idleActive || currentState.isMusicPlaying
     });
     

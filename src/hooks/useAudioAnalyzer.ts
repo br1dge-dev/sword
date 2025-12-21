@@ -99,7 +99,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       const analyzerOptions: AudioAnalyzerOptions = {
         onBeat: (time) => {
           setBeatDetected(true);
-          triggerBeat(); // Aktualisiere den globalen Store
+          triggerBeat(time); // Aktualisiere den globalen Store (performance.now timebase)
           
           // Audio als aktiv markieren
           setAudioActive(true);
@@ -142,7 +142,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
         // Ensure global analyzer always keeps store updates AND forwards to UI callbacks.
         onBeat: (time) => {
           setBeatDetected(true);
-          triggerBeat();
+          triggerBeat(time);
           setAudioActive(true);
           externalOnBeat?.(time);
         },

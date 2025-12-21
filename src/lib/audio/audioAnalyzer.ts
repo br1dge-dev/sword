@@ -48,6 +48,8 @@ export class AudioAnalyzer {
   private noDataCount: number = 0;
   private maxNoDataCount: number = 10;
   private lastEnergy: number = 0; // Speichere die letzte Energie für Throttling
+  private prevEnergyForBeat: number = 0; // Separate: used for beat transient detection (don’t reuse `lastEnergy`)
+  private prevBassForBeat: number = 0;
   
   // NEU: Dynamische Anpassung basierend auf Track-Eigenschaften
   private energyHistory: number[] = []; // Speichere Energy-Werte für Durchschnittsberechnung
@@ -281,9 +283,13 @@ export class AudioAnalyzer {
       
       // Bass-Bereich (0-20% der Frequenzen)
       const bassEnd = Math.floor(this.frequencyData.length * 0.2);
+      let bassSum = 0;
+      let bassCount = 0;
       for (let i = 0; i < bassEnd; i++) {
         sum += this.frequencyData[i] * bassWeight;
         count += bassWeight;
+        bassSum += this.frequencyData[i];
+        bassCount++;
       }
       
       // Mid-Bereich (20-60% der Frequenzen)
@@ -303,6 +309,8 @@ export class AudioAnalyzer {
       
       const average = count > 0 ? sum / count : 0;
       const energy = (average / 255) * 1.1; // Reduzierte Verstärkung für realistischere Werte
+      const bassAvg = bassCount > 0 ? bassSum / bassCount : 0;
+      const bassEnergy = (bassAvg / 255) * 1.25;
       
       // NEU: Dynamische Track-Analyse für adaptive Sensitivität
       this.updateTrackAnalysis(energy, now);
@@ -338,15 +346,24 @@ export class AudioAnalyzer {
       // NEU: Empfindlichere Beat-Erkennung für bessere Reaktivität
       if (energy > currentThreshold) {
         const timeSinceLastBeat = now - this.lastBeatTime;
-        if (timeSinceLastBeat > 120) { // Reduziert von 180ms auf 120ms für schnellere Beats
+        // Keep a longer refractory window: "beatDetected" is a punch trigger, not a continuous flag.
+        if (timeSinceLastBeat > 220) {
           const beatIntensity = energy / currentThreshold;
-          const minSensitivity = 0.3; // Reduziert von 0.5 für empfindlichere Reaktion
-          const maxSensitivity = 2.5; // Reduziert von 3.0 für realistischere Werte
-          const effectiveThreshold = 3 + (maxSensitivity - currentSensitivity) * 3; // Reduziert von 5+5 auf 3+3
+          // IMPORTANT: We need a transient gate; otherwise adaptive thresholds can become "too correct"
+          // and intensity collapses to ~1.0, making beats impossible after the first calibration window.
+          // Prefer bass transient for beat gating (kick-driven), not melodic/synth spikes.
+          const bassDelta = bassEnergy - this.prevBassForBeat;
+          const delta = energy - this.prevEnergyForBeat;
+          const deltaGate = Math.max(0.008, currentThreshold * 0.35);
+          const bassDeltaGate = Math.max(0.02, currentThreshold * 0.55);
+
+          // Sensitivity nudges how strict we are (higher sensitivity => lower required intensity).
+          const baseIntensityGate = 1.55; // stricter: avoid firing on melodic/sustained parts
+          const effectiveThreshold = Math.max(1.15, baseIntensityGate - (currentSensitivity - 1.0) * 0.18);
           
           // IMPORTANT: Keep beat detection deterministic. Random gating makes visuals feel inconsistent.
           // The min interval + adaptive thresholding already prevent spam.
-          if (beatIntensity > effectiveThreshold) {
+          if ((bassDelta > bassDeltaGate || delta > deltaGate) && beatIntensity > effectiveThreshold && bassEnergy > 0.11) {
             this.lastBeatTime = now;
             // DEAKTIVIERT: Logging
             // this.throttledLog(`Beat detected - Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}`);
@@ -357,6 +374,8 @@ export class AudioAnalyzer {
         }
       }
       // Die High-Energy-Beat-Detection ist entfernt!
+      this.prevEnergyForBeat = energy;
+      this.prevBassForBeat = bassEnergy;
 
       this.lastAnalyzeTime = now;
       this.animationFrameId = requestAnimationFrame(() => this.analyze());
@@ -502,15 +521,16 @@ export class AudioAnalyzer {
     
     if (energyRatio < 0.8) {
       // Leiser Track (wie Nightsword)
-      this.adaptiveThreshold = Math.max(0.01, avgEnergy * 0.6); // Noch niedriger für empfindlichere Reaktion
-      this.adaptiveSensitivity = Math.min(2.5, this.options.beatSensitivity! * 2.0); // Erhöht für bessere Beat-Erkennung
+      this.adaptiveThreshold = Math.max(0.012, Math.min(0.06, avgEnergy * 0.45));
+      this.adaptiveSensitivity = Math.min(2.0, this.options.beatSensitivity! * 1.15);
     } else if (energyRatio > 1.5) {
       // Lauter Track
-      this.adaptiveThreshold = Math.min(0.1, avgEnergy * 1.0); // Reduziert von 0.15 auf 0.1
-      this.adaptiveSensitivity = Math.max(0.3, this.options.beatSensitivity! * 0.8); // Reduziert von 0.5 auf 0.3
+      // Keep threshold well below avgEnergy so intensity stays meaningful; clamp keeps it stable across tracks.
+      this.adaptiveThreshold = Math.max(0.015, Math.min(0.06, avgEnergy * 0.35));
+      this.adaptiveSensitivity = Math.max(0.8, this.options.beatSensitivity! * 1.0);
     } else {
       // Normaler Track
-      this.adaptiveThreshold = Math.max(0.01, Math.min(0.1, avgEnergy)); // Reduziert von 0.02/0.15 auf 0.01/0.1
+      this.adaptiveThreshold = Math.max(0.014, Math.min(0.06, avgEnergy * 0.4));
       this.adaptiveSensitivity = this.options.beatSensitivity!;
     }
     
@@ -534,6 +554,8 @@ export class AudioAnalyzer {
     this.energyHistory = [];
     this.adaptiveThreshold = this.options.energyThreshold!;
     this.adaptiveSensitivity = this.options.beatSensitivity!;
+    this.prevEnergyForBeat = 0;
+    this.prevBassForBeat = 0;
   }
 
   public async detectTempo(): Promise<number> {

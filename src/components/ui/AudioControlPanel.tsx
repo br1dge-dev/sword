@@ -80,9 +80,10 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     isInitialized,
     isAnalyzing
   } = useAudioAnalyzer({
-    energyThreshold: 0.015, // Reduziert von 0.03 für empfindlichere Reaktion
-    analyzeInterval: 50,
-    beatSensitivity: 1.2, // Erhöht für bessere Beat-Erkennung
+    energyThreshold: 0.02, // slightly less sensitive: beats shouldn't fire on every melodic transient
+    analyzeInterval: 33, // ~30Hz for less perceived latency / tighter beat response
+    frequencyInterval: 33, // keep band/onset features fresh; entropy uses bass transients
+    beatSensitivity: 1.0, // less sensitive: prefer kick/bass beats
     onBeat: () => {
       onBeat?.();
       setVisualBeatActive(true);
@@ -157,14 +158,23 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         audioRef.current.volume = 0.5;
         
         if (isPlaying || autoplay) {
+          // Keep UI/store in sync even when autoplaying (e.g. track ended).
+          setIsPlaying(true);
+          setMusicPlaying(true);
+          setAudioActive(true);
           audioRef.current.play().catch(() => {});
+
+          // Ensure analyzer keeps running across track switches.
+          if (isInitialized && !isAnalyzing) {
+            start();
+          }
         }
       }
     } catch (err) {
       // DEAKTIVIERT: Logging
       // console.error('Error switching track:', err);
     }
-  }, [currentTrackIndex, isPlaying]);
+  }, [currentTrackIndex, isAnalyzing, isInitialized, isPlaying, setAudioActive, setMusicPlaying, start]);
 
   // Audio-Element Event Handler
   useEffect(() => {
@@ -287,7 +297,14 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         audioRef.current.volume = 0.5;
         
         if (isPlaying) {
+          setIsPlaying(true);
+          setMusicPlaying(true);
+          setAudioActive(true);
           audioRef.current.play();
+
+          if (isInitialized && !isAnalyzing) {
+            start();
+          }
         }
       }
     } catch (err) {
