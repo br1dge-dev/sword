@@ -157,14 +157,23 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         audioRef.current.volume = 0.5;
         
         if (isPlaying || autoplay) {
+          // Keep UI/store in sync even when autoplaying (e.g. track ended).
+          setIsPlaying(true);
+          setMusicPlaying(true);
+          setAudioActive(true);
           audioRef.current.play().catch(() => {});
+
+          // Ensure analyzer keeps running across track switches.
+          if (isInitialized && !isAnalyzing) {
+            start();
+          }
         }
       }
     } catch (err) {
       // DEAKTIVIERT: Logging
       // console.error('Error switching track:', err);
     }
-  }, [currentTrackIndex, isPlaying]);
+  }, [currentTrackIndex, isAnalyzing, isInitialized, isPlaying, setAudioActive, setMusicPlaying, start]);
 
   // Audio-Element Event Handler
   useEffect(() => {
@@ -287,7 +296,14 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         audioRef.current.volume = 0.5;
         
         if (isPlaying) {
+          setIsPlaying(true);
+          setMusicPlaying(true);
+          setAudioActive(true);
           audioRef.current.play();
+
+          if (isInitialized && !isAnalyzing) {
+            start();
+          }
         }
       }
     } catch (err) {
