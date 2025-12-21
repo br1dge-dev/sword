@@ -39,6 +39,12 @@ export default function MobileControlsOverlay({
       toggleInvertPowerMode: s.toggleInvertPowerMode,
     })),
   );
+  const { autoXrayEnabled, toggleAutoXrayEnabled } = usePowerUpStore(
+    useShallow((s) => ({
+      autoXrayEnabled: s.autoXrayEnabled,
+      toggleAutoXrayEnabled: s.toggleAutoXrayEnabled,
+    })),
+  );
 
   return (
     <>
@@ -87,6 +93,16 @@ export default function MobileControlsOverlay({
               title="POWER"
             >
               <IoMdFlash className={`${invertPowerMode ? 'text-black' : 'text-grifter-blue'} text-2xl`} />
+            </button>
+
+            <button
+              onClick={toggleAutoXrayEnabled}
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+              style={{ boxShadow: autoXrayEnabled ? '0 0 16px rgba(62,230,255,0.95)' : '0 0 10px rgba(62, 230, 255, 0.45)' }}
+              aria-label="Auto X-ray"
+              title="AUTO"
+            >
+              <span className="text-grifter-blue text-[10px] font-press-start-2p">AUTO</span>
             </button>
 
             <button

@@ -34,21 +34,184 @@ export default function HomePage() {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isWtfOpen, setIsWtfOpen] = useState(false);
   const [showFps, setShowFps] = useState(false);
-  const { energy, beatDetected, setMusicPlaying, swordColor } = useAudioReactionStore(
+  const { energy, beatDetected, setMusicPlaying, swordColor, frequencyData } = useAudioReactionStore(
     useShallow((s) => ({
       energy: s.energy,
       beatDetected: s.beatDetected,
       setMusicPlaying: s.setMusicPlaying,
       swordColor: s.swordColor,
+      frequencyData: s.frequencyData,
     })),
   );
-  const { invertPowerMode, toggleInvertPowerMode } = usePowerUpStore(
+  const { invertPowerMode, toggleInvertPowerMode, autoXrayEnabled, toggleAutoXrayEnabled } = usePowerUpStore(
     useShallow((s) => ({
       invertPowerMode: s.invertPowerMode,
       toggleInvertPowerMode: s.toggleInvertPowerMode,
+      autoXrayEnabled: s.autoXrayEnabled,
+      toggleAutoXrayEnabled: s.toggleAutoXrayEnabled,
     })),
   );
   const swordColorSafe = swordColor ?? '#00FCA6';
+
+  // --- AUTO X-RAY driver (audio-reactive, non-flickery) ---
+  const mainRef = useRef<HTMLElement | null>(null);
+  const energyRef = useRef<number>(energy);
+  const beatRef = useRef<boolean>(beatDetected);
+  const freqRef = useRef<Uint8Array | null>(frequencyData ?? null);
+  useEffect(() => {
+    energyRef.current = energy;
+  }, [energy]);
+  useEffect(() => {
+    beatRef.current = beatDetected;
+  }, [beatDetected]);
+  useEffect(() => {
+    freqRef.current = frequencyData ?? null;
+  }, [frequencyData]);
+
+  const xrayStateRef = useRef<{
+    lastNow: number;
+    intensity: number; // 0..1
+    active: boolean;
+    activeSince: number;
+    cooldownUntil: number;
+    prevSpectrum: Uint8Array | null;
+  }>({
+    lastNow: 0,
+    intensity: 0,
+    active: false,
+    activeSince: 0,
+    cooldownUntil: 0,
+    prevSpectrum: null,
+  });
+
+  useEffect(() => {
+    if (!isClient) return;
+    let raf: number | null = null;
+    let cancelled = false;
+
+    const ON_TH = 0.78;
+    const OFF_TH = 0.55;
+    const MIN_ON_MS = 2600; // keep on long enough to feel like a “mode”
+    const MIN_COOLDOWN_MS = 6000;
+    const MAX_COOLDOWN_MS = 10000;
+    const ATTACK_MS = 320;
+    const RELEASE_MS = 520;
+    const TICK_MS = 50; // ~20 FPS logic (no need to run at 60)
+    let lastTick = 0;
+
+    const clamp01 = (v: number) => (v <= 0 ? 0 : v >= 1 ? 1 : v);
+
+    const avgBand = (arr: Uint8Array, start: number, end: number) => {
+      const s = Math.max(0, Math.min(arr.length, start));
+      const e = Math.max(s, Math.min(arr.length, end));
+      if (e <= s) return 0;
+      let sum = 0;
+      for (let i = s; i < e; i++) sum += arr[i];
+      return sum / (e - s);
+    };
+
+    const onsetFlux = (curr: Uint8Array, prev: Uint8Array | null) => {
+      if (!prev || prev.length !== curr.length) return 0;
+      let flux = 0;
+      for (let i = 0; i < curr.length; i++) {
+        const d = curr[i] - prev[i];
+        if (d > 0) flux += d;
+      }
+      return clamp01(flux / (curr.length * 255));
+    };
+
+    const step = (now: number) => {
+      if (cancelled) return;
+      raf = requestAnimationFrame(step);
+
+      if (now - lastTick < TICK_MS) return;
+      lastTick = now;
+
+      const el = mainRef.current;
+      if (!el) return;
+
+      // Manual override: full X-RAY.
+      if (invertPowerMode) {
+        xrayStateRef.current.intensity = 1;
+        el.style.setProperty('--xray', '1');
+        return;
+      }
+
+      // If auto is disabled, fade back to 0 and reset state.
+      if (!autoXrayEnabled) {
+        const st = xrayStateRef.current;
+        const dt = st.lastNow ? now - st.lastNow : 0;
+        st.lastNow = now;
+        const alpha = 1 - Math.exp(-dt / Math.max(1, RELEASE_MS));
+        st.intensity = st.intensity + (0 - st.intensity) * alpha;
+        if (st.intensity < 0.001) {
+          st.intensity = 0;
+          st.active = false;
+          st.activeSince = 0;
+          st.cooldownUntil = 0;
+          st.prevSpectrum = null;
+        }
+        el.style.setProperty('--xray', st.intensity.toFixed(3));
+        return;
+      }
+
+      const st = xrayStateRef.current;
+      const dt = st.lastNow ? now - st.lastNow : 0;
+      st.lastNow = now;
+
+      const e = clamp01(energyRef.current);
+      const beat = !!beatRef.current;
+      const freq = freqRef.current;
+
+      let hi = 0;
+      let onset = 0;
+      if (freq && freq.length) {
+        const midEnd = Math.floor(freq.length * 0.6);
+        hi = avgBand(freq, midEnd, freq.length) / 255;
+        onset = onsetFlux(freq, st.prevSpectrum);
+        // Important: copy, because analyzer pipelines may mutate/reuse typed arrays.
+        st.prevSpectrum = freq.slice();
+      } else {
+        st.prevSpectrum = null;
+      }
+
+      // Overdrive score: emphasize onset + highs; include overall energy.
+      let score = (0.55 * onset) + (0.35 * hi) + (0.20 * e);
+      if (beat) score = clamp01(score + 0.08);
+      score = clamp01(score);
+
+      // Hysteresis state machine + cooldown
+      if (!st.active) {
+        if (now >= st.cooldownUntil && score > ON_TH) {
+          // Require a “moment” signal to avoid slow/ambient enabling too often.
+          if (beat || onset > 0.18) {
+            st.active = true;
+            st.activeSince = now;
+          }
+        }
+      } else {
+        const onFor = now - st.activeSince;
+        if (onFor >= MIN_ON_MS && score < OFF_TH) {
+          st.active = false;
+          const cd = MIN_COOLDOWN_MS + Math.random() * (MAX_COOLDOWN_MS - MIN_COOLDOWN_MS);
+          st.cooldownUntil = now + cd;
+        }
+      }
+
+      const target = st.active ? 1 : 0;
+      const tau = target > st.intensity ? ATTACK_MS : RELEASE_MS;
+      const alpha = 1 - Math.exp(-dt / Math.max(1, tau));
+      st.intensity = st.intensity + (target - st.intensity) * alpha;
+
+      el.style.setProperty('--xray', st.intensity.toFixed(3));
+    };
+
+    raf = requestAnimationFrame(step);
+    return () => {
+      cancelled = true;
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [isClient, invertPowerMode, autoXrayEnabled]);
   
   // Für den Titel: Random Highlight
   const leaderboardTitle = 'L3ADERBOARD';
@@ -191,7 +354,10 @@ export default function HomePage() {
   };
 
   return (
-    <main className={`flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden ${invertPowerMode ? 'invert-power' : ''}`}>
+    <main
+      ref={mainRef}
+      className="xray-power flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden"
+    >
       <BuildBadge />
       {isClient && showFps ? <FpsCounter /> : null}
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
@@ -267,6 +433,19 @@ export default function HomePage() {
             title="POWER"
           >
             <IoMdFlash className={`${invertPowerMode ? 'text-black' : 'text-grifter-blue'} text-3xl`} />
+          </button>
+
+          {/* AUTO X-RAY */}
+          <button
+            onClick={toggleAutoXrayEnabled}
+            className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            style={{
+              boxShadow: autoXrayEnabled ? '0 0 22px rgba(62, 230, 255, 0.95)' : '0 0 16px rgba(62, 230, 255, 0.55)',
+            }}
+            aria-label="Auto X-ray"
+            title="AUTO"
+          >
+            <span className="text-grifter-blue text-[10px] font-press-start-2p">AUTO</span>
           </button>
 
           {/* HIDE Button */}
