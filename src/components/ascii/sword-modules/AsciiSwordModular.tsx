@@ -219,8 +219,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   } | null>(null);
   const debugEffectsLastSetRef = useRef<number>(0);
   
-  // Automatisches Beat-Reset aktivieren
-  useBeatReset(500);
+  // BeatDetected is an impulse; keep the "on" window short so it doesn't look stuck ON.
+  useBeatReset(120);
   
   // Idle-Animation läuft jetzt im Layout, nicht mehr hier
   
@@ -835,16 +835,22 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           entropy.prevBass = snap.bass;
           entropy.prevEnergy = snap.energy;
 
-          const bassDominant = snap.bass > snap.mid * 1.35 && snap.bass > snap.high * 1.65;
-          // Much stricter: entropy should NOT react to melodic transients.
+          const bassDominant = snap.bass > snap.mid * 1.45 && snap.bass > snap.high * 1.9;
+          // ENTROPY should be kick/bass driven, not "beatDetected" driven.
+          // We gate purely on bass dominance + bass transient, so melodic/synth spikes won't trigger it.
+          const crashScore = clamp01(
+            bassDelta * 22 +
+              energyDelta * 10 +
+              Math.max(0, snap.onset - 0.06) * 2.2 +
+              Math.max(0, snap.bass - snap.mid) * 2.8,
+          );
           const mainBeat =
-            !!beatDetectedRef.current &&
             bassDominant &&
-            snap.bass > 0.11 &&
-            snap.energy > 0.08 &&
-            bassDelta > 0.03 &&
-            energyDelta > 0.015;
-          const minGapMs = 420; // fewer triggers (prefer 2–3 hits/sec max)
+            snap.bass > 0.13 &&
+            snap.energy > 0.09 &&
+            bassDelta > 0.045 &&
+            crashScore > 0.35;
+          const minGapMs = 620; // much less frequent (avoid "always on")
           if (mainBeat && !entropy.beatLatch && (entropy.lastImpulseMs < 0 || nowMs - entropy.lastImpulseMs >= minGapMs)) {
             entropy.beatLatch = true;
             entropy.lastImpulseMs = nowMs;
@@ -862,15 +868,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
           const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
           // Default: smaller displacement. Only go big on real “crash/crescendo”.
-          // Default: compact. Explode only on real "crash/crescendo".
-          const tierPx = forgeTier === 1 ? 9 : forgeTier === 2 ? 13 : 18;
-          const crash = clamp01(
-            bassDelta * 18 +
-              energyDelta * 12 +
-              Math.max(0, snap.onset - 0.05) * 3.0 +
-              Math.max(0, snap.bass - snap.mid) * 2.4,
-          );
-          entropy.px = tierPx * (0.28 + crash * 1.55);
+          // Default: very compact. Explode hard only when crashScore is high.
+          const tierPx = forgeTier === 1 ? 12 : forgeTier === 2 ? 18 : 26;
+          const crash = crashScore;
+          // Nonlinear ramp: small most of the time; big on crescendos/crashes.
+          const big = Math.pow(crash, 1.6);
+          entropy.px = tierPx * (0.18 + big * 2.35);
         }
       }
 
