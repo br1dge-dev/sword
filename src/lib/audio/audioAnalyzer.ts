@@ -7,6 +7,12 @@ export interface AudioAnalyzerOptions {
   beatSensitivity?: number;
   energyThreshold?: number;
   analyzeInterval?: number;
+  /**
+   * Throttle for emitting frequency snapshots to consumers (ms).
+   * The analyzer updates its internal FFT every analyze tick, but copying & emitting
+   * large Uint8Arrays every tick is expensive. Default ~20Hz.
+   */
+  frequencyInterval?: number;
 }
 
 export interface BeatDetectionResult {
@@ -29,10 +35,12 @@ export class AudioAnalyzer {
   private frequencyData: Uint8Array | null = null;
   private lastAnalyzeTime: number = 0;
   private lastBeatTime: number = 0; // Zeit des letzten erkannten Beats
+  private lastFrequencyEmitTime: number = 0;
   private options: AudioAnalyzerOptions = {
     beatSensitivity: 1.0,
     energyThreshold: 0.02, // Reduziert für empfindlichere Reaktionen
-    analyzeInterval: 50
+    analyzeInterval: 50,
+    frequencyInterval: 50,
   };
   private initializationPromise: Promise<void> | null = null;
   private reconnectAttempts: number = 0;
@@ -253,9 +261,13 @@ export class AudioAnalyzer {
       // This is safe because `AnalyserNode` writes into the provided typed array.
       this.analyser.getByteFrequencyData(this.frequencyData as any);
 
-      // Send frequency snapshot to consumers (copy because WebAudio mutates the array in-place).
+      // Emit frequency snapshots to consumers (throttled + copied because WebAudio mutates in-place).
       if (this.options.onFrequency) {
-        this.options.onFrequency(this.frequencyData.slice());
+        const freqIntervalMs = this.options.frequencyInterval ?? 50;
+        if (now - this.lastFrequencyEmitTime >= freqIntervalMs) {
+          this.lastFrequencyEmitTime = now;
+          this.options.onFrequency(this.frequencyData.slice());
+        }
       }
       
       // NEU: Verbesserte Energie-Berechnung mit Frequenzgewichtung
@@ -332,7 +344,9 @@ export class AudioAnalyzer {
           const maxSensitivity = 2.5; // Reduziert von 3.0 für realistischere Werte
           const effectiveThreshold = 3 + (maxSensitivity - currentSensitivity) * 3; // Reduziert von 5+5 auf 3+3
           
-          if (beatIntensity > effectiveThreshold && Math.random() < 0.85) { // Erhöht von 0.75 auf 0.85 für mehr Beats
+          // IMPORTANT: Keep beat detection deterministic. Random gating makes visuals feel inconsistent.
+          // The min interval + adaptive thresholding already prevent spam.
+          if (beatIntensity > effectiveThreshold) {
             this.lastBeatTime = now;
             // DEAKTIVIERT: Logging
             // this.throttledLog(`Beat detected - Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}`);
