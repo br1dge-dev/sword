@@ -31,6 +31,11 @@ interface PowerUpState {
   invertPowerMode: boolean;
   toggleInvertPowerMode: () => void;
   setInvertPowerMode: (enabled: boolean) => void;
+
+  // Auto X-RAY (audio driven)
+  autoXrayEnabled: boolean;
+  toggleAutoXrayEnabled: () => void;
+  setAutoXrayEnabled: (enabled: boolean) => void;
   
   // Aktionen
   startPowerUp: () => void;
@@ -67,6 +72,10 @@ export const usePowerUpStore = create<PowerUpState>()(
       invertPowerMode: false,
       toggleInvertPowerMode: () => set((s) => ({ invertPowerMode: !s.invertPowerMode })),
       setInvertPowerMode: (enabled) => set({ invertPowerMode: enabled }),
+
+      autoXrayEnabled: false,
+      toggleAutoXrayEnabled: () => set((s) => ({ autoXrayEnabled: !s.autoXrayEnabled })),
+      setAutoXrayEnabled: (enabled) => set({ autoXrayEnabled: enabled }),
       
       startPowerUp: () => {
         set((state) => {
@@ -184,6 +193,7 @@ export const usePowerUpStore = create<PowerUpState>()(
           glitchProgress: 0,
           isGlitchComplete: false,
           invertPowerMode: false,
+          autoXrayEnabled: false,
         });
       }
     }),
@@ -201,6 +211,7 @@ export const usePowerUpStore = create<PowerUpState>()(
         glitchProgress: state.glitchProgress,
         isGlitchComplete: state.isGlitchComplete,
         invertPowerMode: state.invertPowerMode,
+        autoXrayEnabled: state.autoXrayEnabled,
       })
     }
   )
