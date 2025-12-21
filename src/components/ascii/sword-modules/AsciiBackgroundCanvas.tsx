@@ -131,8 +131,9 @@ const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
       cacheARef.current.fontSize !== fontSize ||
       cacheARef.current.fontFamily !== fontFamily;
 
+    let cacheA = cacheARef.current;
     if (needNewA) {
-      cacheARef.current = {
+      cacheA = {
         canvas: createOffscreenCanvas(Math.floor(width * dpr), Math.floor(height * dpr)),
         width,
         height,
@@ -145,32 +146,37 @@ const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
         offsetY,
         patternRef: null,
       };
+      cacheARef.current = cacheA;
     } else {
       // Keep metrics in sync when only pattern changes.
-      cacheARef.current.charWidth = charWidth;
-      cacheARef.current.charHeight = charHeight;
-      cacheARef.current.offsetX = offsetX;
-      cacheARef.current.offsetY = offsetY;
+      if (cacheA) {
+        cacheA.charWidth = charWidth;
+        cacheA.charHeight = charHeight;
+        cacheA.offsetX = offsetX;
+        cacheA.offsetY = offsetY;
+      }
     }
 
-    if (cacheARef.current.patternRef !== pattern) {
-      cacheARef.current.patternRef = pattern;
-      renderPatternToCache(cacheARef.current, pattern);
+    if (cacheA && cacheA.patternRef !== pattern) {
+      cacheA.patternRef = pattern;
+      renderPatternToCache(cacheA, pattern);
     }
 
     // (Re)build cache B if needed (only if patternB exists).
     const hasB = !!(patternB && patternB.length > 0);
     if (hasB) {
+      const cacheBExisting = cacheBRef.current;
       const needNewB =
-        !cacheBRef.current ||
-        cacheBRef.current.width !== width ||
-        cacheBRef.current.height !== height ||
-        cacheBRef.current.dpr !== dpr ||
-        cacheBRef.current.fontSize !== fontSize ||
-        cacheBRef.current.fontFamily !== fontFamily;
+        !cacheBExisting ||
+        cacheBExisting.width !== width ||
+        cacheBExisting.height !== height ||
+        cacheBExisting.dpr !== dpr ||
+        cacheBExisting.fontSize !== fontSize ||
+        cacheBExisting.fontFamily !== fontFamily;
 
+      let cacheB = cacheBExisting;
       if (needNewB) {
-        cacheBRef.current = {
+        cacheB = {
           canvas: createOffscreenCanvas(Math.floor(width * dpr), Math.floor(height * dpr)),
           width,
           height,
@@ -183,16 +189,17 @@ const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
           offsetY,
           patternRef: null,
         };
-      } else if (cacheBRef.current) {
-        cacheBRef.current.charWidth = charWidth;
-        cacheBRef.current.charHeight = charHeight;
-        cacheBRef.current.offsetX = offsetX;
-        cacheBRef.current.offsetY = offsetY;
+        cacheBRef.current = cacheB;
+      } else if (cacheB) {
+        cacheB.charWidth = charWidth;
+        cacheB.charHeight = charHeight;
+        cacheB.offsetX = offsetX;
+        cacheB.offsetY = offsetY;
       }
 
-      if (cacheBRef.current && cacheBRef.current.patternRef !== patternB) {
-        cacheBRef.current.patternRef = patternB!;
-        renderPatternToCache(cacheBRef.current, patternB!);
+      if (cacheB && cacheB.patternRef !== patternB) {
+        cacheB.patternRef = patternB!;
+        renderPatternToCache(cacheB, patternB!);
       }
     } else {
       cacheBRef.current = null;
@@ -224,7 +231,7 @@ const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
     }
 
     ctx.globalAlpha = 1;
-    for (const [color, pts] of byColor) {
+    for (const [color, pts] of Array.from(byColor.entries())) {
       ctx.fillStyle = color;
       for (let i = 0; i < pts.length; i++) {
         const { x, y } = pts[i];
