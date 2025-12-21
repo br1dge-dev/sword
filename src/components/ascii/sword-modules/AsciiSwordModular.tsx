@@ -404,7 +404,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     });
     return positions;
   }, [currentLevel, level]);
-
+  
   // OPTIMIERT: Memoisierte Edge-Positionen
   const edgePositions = useMemo(() => {
     const positions: Array<EdgePosition> = [];
@@ -426,7 +426,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     });
     return positions;
   }, [currentLevel, level]);
-
+  
   // OPTIMIERT: Memoisierte Schwert-ASCII-Art
   const { swordArt, centeredSwordLines } = useMemo(() => {
     const activeLevel = currentLevel || level;
@@ -480,7 +480,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // --- ENTROPY (beat-impact “explosion drawing”) ---
   // Precompute per-cell direction vectors so the effect is punchy but cheap at runtime.
   const entropyVecMap = useMemo(() => {
-    const m = new Map<string, { dx: number; dy: number; wobbleMul: number }>();
+    const m = new Map<string, { dx: number; dy: number; wobbleMul: number; strengthMul: number }>();
     if (!swordPositions.length) return m;
     // Center of the sword bounds (approx)
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -495,6 +495,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     const seed = 17;
     for (const p of swordPositions) {
       const k = `${p.x},${p.y}`;
+      // Reduce entropy on handle/guard (like glitch L3 focus): handle almost none, guard minimal, blade full.
+      const isHandle = isHandleFast(p.x, p.y);
+      const isGuardBand = hiltStartIndex !== -1 && p.y >= hiltStartIndex - 2 && p.y <= hiltStartIndex; // near cross-guard
+      const isPommelBand = hiltStartIndex !== -1 && p.y >= hiltStartIndex + 1; // below guard (handle/pommel)
+      const strengthMul = isHandle || isPommelBand ? 0.05 : isGuardBand ? 0.18 : 1.0;
       // Outward vector + a bit of deterministic “chaos”
       let vx = p.x - cx;
       let vy = p.y - cy;
@@ -510,10 +515,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       vy /= len2;
       // Per-cell stable wobble multiplier (no per-cell trig at runtime).
       const wobbleMul = 0.78 + hash01(p.x, p.y, seed + 2) * 0.44; // ~0.78..1.22
-      m.set(k, { dx: vx, dy: vy, wobbleMul });
+      m.set(k, { dx: vx, dy: vy, wobbleMul, strengthMul });
     }
     return m;
-  }, [swordPositions]);
+  }, [hiltStartIndex, isHandleFast, swordPositions]);
 
   const entropyRef = useRef<{ lastImpulseMs: number; amp01: number; px: number; beatLatch: boolean; prevBass: number; prevEnergy: number }>({
     lastImpulseMs: -1,
@@ -533,7 +538,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     handlePositionsRef.current = handlePositionsMemo;
   }, [handlePositionsMemo]);
-
+  
   // Zustände für visuelle Effekte
   const [glowIntensity, setGlowIntensity] = useState(0);
   const [baseColor, setBaseColor] = useState('#00FCA6');
@@ -830,14 +835,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           entropy.prevBass = snap.bass;
           entropy.prevEnergy = snap.energy;
 
-          const bassDominant = snap.bass > snap.mid * 1.2 && snap.bass > snap.high * 1.35;
+          const bassDominant = snap.bass > snap.mid * 1.35 && snap.bass > snap.high * 1.65;
+          // Much stricter: entropy should NOT react to melodic transients.
           const mainBeat =
             !!beatDetectedRef.current &&
             bassDominant &&
-            snap.bass > 0.075 &&
-            snap.energy > 0.06 &&
-            (bassDelta > 0.02 || energyDelta > 0.02);
-          const minGapMs = 260;
+            snap.bass > 0.11 &&
+            snap.energy > 0.08 &&
+            bassDelta > 0.03 &&
+            energyDelta > 0.015;
+          const minGapMs = 420; // fewer triggers (prefer 2–3 hits/sec max)
           if (mainBeat && !entropy.beatLatch && (entropy.lastImpulseMs < 0 || nowMs - entropy.lastImpulseMs >= minGapMs)) {
             entropy.beatLatch = true;
             entropy.lastImpulseMs = nowMs;
@@ -847,17 +854,23 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
           const t = entropy.lastImpulseMs > 0 ? nowMs - entropy.lastImpulseMs : 1e9;
           // Snappier: faster attack + faster decay (less “laggy” feel).
-          const attackMs = 18;
-          const decayMs = 145;
+          const attackMs = 14;
+          const decayMs = 120;
           const a = t <= 0 ? 0 : t < attackMs ? t / attackMs : 1;
           const d = Math.exp(-Math.max(0, t - attackMs) / decayMs);
           entropy.amp01 = Math.max(0, Math.min(1, a * d));
 
           const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
           // Default: smaller displacement. Only go big on real “crash/crescendo”.
-          const tierPx = forgeTier === 1 ? 7 : forgeTier === 2 ? 10 : 13;
-          const crash = clamp01(bassDelta * 12 + energyDelta * 10 + snap.onset * 1.2 + (snap.bass - snap.mid) * 1.8);
-          entropy.px = tierPx * (0.55 + crash * 0.95);
+          // Default: compact. Explode only on real "crash/crescendo".
+          const tierPx = forgeTier === 1 ? 9 : forgeTier === 2 ? 13 : 18;
+          const crash = clamp01(
+            bassDelta * 18 +
+              energyDelta * 12 +
+              Math.max(0, snap.onset - 0.05) * 3.0 +
+              Math.max(0, snap.bass - snap.mid) * 2.4,
+          );
+          entropy.px = tierPx * (0.28 + crash * 1.55);
         }
       }
 
@@ -1639,7 +1652,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                   if (v) {
                     // Global wobble (cheap) + per-cell wobbleMul (precomputed) => no per-cell trig.
                     const globalWobble = 0.84 + Math.sin(shimmerRef.current.nowMs * 0.06) * 0.16;
-                    const mag = ent.px * ent.amp01 * globalWobble * v.wobbleMul;
+                    const mag = ent.px * ent.amp01 * globalWobble * v.wobbleMul * v.strengthMul;
                     style.transform = `${style.transform || ''} translate(${v.dx * mag}px, ${v.dy * mag}px)`.trim();
                   }
                 }
