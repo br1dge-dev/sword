@@ -3,10 +3,8 @@
 import React from 'react';
 import SideButtons from './SideButtons';
 import { IoMdSettings } from 'react-icons/io';
-import { IoMdEye, IoMdEyeOff, IoMdHelpCircle, IoMdTrophy, IoMdFlash } from 'react-icons/io';
+import { IoMdEye, IoMdEyeOff, IoMdHelpCircle, IoMdTrophy } from 'react-icons/io';
 import AudioControlPanel from './AudioControlPanel';
-import { usePowerUpStore } from '@/store/powerUpStore';
-import { useShallow } from 'zustand/react/shallow';
 
 interface MobileControlsOverlayProps {
   isOpen: boolean;
@@ -17,6 +15,8 @@ interface MobileControlsOverlayProps {
   onOpenWtf: () => void;
   onToggleLeaderboard: () => void;
   isUIVisible: boolean;
+  isFpsEnabled: boolean;
+  onToggleFps: () => void;
 }
 
 export default function MobileControlsOverlay({
@@ -28,14 +28,9 @@ export default function MobileControlsOverlay({
   onOpenWtf,
   onToggleLeaderboard,
   isUIVisible,
+  isFpsEnabled,
+  onToggleFps,
 }: MobileControlsOverlayProps) {
-  const { invertPowerMode, toggleInvertPowerMode } = usePowerUpStore(
-    useShallow((s) => ({
-      invertPowerMode: s.invertPowerMode,
-      toggleInvertPowerMode: s.toggleInvertPowerMode,
-    })),
-  );
-
   return (
     <>
       {/* Overlay-Button (immer sichtbar) */}
@@ -76,13 +71,13 @@ export default function MobileControlsOverlay({
           {/* Actions behind the gear button */}
           <div className="flex items-center justify-center gap-4 pt-2">
             <button
-              onClick={toggleInvertPowerMode}
+              onClick={onToggleFps}
               className="w-11 h-11 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
-              style={{ boxShadow: invertPowerMode ? '0 0 16px rgba(255,255,255,0.75)' : '0 0 10px rgba(62, 230, 255, 0.45)' }}
-              aria-label="Power (invert)"
-              title="POWER"
+              style={{ boxShadow: isFpsEnabled ? '0 0 16px rgba(62,230,255,0.95)' : '0 0 10px rgba(62, 230, 255, 0.45)' }}
+              aria-label="Toggle FPS counter"
+              title="FPS"
             >
-              <IoMdFlash className={`${invertPowerMode ? 'text-black' : 'text-grifter-blue'} text-2xl`} />
+              <span className="text-grifter-blue text-[10px] font-press-start-2p">FPS</span>
             </button>
 
             <button

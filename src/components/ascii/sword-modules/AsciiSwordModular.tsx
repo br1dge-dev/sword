@@ -1327,14 +1327,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             veins={coloredVeins}
             width={((staticBackground.length > 0 ? staticBackground[0].length : caveBackground[0]?.length) || 160) * 10}
             height={((staticBackground.length > 0 ? staticBackground.length : caveBackground.length) || 100) * 14}
-            fontSize={12}
+            fontSize={13}
             fontFamily={'monospace'}
           />
         </div>
       </div>
       {/* Schwert im Vordergrund */}
       <pre
-        className="relative z-10 font-mono text-xs sm:text-sm md:text-base lg:text-lg whitespace-pre select-none"
+        className="relative z-10 font-mono text-sm sm:text-base md:text-lg lg:text-xl whitespace-pre select-none"
         style={{
           color: baseColor,
           textShadow,

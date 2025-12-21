@@ -273,12 +273,7 @@
     animation: crtRoll 3.8s linear infinite;
   }
 
-  /* Invert “power / X-ray” mode (test toggle).
-     Keep it simple: invert the whole scene for a punchy “radiograph” look,
-     then push contrast/brightness a bit. */
-  .invert-power {
-    filter: invert(1) hue-rotate(180deg) contrast(1.15) brightness(1.08);
-  }
+  /* (removed) X-RAY / Overdrive layer */
 
   @keyframes crtRoll {
     0% { background-position: 0% -120%; }

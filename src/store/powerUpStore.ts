@@ -27,10 +27,7 @@ interface PowerUpState {
   glitchProgress: number;
   isGlitchComplete: boolean;
 
-  // Visual layers
-  invertPowerMode: boolean;
-  toggleInvertPowerMode: () => void;
-  setInvertPowerMode: (enabled: boolean) => void;
+  // Visual layers (reserved for future, currently none)
   
   // Aktionen
   startPowerUp: () => void;
@@ -64,10 +61,6 @@ export const usePowerUpStore = create<PowerUpState>()(
       glitchProgress: 0,
       isGlitchComplete: false,
 
-      invertPowerMode: false,
-      toggleInvertPowerMode: () => set((s) => ({ invertPowerMode: !s.invertPowerMode })),
-      setInvertPowerMode: (enabled) => set({ invertPowerMode: enabled }),
-      
       startPowerUp: () => {
         set((state) => {
           // Prüfen, ob der Schmiedeprozess abgeschlossen ist
@@ -183,7 +176,6 @@ export const usePowerUpStore = create<PowerUpState>()(
           isChargeComplete: false,
           glitchProgress: 0,
           isGlitchComplete: false,
-          invertPowerMode: false,
         });
       }
     }),
@@ -200,7 +192,6 @@ export const usePowerUpStore = create<PowerUpState>()(
         isChargeComplete: state.isChargeComplete,
         glitchProgress: state.glitchProgress,
         isGlitchComplete: state.isGlitchComplete,
-        invertPowerMode: state.invertPowerMode,
       })
     }
   )
