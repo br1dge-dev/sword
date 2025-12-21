@@ -1045,7 +1045,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setUnicodeGlitches([]);
             }
 
-          if ((beatStrength > 0.85 || onset > 0.03) && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
+          // NOTE: Some tracks have long “high intensity” plateaus with little rhythmic transient energy.
+          // In those passages, beat/onset can be low while energy is high, which previously (via synthetic beats)
+          // still produced glitch bursts. Keep it punchy by also allowing a high-energy fallback trigger.
+          const highEnergyPressure =
+            currentEnergy > 0.32 && (reactive.high > 0.16 || reactive.mid > 0.18 || reactive.bass > 0.18);
+          if ((beatStrength > 0.85 || onset > 0.03 || (glitchTier >= 2 && highEnergyPressure)) && effectsTriggered < MAX_EFFECTS_PER_UPDATE && now >= unicodeGlitchUntilRef.current) {
             const tempGlitchLevel = Math.min(3, Math.floor(glitchTier + (currentEnergy * 1.2)));
             // Glitch L3 should primarily affect the blade; handle/hilt get only subtle echoes.
             const unicodeBase = tempGlitchLevel >= 3 ? bladePositionsRef.current : swordPositions;
@@ -1068,7 +1073,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }
           const wantsGlitchChars =
             glitchTier >= 2 &&
-            (currentBeat || beatStrength > 0.7 || onset > 0.04) &&
+            (currentBeat || beatStrength > 0.7 || onset > 0.04 || highEnergyPressure) &&
             effectsTriggered < MAX_EFFECTS_PER_UPDATE &&
             now >= glitchCharsUntilRef.current;
           if (wantsGlitchChars) {
@@ -1101,9 +1106,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             fadeActiveRef.current = false;
       setFadedChars([]);
           }
-          const wantsBlur = glitchTier >= 2 && (onset > 0.03 || beatStrength > 0.55) && now >= blurUntilRef.current;
-          const wantsSkew = glitchTier >= 2 && (currentBeat || beatStrength > 0.7) && now >= skewUntilRef.current;
-          const wantsFade = glitchTier >= 3 && (currentBeat || onset > 0.05) && now >= fadeUntilRef.current;
+          const wantsBlur = glitchTier >= 2 && (onset > 0.03 || beatStrength > 0.55 || highEnergyPressure) && now >= blurUntilRef.current;
+          const wantsSkew = glitchTier >= 2 && (currentBeat || beatStrength > 0.7 || highEnergyPressure) && now >= skewUntilRef.current;
+          const wantsFade = glitchTier >= 3 && (currentBeat || onset > 0.05 || highEnergyPressure) && now >= fadeUntilRef.current;
           if (wantsBlur && effectsTriggered < MAX_EFFECTS_PER_UPDATE) {
             setBlurredChars(generateBlurredChars(glitchTier >= 3 ? bladePositionsRef.current : swordPositions, glitchTier));
             blurActiveRef.current = true;
