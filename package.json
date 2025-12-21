@@ -1,13 +1,16 @@
 {
   "name": "sword",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "analyze:perf": "node scripts/analyze-performance.js"
+    "analyze:perf": "node scripts/analyze-performance.js",
+    "bump:patch": "npm version patch --no-git-tag-version",
+    "bump:minor": "npm version minor --no-git-tag-version",
+    "bump:major": "npm version major --no-git-tag-version"
   },
   "dependencies": {
     "autoprefixer": "10.4.23",
