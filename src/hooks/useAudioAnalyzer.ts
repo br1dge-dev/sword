@@ -5,7 +5,7 @@ import { useAudioReactionStore } from '@/store/audioReactionStore';
 interface UseAudioAnalyzerOptions extends AudioAnalyzerOptions {
   autoStart?: boolean;
   autoDetectBeat?: boolean;
-  frequencyInterval?: number; // Throttle for frequency snapshots pushed to the store
+  frequencyInterval?: number; // Throttle for frequency snapshots pushed to consumers (handled in AudioAnalyzer)
 }
 
 interface UseAudioAnalyzerReturn {
@@ -58,7 +58,6 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
   const triggerBeat = useAudioReactionStore((s) => s.triggerBeat);
   const setAudioActive = useAudioReactionStore((s) => s.setAudioActive);
   const setFrequencyData = useAudioReactionStore((s) => s.setFrequencyData);
-  const lastFrequencyUpdateRef = useRef<number>(0);
   
   // Reset beat detection after a short delay
   useEffect(() => {
@@ -88,6 +87,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
       analyzeInterval: 33, // ~30Hz for smoother reactivity (energy still throttled in store)
       energyThreshold: 0.015, // Reduziert von 0.03 für empfindlichere Reaktion
       beatSensitivity: 1.2, // Erhöht von 0.8 für bessere Beat-Erkennung
+      frequencyInterval: options?.frequencyInterval ?? 50, // default ~20Hz
       ...options,
     };
 
@@ -115,27 +115,12 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
           if (e > 0.015) { // Reduziert von 0.03 für empfindlichere Reaktion
             setAudioActive(true);
           }
-          
-          // NEU: Verbesserte Beat-Erkennung mit niedrigeren Schwellenwerten
-          if (e > energyThreshold) { // Reduziert von 0.05 für empfindlichere Reaktion
-            const now = Date.now();
-            const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
-            
-            // Mindestens 80ms zwischen Beats (reduziert von 100ms für schnellere Beats)
-            if (timeSinceLastBeat > 80) {
-              setBeatDetected(true);
-              triggerBeat();
-            }
-          }
 
           // Zusätzlich: UI/Caller Callback
           externalOnEnergy?.(e);
         },
         onFrequency: (frequencies: Uint8Array) => {
-          const now = Date.now();
-          const interval = options?.frequencyInterval ?? 50; // default ~20Hz for frequency-driven visuals
-          if (now - lastFrequencyUpdateRef.current < interval) return;
-          lastFrequencyUpdateRef.current = now;
+          // Already throttled/copied in AudioAnalyzer.
           setFrequencyData(frequencies);
 
           // Zusätzlich: UI/Caller Callback
@@ -165,21 +150,9 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
           setEnergy(e);
           updateEnergy(e);
           if (e > 0.015) setAudioActive(true);
-          if (e > energyThreshold) {
-            const now = Date.now();
-            const timeSinceLastBeat = now - (analyzerRef.current?.getLastBeatTime() || 0);
-            if (timeSinceLastBeat > 80) {
-              setBeatDetected(true);
-              triggerBeat();
-            }
-          }
           externalOnEnergy?.(e);
         },
         onFrequency: (frequencies: Uint8Array) => {
-          const now = Date.now();
-          const interval = options?.frequencyInterval ?? 50;
-          if (now - lastFrequencyUpdateRef.current < interval) return;
-          lastFrequencyUpdateRef.current = now;
           setFrequencyData(frequencies);
           externalOnFrequency?.(frequencies);
         },
