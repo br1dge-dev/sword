@@ -11,6 +11,7 @@ import { Inter, Press_Start_2P, Silkscreen } from 'next/font/google';
 import { useAudioReactionStore, useIdleAnimation } from '@/store/audioReactionStore';
 import '../styles/globals.css';
 import { useShallow } from 'zustand/react/shallow';
+import VersionBadge from '@/components/ui/VersionBadge';
 
 // Initialize the Inter font with Latin subset
 const inter = Inter({ subsets: ['latin'] });
@@ -89,6 +90,7 @@ export default function RootLayout({
         <div className="min-h-screen overflow-hidden">
           {children}
         </div>
+        <VersionBadge />
         {/* Global CRT overlay: scanlines + tube glow + subtle noise (affects ALL UI) */}
         <div className="crt-overlay" aria-hidden="true" />
       </body>
