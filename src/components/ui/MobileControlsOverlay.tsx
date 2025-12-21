@@ -17,6 +17,8 @@ interface MobileControlsOverlayProps {
   onOpenWtf: () => void;
   onToggleLeaderboard: () => void;
   isUIVisible: boolean;
+  isFpsEnabled: boolean;
+  onToggleFps: () => void;
 }
 
 export default function MobileControlsOverlay({
@@ -28,6 +30,8 @@ export default function MobileControlsOverlay({
   onOpenWtf,
   onToggleLeaderboard,
   isUIVisible,
+  isFpsEnabled,
+  onToggleFps,
 }: MobileControlsOverlayProps) {
   const { invertPowerMode, toggleInvertPowerMode } = usePowerUpStore(
     useShallow((s) => ({
@@ -83,6 +87,16 @@ export default function MobileControlsOverlay({
               title="POWER"
             >
               <IoMdFlash className={`${invertPowerMode ? 'text-black' : 'text-grifter-blue'} text-2xl`} />
+            </button>
+
+            <button
+              onClick={onToggleFps}
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+              style={{ boxShadow: isFpsEnabled ? '0 0 16px rgba(62,230,255,0.95)' : '0 0 10px rgba(62, 230, 255, 0.45)' }}
+              aria-label="Toggle FPS counter"
+              title="FPS"
+            >
+              <span className="text-grifter-blue text-[10px] font-press-start-2p">FPS</span>
             </button>
 
             <button

@@ -19,6 +19,7 @@ import BuildBadge from '@/components/ui/BuildBadge';
 import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle, IoMdFlash } from 'react-icons/io';
 import { useShallow } from 'zustand/react/shallow';
 import WtfIsThisModal from '@/components/ui/WtfIsThisModal';
+import FpsCounter from '@/components/ui/FpsCounter';
 
 const HIGHLIGHT_COLORS = ['#F8E16C', '#FF3EC8', '#3EE6FF'] as const;
 
@@ -32,6 +33,7 @@ export default function HomePage() {
   const [isUIVisible, setIsUIVisible] = useState(true);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isWtfOpen, setIsWtfOpen] = useState(false);
+  const [showFps, setShowFps] = useState(false);
   const { energy, beatDetected, setMusicPlaying, swordColor } = useAudioReactionStore(
     useShallow((s) => ({
       energy: s.energy,
@@ -92,6 +94,29 @@ export default function HomePage() {
       // KEIN Cleanup beim Unmount, da die Idle-Animation im Layout läuft
     };
   }, [setMusicPlaying]);
+
+  // Persist FPS toggle (dev-friendly)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const v = window.localStorage.getItem('griftsword_show_fps');
+      setShowFps(v === '1');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleFps = () => {
+    setShowFps((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem('griftsword_show_fps', next ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   // IMPORTANT: Only render ONE audio UI at a time (desktop OR mobile).
   // With multiple AudioControlPanels mounted, the global analyzer can attach to the wrong <audio> element,
@@ -168,6 +193,7 @@ export default function HomePage() {
   return (
     <main className={`flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden ${invertPowerMode ? 'invert-power' : ''}`}>
       <BuildBadge />
+      {isClient && showFps ? <FpsCounter /> : null}
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
         isModalOpen || isLeaderboardOpen ? 'backdrop-blur-modal' : ''
       }`}>
@@ -219,6 +245,8 @@ export default function HomePage() {
               onOpenWtf={() => setIsWtfOpen(true)}
               onToggleLeaderboard={() => setIsLeaderboardOpen((v) => !v)}
               isUIVisible={isUIVisible}
+              isFpsEnabled={showFps}
+              onToggleFps={toggleFps}
             />
           </div>
         )}
@@ -266,6 +294,19 @@ export default function HomePage() {
             aria-label="WTF is this?"
           >
             <IoMdHelpCircle className="text-grifter-blue text-3xl" />
+          </button>
+
+          {/* FPS */}
+          <button
+            onClick={toggleFps}
+            className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-blue"
+            style={{
+              boxShadow: showFps ? '0 0 22px rgba(62, 230, 255, 0.95)' : '0 0 16px rgba(62, 230, 255, 0.55)',
+            }}
+            aria-label="Toggle FPS counter"
+            title="FPS"
+          >
+            <span className="text-grifter-blue text-[12px] font-press-start-2p">FPS</span>
           </button>
 
           {/* Leaderboard Button */}
