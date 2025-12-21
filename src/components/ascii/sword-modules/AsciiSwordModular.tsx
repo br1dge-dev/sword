@@ -93,6 +93,41 @@ const EQ_PALETTES: EqPalette[] = [
   { low: '#F8E16C', mid: '#00FCA6', high: '#3EE6FF', peak: '#FF3EC8' }, // yellow -> green -> cyan
 ];
 
+function clamp01(v: number) {
+  if (v <= 0) return 0;
+  if (v >= 1) return 1;
+  return v;
+}
+
+function parseColorToRgbFast(color: string): { r: number; g: number; b: number } | null {
+  // #RRGGBB
+  if (color.startsWith('#') && color.length === 7) {
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) return { r, g, b };
+  }
+  // rgb(r,g,b)
+  if (color.startsWith('rgb(')) {
+    const m = color.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+    if (m) return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]) };
+  }
+  // rgba(r,g,b,a)
+  if (color.startsWith('rgba(')) {
+    const m = color.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,/i);
+    if (m) return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]) };
+  }
+  return null;
+}
+
+function mixToWhite(rgb: { r: number; g: number; b: number }, amount01: number) {
+  const t = clamp01(amount01);
+  const r = Math.round(rgb.r + (255 - rgb.r) * t);
+  const g = Math.round(rgb.g + (255 - rgb.g) * t);
+  const b = Math.round(rgb.b + (255 - rgb.b) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
   const { currentLevel, chargeLevel, glitchLevel } = useSwordPowerUpState();
@@ -358,7 +393,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     });
     return positions;
   }, [currentLevel, level]);
-  
+
   // OPTIMIERT: Memoisierte Schwert-ASCII-Art
   const { swordArt, centeredSwordLines } = useMemo(() => {
     const activeLevel = currentLevel || level;
@@ -380,6 +415,25 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     (x: number, y: number) => hiltStartIndex !== -1 && y >= hiltStartIndex && Math.abs(x - middleX) <= 2,
     [hiltStartIndex, middleX],
   );
+
+  // Precompute blade-only edge positions and normalized progress for a deterministic “traveling wave”.
+  const bladeEdgeWave = useMemo(() => {
+    const bladeOnly = hiltStartIndex === -1 ? edgePositions : edgePositions.filter((p) => p.y < hiltStartIndex);
+    if (!bladeOnly.length) return { points: [] as Array<{ x: number; y: number; k: string; prog01: number }>, minY: 0, maxY: 0 };
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of bladeOnly) {
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const denom = Math.max(1, maxY - minY);
+    const points = bladeOnly.map((p) => {
+      // progress 0 at hilt (bottom of blade), 1 at tip (top)
+      const prog01 = clamp01(1 - (p.y - minY) / denom);
+      return { x: p.x, y: p.y, k: `${p.x},${p.y}`, prog01 };
+    });
+    return { points, minY, maxY };
+  }, [edgePositions, hiltStartIndex]);
 
   // For power-up effects: treat blade as the primary “impact” area (handle/hilt should stay calmer).
   const bladePositions = useMemo(() => {
@@ -612,6 +666,30 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const eqPaletteIndexRef = useRef(0);
   const eqPaletteLastSwapMsRef = useRef(0);
 
+  // Reactive refs for shimmer/wave coloring (avoid extra state arrays).
+  const shimmerRef = useRef<{ nowMs: number; energy: number; bass: number; mid: number; high: number; beat: number }>({
+    nowMs: 0,
+    energy: 0,
+    bass: 0,
+    mid: 0,
+    high: 0,
+    beat: 0,
+  });
+  const baseColorRgb = useMemo(() => parseColorToRgbFast(baseColor) ?? { r: 0, g: 252, b: 166 }, [baseColor]);
+  const baseColorRgbRef = useRef(baseColorRgb);
+  useEffect(() => {
+    baseColorRgbRef.current = baseColorRgb;
+  }, [baseColorRgb]);
+
+  const bladeEdgeWaveRef = useRef(bladeEdgeWave);
+  useEffect(() => {
+    bladeEdgeWaveRef.current = bladeEdgeWave;
+  }, [bladeEdgeWave]);
+
+  // Deterministic beat-traveling wave
+  const waveStartMsRef = useRef<number>(-1);
+  const waveMapRef = useRef<Map<string, string>>(new Map());
+
   useEffect(() => {
     lastColorChangeTimeRef.current = lastColorChangeTime;
   }, [lastColorChangeTime]);
@@ -656,6 +734,53 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           beatDetected: beatDetectedRef.current,
           frequencyData: frequencyDataRef.current,
         });
+
+        // Update shimmer inputs for render-time modulation (cheap; no extra arrays).
+        shimmerRef.current = {
+          nowMs,
+          energy: reactive.energy,
+          bass: reactive.bass,
+          mid: reactive.mid,
+          high: reactive.high,
+          beat: reactive.beat,
+        };
+
+        // Deterministic traveling edge wave on beat (replaces “random pulse spam”).
+        // Wave runs from hilt -> tip; width scales with energy/beatStrength.
+        if (beatDetectedRef.current) {
+          waveStartMsRef.current = nowMs;
+        }
+        const waveStart = waveStartMsRef.current;
+        const waveMap = new Map<string, string>();
+        const waveGeom = bladeEdgeWaveRef.current;
+        const baseRgb = baseColorRgbRef.current;
+        if (waveStart > 0 && waveGeom.points.length) {
+          const age = nowMs - waveStart;
+          const durationMs = 520; // feels snappy
+          if (age <= durationMs) {
+            const t = clamp01(age / durationMs);
+            // Ease for a more “punchy” travel
+            const wavePos = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            const width = 0.06 + reactive.energy * 0.05 + reactive.beat * 0.06;
+
+            // Choose wave hue from current EQ palette (deterministic given audio events).
+            const pal = EQ_PALETTES[eqPaletteIndexRef.current] ?? EQ_PALETTES[0];
+            for (const p of waveGeom.points) {
+              const d = Math.abs(p.prog01 - wavePos);
+              if (d > width) continue;
+              const a = 1 - d / Math.max(0.0001, width);
+              // Band-hue: top -> high, middle -> mid, bottom -> low
+              const hue = p.prog01 > 0.66 ? pal.high : p.prog01 > 0.33 ? pal.mid : pal.low;
+              const hueRgb = parseColorToRgbFast(hue) ?? baseRgb;
+              // Bright pulse to white-ish (more intense)
+              const c = mixToWhite(hueRgb, 0.35 + a * 0.55);
+              waveMap.set(p.k, c);
+            }
+          } else {
+            waveStartMsRef.current = -1;
+          }
+        }
+        waveMapRef.current = waveMap;
 
         // Debug overlay (only when enabled; low refresh rate to avoid perf impact)
         if (debugReactiveEnabled) {
@@ -1231,6 +1356,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               const unicodeGlitch = unicodeGlitchMap.get(k);
               const coloredTile = coloredTileMap.get(k);
               const edgeEffect = edgeEffectMap.get(k);
+              const waveColor = waveMapRef.current.get(k);
               const isEdge = isEdgeChar(char) && !isHandleFast(x, y);
               let style: React.CSSProperties = { 
                 display: 'inline-block',
@@ -1246,6 +1372,24 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               } else if (coloredTile) {
                 style.color = coloredTile.color;
                 style.textShadow = `0 0 ${shadowSize}px ${coloredTile.color}`;
+              } else if (isEdge && waveColor) {
+                // Deterministic beat-wave highlight on blade edges
+                style.color = waveColor;
+                style.textShadow = `0 0 ${shadowSize}px ${waveColor}`;
+              } else if (!isHandleFast(x, y) && isMusicPlaying && !idle) {
+                // Band-locked shimmer on the blade (cheap: just compute color; no extra arrays).
+                const s = shimmerRef.current;
+                // Map y to top/mid/bottom thirds of blade area
+                const geom = bladeEdgeWaveRef.current;
+                const denom = Math.max(1, geom.maxY - geom.minY);
+                const prog = clamp01(1 - (y - geom.minY) / denom);
+                const band = prog > 0.66 ? s.high : prog > 0.33 ? s.mid : s.bass;
+                const phase = (s.nowMs * 0.012) + x * 0.37 + y * 0.11;
+                const shimmer = (Math.sin(phase) + 1) * 0.5;
+                const amount = clamp01((0.03 + band * 0.11 + s.energy * 0.05) * shimmer);
+                const c = mixToWhite(baseColorRgbRef.current, amount);
+                style.color = c;
+                style.textShadow = `0 0 ${shadowSize}px ${c}`;
               }
               
               // ROTATION-EFFEKT (Charge Level 1+)
