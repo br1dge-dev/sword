@@ -480,7 +480,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // --- ENTROPY (beat-impact “explosion drawing”) ---
   // Precompute per-cell direction vectors so the effect is punchy but cheap at runtime.
   const entropyVecMap = useMemo(() => {
-    const m = new Map<string, { dx: number; dy: number; phase: number }>();
+    const m = new Map<string, { dx: number; dy: number; wobbleMul: number }>();
     if (!swordPositions.length) return m;
     // Center of the sword bounds (approx)
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -508,17 +508,20 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const len2 = Math.max(0.001, Math.hypot(vx, vy));
       vx /= len2;
       vy /= len2;
-      const phase = hash01(p.x, p.y, seed + 2) * Math.PI * 2;
-      m.set(k, { dx: vx, dy: vy, phase });
+      // Per-cell stable wobble multiplier (no per-cell trig at runtime).
+      const wobbleMul = 0.78 + hash01(p.x, p.y, seed + 2) * 0.44; // ~0.78..1.22
+      m.set(k, { dx: vx, dy: vy, wobbleMul });
     }
     return m;
   }, [swordPositions]);
 
-  const entropyRef = useRef<{ lastImpulseMs: number; amp01: number; px: number; beatLatch: boolean }>({
+  const entropyRef = useRef<{ lastImpulseMs: number; amp01: number; px: number; beatLatch: boolean; prevBass: number; prevEnergy: number }>({
     lastImpulseMs: -1,
     amp01: 0,
     px: 0,
     beatLatch: false,
+    prevBass: 0,
+    prevEnergy: 0,
   });
 
   // Keep refs so the rAF scheduler can read without re-subscribing.
@@ -817,10 +820,23 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           entropy.amp01 = 0;
           entropy.lastImpulseMs = -1;
           entropy.beatLatch = false;
+          entropy.prevBass = 0;
+          entropy.prevEnergy = 0;
         } else {
           const snap = reactiveLatestRef.current;
-          // Main-beat gate (but tolerant): requires beatDetected plus some low-end / beat strength.
-          const mainBeat = !!beatDetectedRef.current && (snap.beat > 0.38 || snap.onset > 0.06) && snap.bass > 0.06 && snap.energy > 0.05;
+          // Bass-transient gate: entropy should follow kick/bass, not melodic/synth spikes.
+          const bassDelta = snap.bass - entropy.prevBass;
+          const energyDelta = snap.energy - entropy.prevEnergy;
+          entropy.prevBass = snap.bass;
+          entropy.prevEnergy = snap.energy;
+
+          const bassDominant = snap.bass > snap.mid * 1.2 && snap.bass > snap.high * 1.35;
+          const mainBeat =
+            !!beatDetectedRef.current &&
+            bassDominant &&
+            snap.bass > 0.075 &&
+            snap.energy > 0.06 &&
+            (bassDelta > 0.02 || energyDelta > 0.02);
           const minGapMs = 260;
           if (mainBeat && !entropy.beatLatch && (entropy.lastImpulseMs < 0 || nowMs - entropy.lastImpulseMs >= minGapMs)) {
             entropy.beatLatch = true;
@@ -830,16 +846,18 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }
 
           const t = entropy.lastImpulseMs > 0 ? nowMs - entropy.lastImpulseMs : 1e9;
-          const attackMs = 35;
-          const decayMs = 190;
+          // Snappier: faster attack + faster decay (less “laggy” feel).
+          const attackMs = 18;
+          const decayMs = 145;
           const a = t <= 0 ? 0 : t < attackMs ? t / attackMs : 1;
           const d = Math.exp(-Math.max(0, t - attackMs) / decayMs);
           entropy.amp01 = Math.max(0, Math.min(1, a * d));
 
           const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
-          const tierPx = forgeTier === 1 ? 6 : forgeTier === 2 ? 10 : 14;
-          const mod = 0.85 + snap.beat * 0.3 + snap.energy * 0.2;
-          entropy.px = tierPx * mod;
+          // Default: smaller displacement. Only go big on real “crash/crescendo”.
+          const tierPx = forgeTier === 1 ? 7 : forgeTier === 2 ? 10 : 13;
+          const crash = clamp01(bassDelta * 12 + energyDelta * 10 + snap.onset * 1.2 + (snap.bass - snap.mid) * 1.8);
+          entropy.px = tierPx * (0.55 + crash * 0.95);
         }
       }
 
@@ -1619,12 +1637,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
                 if (ent.amp01 > 0.001) {
                   const v = entropyVecMap.get(k);
                   if (v) {
-                    // Use scheduler time (already in ref) to avoid per-cell Date.now() calls.
-                    const wobble = 0.75 + Math.sin(shimmerRef.current.nowMs * 0.06 + v.phase) * 0.25;
-                    const mag = ent.px * ent.amp01 * wobble;
-                    const tx = (v.dx * mag).toFixed(2);
-                    const ty = (v.dy * mag).toFixed(2);
-                    style.transform = `${style.transform || ''} translate(${tx}px, ${ty}px)`.trim();
+                    // Global wobble (cheap) + per-cell wobbleMul (precomputed) => no per-cell trig.
+                    const globalWobble = 0.84 + Math.sin(shimmerRef.current.nowMs * 0.06) * 0.16;
+                    const mag = ent.px * ent.amp01 * globalWobble * v.wobbleMul;
+                    style.transform = `${style.transform || ''} translate(${v.dx * mag}px, ${v.dy * mag}px)`.trim();
                   }
                 }
               }
