@@ -346,7 +346,8 @@ export class AudioAnalyzer {
       // NEU: Empfindlichere Beat-Erkennung für bessere Reaktivität
       if (energy > currentThreshold) {
         const timeSinceLastBeat = now - this.lastBeatTime;
-        if (timeSinceLastBeat > 120) { // Reduziert von 180ms auf 120ms für schnellere Beats
+        // Keep a longer refractory window: "beatDetected" is a punch trigger, not a continuous flag.
+        if (timeSinceLastBeat > 220) {
           const beatIntensity = energy / currentThreshold;
           // IMPORTANT: We need a transient gate; otherwise adaptive thresholds can become "too correct"
           // and intensity collapses to ~1.0, making beats impossible after the first calibration window.
@@ -354,15 +355,15 @@ export class AudioAnalyzer {
           const bassDelta = bassEnergy - this.prevBassForBeat;
           const delta = energy - this.prevEnergyForBeat;
           const deltaGate = Math.max(0.008, currentThreshold * 0.35);
-          const bassDeltaGate = Math.max(0.012, currentThreshold * 0.45);
+          const bassDeltaGate = Math.max(0.02, currentThreshold * 0.55);
 
           // Sensitivity nudges how strict we are (higher sensitivity => lower required intensity).
-          const baseIntensityGate = 1.35; // ~"35% above baseline"
+          const baseIntensityGate = 1.55; // stricter: avoid firing on melodic/sustained parts
           const effectiveThreshold = Math.max(1.15, baseIntensityGate - (currentSensitivity - 1.0) * 0.18);
           
           // IMPORTANT: Keep beat detection deterministic. Random gating makes visuals feel inconsistent.
           // The min interval + adaptive thresholding already prevent spam.
-          if ((bassDelta > bassDeltaGate || delta > deltaGate) && beatIntensity > effectiveThreshold && bassEnergy > 0.08) {
+          if ((bassDelta > bassDeltaGate || delta > deltaGate) && beatIntensity > effectiveThreshold && bassEnergy > 0.11) {
             this.lastBeatTime = now;
             // DEAKTIVIERT: Logging
             // this.throttledLog(`Beat detected - Energy: ${energy.toFixed(3)}, Intensity: ${beatIntensity.toFixed(2)}`);
