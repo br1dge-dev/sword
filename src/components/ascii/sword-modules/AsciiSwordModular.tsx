@@ -128,6 +128,12 @@ function mixToWhite(rgb: { r: number; g: number; b: number }, amount01: number) 
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+function hash01(x: number, y: number, seed: number) {
+  // Cheap deterministic hash -> 0..1
+  const n = Math.sin((x * 127.1 + y * 311.7 + seed * 74.7)) * 43758.5453;
+  return n - Math.floor(n);
+}
+
 export default function AsciiSwordModular({ level = 1, directEnergy, directBeat }: AsciiSwordProps) {
   // Zugriff auf den PowerUpStore
   const { currentLevel, chargeLevel, glitchLevel } = useSwordPowerUpState();
@@ -443,6 +449,50 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const handlePositionsMemo = useMemo(() => {
     return swordPositions.filter((p) => isHandleFast(p.x, p.y));
   }, [swordPositions, isHandleFast]);
+
+  // --- ENTROPY (beat-impact “explosion drawing”) ---
+  // Precompute per-cell direction vectors so the effect is punchy but cheap at runtime.
+  const entropyVecMap = useMemo(() => {
+    const m = new Map<string, { dx: number; dy: number; phase: number }>();
+    if (!swordPositions.length) return m;
+    // Center of the sword bounds (approx)
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of swordPositions) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const seed = 17;
+    for (const p of swordPositions) {
+      const k = `${p.x},${p.y}`;
+      // Outward vector + a bit of deterministic “chaos”
+      let vx = p.x - cx;
+      let vy = p.y - cy;
+      const len = Math.max(0.001, Math.hypot(vx, vy));
+      vx /= len;
+      vy /= len;
+      const jx = (hash01(p.x, p.y, seed) - 0.5) * 0.9;
+      const jy = (hash01(p.x, p.y, seed + 1) - 0.5) * 0.9;
+      vx += jx;
+      vy += jy;
+      const len2 = Math.max(0.001, Math.hypot(vx, vy));
+      vx /= len2;
+      vy /= len2;
+      const phase = hash01(p.x, p.y, seed + 2) * Math.PI * 2;
+      m.set(k, { dx: vx, dy: vy, phase });
+    }
+    return m;
+  }, [swordPositions]);
+
+  const entropyRef = useRef<{ lastImpulseMs: number; amp01: number; px: number; beatLatch: boolean }>({
+    lastImpulseMs: -1,
+    amp01: 0,
+    px: 0,
+    beatLatch: false,
+  });
 
   // Keep refs so the rAF scheduler can read without re-subscribing.
   const bladePositionsRef = useRef<Array<SwordPosition>>(bladePositions);
@@ -781,6 +831,38 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }
         }
         waveMapRef.current = waveMap;
+
+        // --- ENTROPY: beat-latched impact impulse ---
+        // Main beat only: use beatDetectedRef but latch so we trigger once per pulse (beatDetected lasts ~500ms).
+        const entropy = entropyRef.current;
+        const playing = isMusicPlayingRef.current && !idleRef.current;
+        const beatNow = !!beatDetectedRef.current;
+        if (!playing) {
+          entropy.amp01 = 0;
+          entropy.lastImpulseMs = -1;
+          entropy.beatLatch = false;
+        } else {
+          if (beatNow && !entropy.beatLatch) {
+            entropy.beatLatch = true;
+            entropy.lastImpulseMs = nowMs;
+          } else if (!beatNow) {
+            entropy.beatLatch = false;
+          }
+
+          // Fast attack + decay for punch
+          const t = entropy.lastImpulseMs > 0 ? nowMs - entropy.lastImpulseMs : 1e9;
+          const attackMs = 40;
+          const decayMs = 220;
+          const a = t <= 0 ? 0 : t < attackMs ? t / attackMs : 1;
+          const d = Math.exp(-Math.max(0, t - attackMs) / decayMs);
+          entropy.amp01 = Math.max(0, Math.min(1, a * d));
+
+          // Scale by forge tier and a touch by beat strength / energy (keeps it “main beat” but responsive).
+          const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
+          const tierPx = forgeTier === 1 ? 6 : forgeTier === 2 ? 10 : 14;
+          const mod = 0.85 + reactive.beat * 0.35 + reactive.energy * 0.25;
+          entropy.px = tierPx * mod;
+        }
 
         // Debug overlay (only when enabled; low refresh rate to avoid perf impact)
         if (debugReactiveEnabled) {
@@ -1404,6 +1486,23 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               
               if (edgeEffect?.offset) {
                 style.transform = `${style.transform || ''} translate(${edgeEffect.offset.x}px, ${edgeEffect.offset.y}px)`.trim();
+              }
+
+              // ENTROPY: beat-impact “explosion drawing” that makes the sword briefly fly apart.
+              // Keep it cheap: use precomputed direction vectors + a single global amplitude ref.
+              if (isMusicPlaying && !idle) {
+                const ent = entropyRef.current;
+                if (ent.amp01 > 0.001) {
+                  const v = entropyVecMap.get(k);
+                  if (v) {
+                    // Use scheduler time (already in ref) to avoid per-cell Date.now() calls.
+                    const wobble = 0.75 + Math.sin(shimmerRef.current.nowMs * 0.06 + v.phase) * 0.25;
+                    const mag = ent.px * ent.amp01 * wobble;
+                    const tx = (v.dx * mag).toFixed(2);
+                    const ty = (v.dy * mag).toFixed(2);
+                    style.transform = `${style.transform || ''} translate(${tx}px, ${ty}px)`.trim();
+                  }
+                }
               }
               const isBlurred = blurredSet.has(k);
               if (isBlurred) {
