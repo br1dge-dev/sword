@@ -343,10 +343,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     const activeLevel = currentLevel || level;
     const swordArt = swordLevels[activeLevel as keyof typeof swordLevels] || swordLevels[1];
     const centeredSwordLines = centerAsciiArt(swordArt);
+    const hiltStart = centeredSwordLines.findIndex((l) =>
+      l.includes('__▓█▓__') || l.includes('_▓██▓_') || l.includes('_▓███▓_'),
+    );
+    const mid = centeredSwordLines[0]?.length ? Math.floor(centeredSwordLines[0].length / 2) : 0;
     
     centeredSwordLines.forEach((line, y) => {
       Array.from(line).forEach((char, x) => {
-        if (isEdgeChar(char) && !isHandlePosition(x, y, centeredSwordLines)) {
+        const isHandle = hiltStart !== -1 && y >= hiltStart && Math.abs(x - mid) <= 2;
+        if (isEdgeChar(char) && !isHandle) {
           positions.push({x, y, char});
         }
       });
@@ -364,14 +369,26 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     };
   }, [currentLevel, level]);
 
+  // PERF: cache handle geometry so we don’t recompute `findIndex(...)` inside `isHandlePosition` per character.
+  const hiltStartIndex = useMemo(() => {
+    return centeredSwordLines.findIndex((line) =>
+      line.includes('__▓█▓__') || line.includes('_▓██▓_') || line.includes('_▓███▓_'),
+    );
+  }, [centeredSwordLines]);
+  const middleX = useMemo(() => (centeredSwordLines[0]?.length ? Math.floor(centeredSwordLines[0].length / 2) : 0), [centeredSwordLines]);
+  const isHandleFast = useCallback(
+    (x: number, y: number) => hiltStartIndex !== -1 && y >= hiltStartIndex && Math.abs(x - middleX) <= 2,
+    [hiltStartIndex, middleX],
+  );
+
   // For power-up effects: treat blade as the primary “impact” area (handle/hilt should stay calmer).
   const bladePositions = useMemo(() => {
-    return swordPositions.filter((p) => !isHandlePosition(p.x, p.y, centeredSwordLines));
-  }, [swordPositions, centeredSwordLines]);
+    return swordPositions.filter((p) => !isHandleFast(p.x, p.y));
+  }, [swordPositions, isHandleFast]);
 
   const handlePositionsMemo = useMemo(() => {
-    return swordPositions.filter((p) => isHandlePosition(p.x, p.y, centeredSwordLines));
-  }, [swordPositions, centeredSwordLines]);
+    return swordPositions.filter((p) => isHandleFast(p.x, p.y));
+  }, [swordPositions, isHandleFast]);
 
   // Keep refs so the rAF scheduler can read without re-subscribing.
   const bladePositionsRef = useRef<Array<SwordPosition>>(bladePositions);
@@ -382,7 +399,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     handlePositionsRef.current = handlePositionsMemo;
   }, [handlePositionsMemo]);
-  
+
   // Zustände für visuelle Effekte
   const [glowIntensity, setGlowIntensity] = useState(0);
   const [baseColor, setBaseColor] = useState('#00FCA6');
@@ -399,6 +416,70 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const [blurredChars, setBlurredChars] = useState<Array<{x: number, y: number}>>([]);
   const [skewedChars, setSkewedChars] = useState<Array<{x: number, y: number, angle: number}>>([]);
   const [fadedChars, setFadedChars] = useState<Array<{x: number, y: number, opacity: number}>>([]);
+
+  // PERF: Build O(1) lookup maps/sets for per-character overlays to avoid repeated `.find()` scans.
+  const glitchCharMap = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; char: string }>();
+    for (const g of glitchChars) {
+      const k = `${g.x},${g.y}`;
+      if (!m.has(k)) m.set(k, g);
+    }
+    return m;
+  }, [glitchChars]);
+
+  const unicodeGlitchMap = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; char: string }>();
+    for (const g of unicodeGlitches) {
+      const k = `${g.x},${g.y}`;
+      if (!m.has(k)) m.set(k, g);
+    }
+    return m;
+  }, [unicodeGlitches]);
+
+  const coloredTileMap = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; color: string }>();
+    for (const t of coloredTiles) {
+      const k = `${t.x},${t.y}`;
+      if (!m.has(k)) m.set(k, t);
+    }
+    return m;
+  }, [coloredTiles]);
+
+  const edgeEffectMap = useMemo(() => {
+    const m = new Map<
+      string,
+      { x: number; y: number; char?: string; color?: string; offset?: { x: number; y: number }; rotation?: number; fontSize?: number }
+    >();
+    for (const e of edgeEffects) {
+      const k = `${e.x},${e.y}`;
+      if (!m.has(k)) m.set(k, e);
+    }
+    return m;
+  }, [edgeEffects]);
+
+  const blurredSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const b of blurredChars) s.add(`${b.x},${b.y}`);
+    return s;
+  }, [blurredChars]);
+
+  const skewMap = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; angle: number }>();
+    for (const c of skewedChars) {
+      const k = `${c.x},${c.y}`;
+      if (!m.has(k)) m.set(k, c);
+    }
+    return m;
+  }, [skewedChars]);
+
+  const fadeMap = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; opacity: number }>();
+    for (const c of fadedChars) {
+      const k = `${c.x},${c.y}`;
+      if (!m.has(k)) m.set(k, c);
+    }
+    return m;
+  }, [fadedChars]);
   
   // Refs für Intervalle, um Speicherlecks zu vermeiden
   const intervalsRef = useRef<IntervalRefs>({
@@ -988,8 +1069,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     setSkewedChars([]);
     setFadedChars([]);
 
-    const handlePositions = swordPositions.filter((p) => isHandlePosition(p.x, p.y, centeredSwordLines));
-    const base = handlePositions.length ? handlePositions : swordPositions;
+    const base = handlePositionsRef.current.length ? handlePositionsRef.current : swordPositions;
 
     // Ensure we ALWAYS render something visible (previous hash filter could yield 0 tiles depending on geometry).
     const middleX = centeredSwordLines[0]?.length ? Math.floor(centeredSwordLines[0].length / 2) : 0;
@@ -1146,11 +1226,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             width: '100%'
           }}>
             {Array.from(line).map((char, x) => {
-              const glitch = glitchChars.find(g => g.x === x && g.y === y);
-              const unicodeGlitch = unicodeGlitches.find(g => g.x === x && g.y === y);
-              const coloredTile = coloredTiles.find(t => t.x === x && t.y === y);
-              const edgeEffect = edgeEffects.find(e => e.x === x && e.y === y);
-              const isEdge = isEdgeChar(char) && !isHandlePosition(x, y, centeredSwordLines);
+              const k = `${x},${y}`;
+              const glitch = glitchCharMap.get(k);
+              const unicodeGlitch = unicodeGlitchMap.get(k);
+              const coloredTile = coloredTileMap.get(k);
+              const edgeEffect = edgeEffectMap.get(k);
+              const isEdge = isEdgeChar(char) && !isHandleFast(x, y);
               let style: React.CSSProperties = { 
                 display: 'inline-block',
                 transform: '',
@@ -1175,15 +1256,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               if (edgeEffect?.offset) {
                 style.transform = `${style.transform || ''} translate(${edgeEffect.offset.x}px, ${edgeEffect.offset.y}px)`.trim();
               }
-              const isBlurred = blurredChars.some(c => c.x === x && c.y === y);
+              const isBlurred = blurredSet.has(k);
               if (isBlurred) {
                 style.filter = `${style.filter || ''} blur(1px)`.trim();
               }
-              const skewEffect = skewedChars.find(c => c.x === x && c.y === y);
+              const skewEffect = skewMap.get(k);
               if (skewEffect) {
                 style.transform = `${style.transform || ''} skewX(${skewEffect.angle}deg)`.trim();
               }
-              const fadeEffect = fadedChars.find(c => c.x === x && c.y === y);
+              const fadeEffect = fadeMap.get(k);
               if (fadeEffect) {
                 style.opacity = String(fadeEffect.opacity);
               }
