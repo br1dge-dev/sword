@@ -81,8 +81,8 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     isAnalyzing
   } = useAudioAnalyzer({
     energyThreshold: 0.02, // slightly less sensitive: beats shouldn't fire on every melodic transient
-    analyzeInterval: 33, // ~30Hz for less perceived latency / tighter beat response
-    frequencyInterval: 33, // keep band/onset features fresh; entropy uses bass transients
+    analyzeInterval: 16, // target ~60Hz for tighter perceived sync (render loop remains rAF)
+    frequencyInterval: 16, // keep band/onset features fresh; entropy uses bass transients
     beatSensitivity: 1.0, // less sensitive: prefer kick/bass beats
     onBeat: () => {
       onBeat?.();

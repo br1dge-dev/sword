@@ -84,10 +84,10 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
     const externalOnFrequency = options?.onFrequency;
 
     const defaultOptions = {
-      analyzeInterval: 33, // ~30Hz for smoother reactivity (energy still throttled in store)
+      analyzeInterval: 16, // target ~60Hz for tighter sync (store may still throttle some fields)
       energyThreshold: 0.015, // Reduziert von 0.03 für empfindlichere Reaktion
       beatSensitivity: 1.2, // Erhöht von 0.8 für bessere Beat-Erkennung
-      frequencyInterval: options?.frequencyInterval ?? 50, // default ~20Hz
+      frequencyInterval: options?.frequencyInterval ?? 16, // default ~60Hz
       ...options,
     };
 

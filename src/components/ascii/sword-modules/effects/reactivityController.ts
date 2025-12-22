@@ -95,7 +95,7 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
   const bands = opts.bands ?? { bassEnd: 0.2, midEnd: 0.6 };
 
   let lastNow = 0;
-  let prevSpectrum: Uint8Array | null = null;
+  let prevSpectrumBuf: Uint8Array | null = null;
   let lastFreqSeq = -1;
   let cachedBassRaw = 0;
   let cachedMidRaw = 0;
@@ -142,11 +142,13 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
       cachedBassRaw = avgBand(freq, 0, bassEnd) / 255;
       cachedMidRaw = avgBand(freq, bassEnd, midEnd) / 255;
       cachedHighRaw = avgBand(freq, midEnd, freq.length) / 255;
-      cachedFluxRaw = computeOnsetFluxNormalized(freq, prevSpectrum);
+      cachedFluxRaw = computeOnsetFluxNormalized(freq, prevSpectrumBuf);
 
-      // Keep a snapshot for next flux computation. Even if the underlying pipeline changes
-      // to reuse Uint8Arrays, this stays correct.
-      prevSpectrum = freq.slice();
+      // Keep a snapshot for next flux computation without allocating.
+      if (!prevSpectrumBuf || prevSpectrumBuf.length !== freq.length) {
+        prevSpectrumBuf = new Uint8Array(freq.length);
+      }
+      prevSpectrumBuf.set(freq);
       lastFreqSeq = seq !== -1 ? seq : (lastFreqSeq + 1);
     }
 

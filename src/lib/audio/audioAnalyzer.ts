@@ -33,6 +33,8 @@ export class AudioAnalyzer {
   private isAnalyzing = false;
   private animationFrameId: number | null = null;
   private frequencyData: Uint8Array | null = null;
+  private frequencyEmitBuffers: [Uint8Array, Uint8Array] | null = null;
+  private frequencyEmitIndex: 0 | 1 = 0;
   private lastAnalyzeTime: number = 0;
   private lastBeatTime: number = 0; // Zeit des letzten erkannten Beats
   private lastFrequencyEmitTime: number = 0;
@@ -127,7 +129,11 @@ export class AudioAnalyzer {
         
         // Initialize frequency data array
         if (this.analyser) {
-          this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
+          const n = this.analyser.frequencyBinCount;
+          this.frequencyData = new Uint8Array(n);
+          // Double-buffer for zero-allocation snapshot emission.
+          this.frequencyEmitBuffers = [new Uint8Array(n), new Uint8Array(n)];
+          this.frequencyEmitIndex = 0;
         }
         
         // DEAKTIVIERT: Logging
@@ -268,7 +274,17 @@ export class AudioAnalyzer {
         const freqIntervalMs = this.options.frequencyInterval ?? 50;
         if (now - this.lastFrequencyEmitTime >= freqIntervalMs) {
           this.lastFrequencyEmitTime = now;
-          this.options.onFrequency(this.frequencyData.slice());
+          // Copy into a stable buffer (no allocations). Alternate buffers so consumers can safely
+          // hold onto the snapshot until the next emit.
+          if (!this.frequencyEmitBuffers || this.frequencyEmitBuffers[0].length !== this.frequencyData.length) {
+            const n = this.frequencyData.length;
+            this.frequencyEmitBuffers = [new Uint8Array(n), new Uint8Array(n)];
+            this.frequencyEmitIndex = 0;
+          }
+          const buf = this.frequencyEmitBuffers[this.frequencyEmitIndex];
+          buf.set(this.frequencyData);
+          this.frequencyEmitIndex = this.frequencyEmitIndex === 0 ? 1 : 0;
+          this.options.onFrequency(buf);
         }
       }
       
@@ -425,7 +441,10 @@ export class AudioAnalyzer {
         
         // Initialize frequency data array
         if (this.analyser) {
-          this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
+        const n = this.analyser.frequencyBinCount;
+        this.frequencyData = new Uint8Array(n);
+        this.frequencyEmitBuffers = [new Uint8Array(n), new Uint8Array(n)];
+        this.frequencyEmitIndex = 0;
         }
         
         // Starte die Analyse erneut
