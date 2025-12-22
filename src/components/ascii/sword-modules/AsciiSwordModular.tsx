@@ -829,6 +829,34 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const BEAT_PULSE_MS = 120;
       const beatPulse = lastBeatTimeMsRef.current > 0 && nowMs - lastBeatTimeMsRef.current <= BEAT_PULSE_MS;
 
+      // Reactivity must be latency-free: update the stable reactive signals at rAF rate
+      // using monotonic time. Downstream effects should read from `reactiveLatestRef`.
+      {
+        const reactive = reactivityControllerRef.current!.update({
+          nowMs,
+          energy: energyRef.current,
+          beatDetected: beatPulse,
+          frequencyData: frequencyDataRef.current,
+        });
+
+        shimmerRef.current = {
+          nowMs,
+          energy: reactive.energy,
+          bass: reactive.bass,
+          mid: reactive.mid,
+          high: reactive.high,
+          beat: reactive.beat,
+        };
+        reactiveLatestRef.current = {
+          energy: reactive.energy,
+          bass: reactive.bass,
+          mid: reactive.mid,
+          high: reactive.high,
+          onset: reactive.onset,
+          beat: reactive.beat,
+        };
+      }
+
       // ENTROPY should be latency-free: update latch + amplitude at rAF rate.
       {
         const entropy = entropyRef.current;
@@ -913,30 +941,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }
         }
 
-        const reactive = reactivityControllerRef.current!.update({
-          nowMs,
-          energy: energyRef.current,
-          beatDetected: beatPulse,
-          frequencyData: frequencyDataRef.current,
-        });
-
-        // Update shimmer inputs for render-time modulation (cheap; no extra arrays).
-        shimmerRef.current = {
-          nowMs,
-          energy: reactive.energy,
-          bass: reactive.bass,
-          mid: reactive.mid,
-          high: reactive.high,
-          beat: reactive.beat,
-        };
-        reactiveLatestRef.current = {
-          energy: reactive.energy,
-          bass: reactive.bass,
-          mid: reactive.mid,
-          high: reactive.high,
-          onset: reactive.onset,
-          beat: reactive.beat,
-        };
+        const reactive = reactiveLatestRef.current;
 
         // Deterministic traveling edge wave on beat (replaces “random pulse spam”).
         // Wave runs from hilt -> tip; width scales with energy/beatStrength.

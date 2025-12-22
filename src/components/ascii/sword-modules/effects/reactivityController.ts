@@ -91,6 +91,11 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
 
   let lastNow = 0;
   let prevSpectrum: Uint8Array | null = null;
+  let lastSpectrum: Uint8Array | null = null;
+  let cachedBassRaw = 0;
+  let cachedMidRaw = 0;
+  let cachedHighRaw = 0;
+  let cachedFluxRaw = 0;
 
   let energy = 0;
   let bass = 0;
@@ -118,24 +123,28 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
       mid = clamp01(smoothAR(mid, 0, dt, bandSmooth));
       high = clamp01(smoothAR(high, 0, dt, bandSmooth));
       onset = clamp01(smoothAR(onset, 0, dt, onsetSmooth));
+      lastSpectrum = null;
       return { energy, bass, mid, high, onset, beat };
     }
 
-    const bassEnd = Math.floor(freq.length * bands.bassEnd);
-    const midEnd = Math.floor(freq.length * bands.midEnd);
-    const bassRaw = avgBand(freq, 0, bassEnd) / 255;
-    const midRaw = avgBand(freq, bassEnd, midEnd) / 255;
-    const highRaw = avgBand(freq, midEnd, freq.length) / 255;
+    // Only recompute expensive spectrum-derived values when the input array identity changes.
+    // (AudioAnalyzer emits copied Uint8Arrays; identity changes only when new data arrives.)
+    if (freq !== lastSpectrum) {
+      const bassEnd = Math.floor(freq.length * bands.bassEnd);
+      const midEnd = Math.floor(freq.length * bands.midEnd);
+      cachedBassRaw = avgBand(freq, 0, bassEnd) / 255;
+      cachedMidRaw = avgBand(freq, bassEnd, midEnd) / 255;
+      cachedHighRaw = avgBand(freq, midEnd, freq.length) / 255;
+      cachedFluxRaw = computeOnsetFluxNormalized(freq, prevSpectrum);
 
-    bass = clamp01(smoothAR(bass, bassRaw, dt, bandSmooth));
-    mid = clamp01(smoothAR(mid, midRaw, dt, bandSmooth));
-    high = clamp01(smoothAR(high, highRaw, dt, bandSmooth));
+      prevSpectrum = freq; // Keep reference (safe: analyzer emits copies)
+      lastSpectrum = freq;
+    }
 
-    const fluxRaw = computeOnsetFluxNormalized(freq, prevSpectrum);
-    onset = clamp01(smoothAR(onset, fluxRaw, dt, onsetSmooth));
-
-    // Copy spectrum for next flux computation (copy is important: Uint8Array is mutable in some pipelines).
-    prevSpectrum = freq.slice();
+    bass = clamp01(smoothAR(bass, cachedBassRaw, dt, bandSmooth));
+    mid = clamp01(smoothAR(mid, cachedMidRaw, dt, bandSmooth));
+    high = clamp01(smoothAR(high, cachedHighRaw, dt, bandSmooth));
+    onset = clamp01(smoothAR(onset, cachedFluxRaw, dt, onsetSmooth));
 
     return { energy, bass, mid, high, onset, beat };
   };
