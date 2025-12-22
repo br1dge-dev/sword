@@ -35,6 +35,18 @@ export type ReactivityOutput = {
    * Beat pulse strength (0..1) with decay; more stable than a single boolean.
    */
   beat: number;
+  /**
+   * Phase-locked beat grid (PLL): stable BPM/phase + quantized beat events.
+   */
+  grid?: {
+    bpm: number;
+    phase01: number;
+    confidence01: number;
+    beatIndex: number;
+    gridBeatEvent: boolean;
+    downbeatEvent: boolean;
+    barPhase01: number;
+  };
 };
 
 type SmoothAROptions = {
@@ -85,7 +97,13 @@ export type ReactivityControllerOptions = {
    * Portion of FFT bins used for bass/mid/high. Default matches existing logic.
    */
   bands?: { bassEnd: number; midEnd: number };
+  /**
+   * Enable phase-locked beat grid (PLL). Default: true.
+   */
+  enableBeatGrid?: boolean;
 };
+
+import { createBeatGridState, stepBeatGrid } from '@/lib/reactive/beatGrid';
 
 export function createReactivityController(opts: ReactivityControllerOptions = {}) {
   const energySmooth = opts.energySmoothing ?? { attackMs: 80, releaseMs: 220 };
@@ -93,6 +111,7 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
   const onsetSmooth = opts.onsetSmoothing ?? { attackMs: 35, releaseMs: 140 };
   const beatDecayMs = opts.beatDecayMs ?? 220;
   const bands = opts.bands ?? { bassEnd: 0.2, midEnd: 0.6 };
+  const enableBeatGrid = opts.enableBeatGrid ?? true;
 
   let lastNow = 0;
   let prevSpectrumBuf: Uint8Array | null = null;
@@ -108,6 +127,7 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
   let high = 0;
   let onset = 0;
   let beat = 0;
+  const gridState = enableBeatGrid ? createBeatGridState(122) : null;
 
   const update = (input: ReactivityInput): ReactivityOutput => {
     const now = input.nowMs;
@@ -120,6 +140,22 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
     if (input.beatDetected) beat = 1;
     else if (dt > 0) beat = Math.max(0, beat - dt / beatDecayMs);
 
+    const grid = gridState
+      ? stepBeatGrid(
+          gridState,
+          { nowMs: now, beatHit: !!input.beatDetected },
+          {
+            beatsPerBar: 4,
+            // tuned for visual stability over ultra-fast lock
+            phaseCorrection: 0.22,
+            bpmCorrection: 0.10,
+            lockWindow01: 0.18,
+            minBpm: 75,
+            maxBpm: 185,
+          },
+        )
+      : undefined;
+
     // Always smooth energy (even without frequency).
     energy = clamp01(smoothAR(energy, clamp01(input.energy), dt, energySmooth));
 
@@ -131,7 +167,7 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
       high = clamp01(smoothAR(high, 0, dt, bandSmooth));
       onset = clamp01(smoothAR(onset, 0, dt, onsetSmooth));
       lastFreqSeq = -1;
-      return { energy, bass, mid, high, onset, beat };
+      return { energy, bass, mid, high, onset, beat, grid };
     }
 
     const seq = typeof input.frequencySeq === 'number' ? input.frequencySeq : -1;
@@ -157,7 +193,7 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
     high = clamp01(smoothAR(high, cachedHighRaw, dt, bandSmooth));
     onset = clamp01(smoothAR(onset, cachedFluxRaw, dt, onsetSmooth));
 
-    return { energy, bass, mid, high, onset, beat };
+    return { energy, bass, mid, high, onset, beat, grid };
   };
 
   return { update };
