@@ -60,6 +60,11 @@ export type OrganicPatchTickInput = {
   beat: number;
   /** raw beat boolean (for “events”) */
   beatDetected: boolean;
+  /**
+   * Quantized downbeat (bar start) when beat grid is confident.
+   * Use this to keep macro changes musically stable.
+   */
+  downbeatEvent?: boolean;
   /** stable "monochrome scaffold" positions to tint */
   baseVeinPositions: Array<{ x: number; y: number }>;
   /** hard cap per tick for performance */
@@ -174,7 +179,7 @@ export function tickOrganicPatches(
   state: OrganicPatchState,
   input: OrganicPatchTickInput,
 ): OrganicPatchTickOutput {
-  const { nowMs, width, height, energy, onset, beat, beatDetected, baseVeinPositions } = input;
+  const { nowMs, width, height, energy, onset, beat, beatDetected, downbeatEvent, baseVeinPositions } = input;
   const maxEmits = Math.max(0, input.maxEmits | 0);
   // Clamp dt to avoid tab-sleep/resume spikes from causing huge jumps.
   const rawDt = state.lastNowMs ? Math.max(0, nowMs - state.lastNowMs) : 16;
@@ -187,8 +192,10 @@ export function tickOrganicPatches(
   const wantsSwap =
     nowMs - state.macroLastSwapMs > MACRO_SWAP_COOLDOWN_MS &&
     (
-      (beatDetected && beat > 0.75 && energy > 0.22) ||
-      (onset > 0.07 && energy > 0.35 && chance(0.08))
+      // Prefer downbeats when available (grid-locked).
+      // Fallback to raw beats if no downbeat signal is provided.
+      ((downbeatEvent ?? false) && energy > 0.18 && (beat > 0.55 || onset > 0.10)) ||
+      ((!downbeatEvent && beatDetected) && beat > 0.78 && energy > 0.22)
     );
   if (wantsSwap) {
     state.macroLastSwapMs = nowMs;
