@@ -228,6 +228,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     isMusicPlaying: boolean;
     beatDetected: boolean;
     beatEvent: boolean;
+    gridBeatEvent: boolean;
+    downbeatEvent: boolean;
+    gridBpm: number;
+    gridPhase01: number;
+    gridConfidence01: number;
     energy: number;
     bass: number;
     mid: number;
@@ -908,8 +913,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const BEAT_PULSE_MS = 120;
       const beatPulse = lastBeatTimeMsRef.current > 0 && nowMs - lastBeatTimeMsRef.current <= BEAT_PULSE_MS;
       // Edge-triggered beat event (fires once per beatId).
-      const beatEvent = beatIdRef.current >= 0 && beatIdRef.current !== lastBeatEventIdRef.current;
-      if (beatEvent) lastBeatEventIdRef.current = beatIdRef.current;
+      const beatEventRaw = beatIdRef.current >= 0 && beatIdRef.current !== lastBeatEventIdRef.current;
+      if (beatEventRaw) lastBeatEventIdRef.current = beatIdRef.current;
+      // Beat events used by effects: prefer PLL grid when confident (fallback to raw hits).
+      let beatEvent = beatEventRaw;
+      let downbeatEvent = false;
+      let gridConfidence01 = 0;
+      let gridBpm = 0;
+      let gridPhase01 = 0;
+      let gridBeatEvent = false;
 
       // Reactivity must be latency-free: update the stable reactive signals at rAF rate
       // using monotonic time. Downstream effects should read from `reactiveLatestRef`.
@@ -917,10 +929,18 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         const reactive = reactivityControllerRef.current!.update({
           nowMs,
           energy: energyRef.current,
-          beatDetected: beatEvent,
+          beatDetected: beatEventRaw,
           frequencyData: frequencyDataRef.current,
           frequencySeq: frequencySeqRef.current,
         });
+
+        // Prefer phase-locked beat grid when it’s confident; otherwise fall back to raw hit events.
+        gridConfidence01 = reactive.grid?.confidence01 ?? 0;
+        gridBpm = reactive.grid?.bpm ?? 0;
+        gridPhase01 = reactive.grid?.phase01 ?? 0;
+        gridBeatEvent = !!reactive.grid?.gridBeatEvent && gridConfidence01 >= 0.35;
+        beatEvent = gridBeatEvent || beatEventRaw;
+        downbeatEvent = !!reactive.grid?.downbeatEvent && gridConfidence01 >= 0.45;
 
         shimmerRef.current = {
           nowMs,
@@ -1121,6 +1141,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               isMusicPlaying: isMusicPlayingRef.current,
               beatDetected: beatPulse,
               beatEvent,
+              gridBeatEvent,
+              downbeatEvent,
+              gridBpm,
+              gridPhase01,
+              gridConfidence01,
               energy: reactive.energy,
               bass: reactive.bass,
               mid: reactive.mid,
@@ -1746,6 +1771,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           <div>entropy: {(debugEffects?.entropyAmp01 ?? 0).toFixed(3)} px:{(debugEffects?.entropyPx ?? 0).toFixed(1)} latch:{debugEffects?.entropyLatch ? '1' : '0'}</div>
           <div>lastImpulseMs: {debugEffects?.entropyLastImpulseMs ? Math.floor(debugEffects.entropyLastImpulseMs) : -1}</div>
           <div>beatEvent: {debugEffects?.beatEvent ? '1' : '0'} beatPulse:{debugEffects?.beatDetected ? '1' : '0'}</div>
+          <div>gridBeat: {debugEffects?.gridBeatEvent ? '1' : '0'} downbeat:{debugEffects?.downbeatEvent ? '1' : '0'}</div>
+          <div>grid bpm: {(debugEffects?.gridBpm ?? 0).toFixed(1)} phase:{(debugEffects?.gridPhase01 ?? 0).toFixed(3)} conf:{(debugEffects?.gridConfidence01 ?? 0).toFixed(2)}</div>
           <div>entropy gate: dB:{(debugEffects?.entropyBassDelta ?? 0).toFixed(3)} crash:{(debugEffects?.entropyCrashScore ?? 0).toFixed(3)}</div>
           <div>gap: min:{Math.floor(debugEffects?.entropyMinGapMs ?? 0)}ms beatInt:{Math.floor(debugEffects?.entropyBeatIntervalMs ?? 0)}ms</div>
           <div>tiles: {debugEffects?.tilesLen ?? 0}</div>
