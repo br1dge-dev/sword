@@ -13,11 +13,12 @@ export function useSwordPowerUpState() {
 }
 
 export function useSwordAudioState() {
-  const { energy, beatDetected, lastBeatTimeMs, isMusicPlaying, isIdleActive } = useAudioReactionStore(
+  const { energy, beatDetected, lastBeatTimeMs, beatId, isMusicPlaying, isIdleActive } = useAudioReactionStore(
     useShallow((s) => ({
       energy: s.energy,
       beatDetected: s.beatDetected,
       lastBeatTimeMs: s.lastBeatTimeMs,
+      beatId: s.beatId,
       isMusicPlaying: s.isMusicPlaying,
       isIdleActive: s.isIdleActive,
     })),
@@ -27,7 +28,7 @@ export function useSwordAudioState() {
   // We want the latest idle flag whenever the component re-renders (energy/beat updates cause rerenders).
   const idle = typeof isIdleActive === 'function' ? isIdleActive() : !!isIdleActive;
 
-  return { energy, beatDetected, lastBeatTimeMs, isMusicPlaying, idle };
+  return { energy, beatDetected, lastBeatTimeMs, beatId, isMusicPlaying, idle };
 }
 
 

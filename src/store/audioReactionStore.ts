@@ -38,12 +38,21 @@ interface AudioReactionState {
    * This avoids "sticky beat" semantics and enables short beat-pulse windows.
    */
   lastBeatTimeMs: number;
+  /**
+   * Monotonic beat sequence id (increments once per detected beat).
+   * Use this for edge-triggered "beat events" to avoid double-firing inside a beatPulse window.
+   */
+  beatId: number;
   isAudioActive: boolean;
   idleEnabled: boolean;
   isMusicPlaying: boolean;
   swordColor: string; // HEX
   setSwordColor: (color: string) => void;
   frequencyData: Uint8Array | null;
+  /**
+   * Monotonic sequence id for frequency snapshots (increments when frequencyData is updated).
+   */
+  frequencySeq: number;
   setFrequencyData: (data: Uint8Array) => void;
   
   // Aktionen
@@ -63,13 +72,15 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   beatDetected: false,
   lastBeatTime: 0,
   lastBeatTimeMs: 0,
+  beatId: 0,
   isAudioActive: false,
   idleEnabled: true,
   isMusicPlaying: false,
   swordColor: '#00FCA6',
   frequencyData: null,
+  frequencySeq: 0,
   setSwordColor: (color) => set({ swordColor: color }),
-  setFrequencyData: (data) => set({ frequencyData: data }),
+  setFrequencyData: (data) => set((s) => ({ frequencyData: data, frequencySeq: (s.frequencySeq + 1) | 0 })),
   
   updateEnergy: (energy, opts = {}) => {
     const now = Date.now();
@@ -103,12 +114,13 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     const perfNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const beatMs = typeof timeMs === 'number' ? timeMs : perfNow;
     // OPTIMIERT: Setze isAudioActive nur wenn keine Idle-Animation läuft oder Musik spielt
-    set({ 
+    set((s) => ({ 
       beatDetected: true,
       lastBeatTime: Date.now(),
       lastBeatTimeMs: beatMs,
+      beatId: (s.beatId + 1) | 0,
       isAudioActive: !idleActive || currentState.isMusicPlaying
-    });
+    }));
     
     // WICHTIG: Stoppe Idle-Animation sofort wenn Musik spielt
     if (currentState.isMusicPlaying && idleActive) {
