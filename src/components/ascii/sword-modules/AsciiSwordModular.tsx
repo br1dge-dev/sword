@@ -1230,6 +1230,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               onset: reactive.onset,
               beat: reactive.beat,
               beatDetected: beatEvent,
+              downbeatEvent,
               baseVeinPositions: baseBgPositionsRef.current,
               maxEmits: 380,
             });
