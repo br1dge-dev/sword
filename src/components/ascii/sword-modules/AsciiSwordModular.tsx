@@ -82,6 +82,7 @@ import {
   stepEqState,
   type EqState,
 } from './effects/equalizerSword';
+import { sampleDelta, type DeltaSampler } from '@/lib/reactive/transients';
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
 import { useSwordAudioState, useSwordPowerUpState } from './hooks/useSwordStores';
@@ -550,10 +551,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     // Beat-event timing (for beat-aligned gating + adaptive min gap).
     lastBeatEventMs: number;
     beatIntervalMs: number;
-    // Sampled transient state (use ~50ms window so PR1 per-frame smoothing doesn't kill deltas).
-    lastSampleMs: number;
-    prevBass: number;
-    prevEnergy: number;
+    // Sampled transient state (fixed window so PR1 per-frame smoothing doesn't kill deltas).
+    bassSampler: DeltaSampler;
+    energySampler: DeltaSampler;
     bassDelta: number;
     energyDelta: number;
   }>({
@@ -563,9 +563,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     beatLatch: false,
     lastBeatEventMs: -1,
     beatIntervalMs: 520,
-    lastSampleMs: -1,
-    prevBass: 0,
-    prevEnergy: 0,
+    bassSampler: { lastSampleMs: -1, prevValue: 0, delta: 0 },
+    energySampler: { lastSampleMs: -1, prevValue: 0, delta: 0 },
     bassDelta: 0,
     energyDelta: 0,
   });
@@ -906,9 +905,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           entropy.beatLatch = false;
           entropy.lastBeatEventMs = -1;
           entropy.beatIntervalMs = 520;
-          entropy.lastSampleMs = -1;
-          entropy.prevBass = 0;
-          entropy.prevEnergy = 0;
+          entropy.bassSampler.lastSampleMs = -1;
+          entropy.energySampler.lastSampleMs = -1;
+          entropy.bassSampler.prevValue = 0;
+          entropy.energySampler.prevValue = 0;
           entropy.bassDelta = 0;
           entropy.energyDelta = 0;
         } else {
@@ -929,19 +929,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           // IMPORTANT: We sample deltas on a ~50ms window, otherwise per-frame smoothing (PR1)
           // makes per-frame deltas too small and entropy effectively never triggers.
           const SAMPLE_MS = 50;
-          if (entropy.lastSampleMs < 0) {
-            entropy.lastSampleMs = nowMs;
-            entropy.prevBass = snap.bass;
-            entropy.prevEnergy = snap.energy;
-            entropy.bassDelta = 0;
-            entropy.energyDelta = 0;
-          } else if (nowMs - entropy.lastSampleMs >= SAMPLE_MS) {
-            entropy.bassDelta = snap.bass - entropy.prevBass;
-            entropy.energyDelta = snap.energy - entropy.prevEnergy;
-            entropy.prevBass = snap.bass;
-            entropy.prevEnergy = snap.energy;
-            entropy.lastSampleMs = nowMs;
-          }
+          entropy.bassDelta = sampleDelta(entropy.bassSampler, nowMs, snap.bass, SAMPLE_MS);
+          entropy.energyDelta = sampleDelta(entropy.energySampler, nowMs, snap.energy, SAMPLE_MS);
           const bassDelta = entropy.bassDelta;
           const energyDelta = entropy.energyDelta;
 
