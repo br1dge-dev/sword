@@ -85,7 +85,6 @@ import {
 import React from 'react'; // Added missing import for React
 import AsciiBackgroundCanvas from './AsciiBackgroundCanvas';
 import { useSwordAudioState, useSwordPowerUpState } from './hooks/useSwordStores';
-import { useChoreoTrack } from '@/hooks/useChoreoTrack';
 
 const EQ_PALETTES: EqPalette[] = [
   { low: '#00FCA6', mid: '#3EE6FF', high: '#FF3EC8', peak: '#F8E16C' }, // green -> cyan -> pink
@@ -165,15 +164,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   useEffect(() => {
     frequencyDataRef.current = frequencyData;
   }, [frequencyData]);
-
-  // Deterministic per-track choreo (currently DR4GONSWORD only).
-  const choreo = useChoreoTrack();
-  const choreoEnabledRef = useRef<boolean>(false);
-  const choreoSampleRef = useRef<typeof choreo.sample | null>(null);
-  useEffect(() => {
-    choreoEnabledRef.current = choreo.enabled;
-    choreoSampleRef.current = choreo.sample ?? null;
-  }, [choreo.enabled, choreo.sample]);
 
   // NOTE: This must be "mount-gated" to avoid hydration mismatches in Next.js
   // (server-rendered HTML must match the client's first render).
@@ -923,23 +913,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }
         }
 
-        const choreoOn = choreoEnabledRef.current && !!choreoSampleRef.current;
-        const c = choreoSampleRef.current;
-        const reactive = choreoOn && c
-          ? {
-              energy: c.energy,
-              bass: c.bass,
-              mid: c.mid,
-              high: c.high,
-              onset: c.onset,
-              beat: c.beatStrength,
-            }
-          : reactivityControllerRef.current!.update({
-              nowMs,
-              energy: energyRef.current,
-              beatDetected: beatPulse,
-              frequencyData: frequencyDataRef.current,
-            });
+        const reactive = reactivityControllerRef.current!.update({
+          nowMs,
+          energy: energyRef.current,
+          beatDetected: beatPulse,
+          frequencyData: frequencyDataRef.current,
+        });
 
         // Update shimmer inputs for render-time modulation (cheap; no extra arrays).
         shimmerRef.current = {
@@ -1230,12 +1209,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
             // --- Sword Equalizer (16 bars) ---
             // Drives coloredTiles as the main “display” during playback (no intervals; same scheduler).
-            // In choreo-mode, prefer precomputed 16-band levels for determinism.
-            const choreoBands = choreoEnabledRef.current ? choreoSampleRef.current?.bands16 : undefined;
-            if ((choreoBands && choreoBands.length === 16) || (frequencyDataRef.current && frequencyDataRef.current.length)) {
-              const raw = choreoBands
-                ? choreoBands.map((v) => Math.max(0, Math.min(1, v)))
-                : computeEqBands(frequencyDataRef.current!, {
+            if (frequencyDataRef.current && frequencyDataRef.current.length) {
+              const raw = computeEqBands(frequencyDataRef.current, {
                 barCount: 16,
                 attackMs: 60,
                 releaseMs: 220,
