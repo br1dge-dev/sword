@@ -6,17 +6,20 @@ import type { ChoreoTrack } from "@/lib/choreo/choreoTypes";
 import { sampleChoreo, type ChoreoSample } from "@/lib/choreo/choreoRuntime";
 
 export function useChoreoTrack() {
-  const { currentTrackName, currentTrackSrc, currentTimeSec } = useAudioReactionStore((s) => ({
+  const { currentTrackName, currentTrackSrc, currentTimeSec, choreoMode } = useAudioReactionStore((s) => ({
     currentTrackName: s.currentTrackName,
     currentTrackSrc: s.currentTrackSrc,
     currentTimeSec: s.currentTimeSec,
+    choreoMode: s.choreoMode,
   }));
 
   const isDr4gonsword = currentTrackName === "DR4GONSWORD";
+  const wantsChoreo = choreoMode === "choreo" || (choreoMode === "auto" && isDr4gonsword);
+  const wantsLive = choreoMode === "live";
   const choreoUrl = useMemo(() => {
-    if (!isDr4gonsword) return null;
+    if (!wantsChoreo) return null;
     return "/choreo/DR4GONSWORD.v1.json";
-  }, [isDr4gonsword]);
+  }, [wantsChoreo]);
 
   const [track, setTrack] = useState<ChoreoTrack | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +62,7 @@ export function useChoreoTrack() {
   }, [track, currentTimeSec]);
 
   return {
-    enabled: isDr4gonsword && !!track && track.trackName === "DR4GONSWORD",
+    enabled: wantsChoreo && !wantsLive && !!track && track.trackName === "DR4GONSWORD",
     trackName: currentTrackName,
     src: currentTrackSrc,
     timeSec: currentTimeSec,

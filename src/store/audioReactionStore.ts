@@ -45,12 +45,14 @@ interface AudioReactionState {
   currentTrackSrc: string | null;
   currentTimeSec: number;
   durationSec: number;
+  choreoMode: 'auto' | 'live' | 'choreo';
   swordColor: string; // HEX
   setSwordColor: (color: string) => void;
   frequencyData: Uint8Array | null;
   setFrequencyData: (data: Uint8Array) => void;
   setTrackInfo: (info: { name: string; src: string } | null) => void;
   setPlaybackTime: (t: { currentTimeSec: number; durationSec: number }) => void;
+  setChoreoMode: (mode: 'auto' | 'live' | 'choreo') => void;
   
   // Aktionen
   updateEnergy: (energy: number, opts?: UpdateEnergyOptions) => void;
@@ -76,12 +78,14 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   currentTrackSrc: null,
   currentTimeSec: 0,
   durationSec: 0,
+  choreoMode: 'auto',
   swordColor: '#00FCA6',
   frequencyData: null,
   setSwordColor: (color) => set({ swordColor: color }),
   setFrequencyData: (data) => set({ frequencyData: data }),
   setTrackInfo: (info) => set({ currentTrackName: info?.name ?? null, currentTrackSrc: info?.src ?? null }),
   setPlaybackTime: ({ currentTimeSec, durationSec }) => set({ currentTimeSec, durationSec }),
+  setChoreoMode: (mode) => set({ choreoMode: mode }),
   
   updateEnergy: (energy, opts = {}) => {
     const now = Date.now();
