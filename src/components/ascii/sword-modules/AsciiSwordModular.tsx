@@ -526,13 +526,27 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     return m;
   }, [hiltStartIndex, isHandleFast, swordPositions]);
 
-  const entropyRef = useRef<{ lastImpulseMs: number; amp01: number; px: number; beatLatch: boolean; prevBass: number; prevEnergy: number }>({
+  const entropyRef = useRef<{
+    lastImpulseMs: number;
+    amp01: number;
+    px: number;
+    beatLatch: boolean;
+    // Sampled transient state (use ~50ms window so PR1 per-frame smoothing doesn't kill deltas).
+    lastSampleMs: number;
+    prevBass: number;
+    prevEnergy: number;
+    bassDelta: number;
+    energyDelta: number;
+  }>({
     lastImpulseMs: -1,
     amp01: 0,
     px: 0,
     beatLatch: false,
+    lastSampleMs: -1,
     prevBass: 0,
     prevEnergy: 0,
+    bassDelta: 0,
+    energyDelta: 0,
   });
 
   // Keep refs so the rAF scheduler can read without re-subscribing.
@@ -865,15 +879,32 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           entropy.amp01 = 0;
           entropy.lastImpulseMs = -1;
           entropy.beatLatch = false;
+          entropy.lastSampleMs = -1;
           entropy.prevBass = 0;
           entropy.prevEnergy = 0;
+          entropy.bassDelta = 0;
+          entropy.energyDelta = 0;
         } else {
           const snap = reactiveLatestRef.current;
           // Bass-transient gate: entropy should follow kick/bass, not melodic/synth spikes.
-          const bassDelta = snap.bass - entropy.prevBass;
-          const energyDelta = snap.energy - entropy.prevEnergy;
-          entropy.prevBass = snap.bass;
-          entropy.prevEnergy = snap.energy;
+          // IMPORTANT: We sample deltas on a ~50ms window, otherwise per-frame smoothing (PR1)
+          // makes per-frame deltas too small and entropy effectively never triggers.
+          const SAMPLE_MS = 50;
+          if (entropy.lastSampleMs < 0) {
+            entropy.lastSampleMs = nowMs;
+            entropy.prevBass = snap.bass;
+            entropy.prevEnergy = snap.energy;
+            entropy.bassDelta = 0;
+            entropy.energyDelta = 0;
+          } else if (nowMs - entropy.lastSampleMs >= SAMPLE_MS) {
+            entropy.bassDelta = snap.bass - entropy.prevBass;
+            entropy.energyDelta = snap.energy - entropy.prevEnergy;
+            entropy.prevBass = snap.bass;
+            entropy.prevEnergy = snap.energy;
+            entropy.lastSampleMs = nowMs;
+          }
+          const bassDelta = entropy.bassDelta;
+          const energyDelta = entropy.energyDelta;
 
           const bassDominant = snap.bass > snap.mid * 1.45 && snap.bass > snap.high * 1.9;
           // ENTROPY should be kick/bass driven, not "beatDetected" driven.
