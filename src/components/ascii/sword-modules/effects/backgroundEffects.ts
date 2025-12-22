@@ -162,14 +162,17 @@ function generateBackgroundRegion(
       // --- NEU: chaotisch-konzentrische Muster ---
       const dx = x - centerX;
       const dy = y - adjustedHeight / 2;
-      // Ringbreite pro Feld leicht variieren
-      const ringWidth = 6 + Math.floor(pseudoRandom(x, y, patternType + 8888) * 3); // 6 bis 8
+      // Ringbreite pro Feld leicht variieren (bigger rings => less “tiny/overbusy” look)
+      const ringWidth = 8 + Math.floor(pseudoRandom(x, y, patternType + 8888) * 4); // 8 bis 11
       // Zufälliger Offset für den Abstand
       const noisyDist = Math.sqrt(dx * dx + dy * dy) + (pseudoRandom(x, y, patternType + 9999) - 0.5) * 6;
       const ring = Math.floor(noisyDist / ringWidth);
 
-      // Dichte pro Ring: innen dichter, außen lockerer
-      let emptyProbability = 0.18 + 0.07 * ring;
+      // Dichte pro Ring: innen lockerer (weniger “zugedrückt” im Zentrum), außen noch lockerer
+      let emptyProbability = 0.24 + 0.065 * ring;
+      // Extra “breathing room” near the center
+      if (ring <= 1) emptyProbability += 0.18;
+      else if (ring <= 3) emptyProbability += 0.08;
       if (isLargeViewport && Math.abs(dx) > fadeStart) {
         emptyProbability = Math.min(0.995, emptyProbability + ((Math.abs(dx) - fadeStart) / fadeWidth) * 1.25);
         emptyProbability = Math.pow(emptyProbability, 1.25);
@@ -177,7 +180,7 @@ function generateBackgroundRegion(
           emptyProbability = Math.min(0.998, emptyProbability * 1.2);
         }
       }
-      emptyProbability = Math.max(emptyProbability, 0.25);
+      emptyProbability = Math.max(emptyProbability, 0.35);
       if (pseudoRandom(x, y, patternType) < emptyProbability) {
         background[y][x] = ' ';
         continue;
