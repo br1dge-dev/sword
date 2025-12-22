@@ -62,14 +62,10 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   // };
   
   // Audio-Reaction-Store
-  const { setMusicPlaying, setAudioActive, setTrackInfo, setPlaybackTime, choreoMode, setChoreoMode, isIdleActive, swordColor } = useAudioReactionStore(
+  const { setMusicPlaying, setAudioActive, isIdleActive, swordColor } = useAudioReactionStore(
     useShallow((state) => ({
       setMusicPlaying: state.setMusicPlaying,
       setAudioActive: state.setAudioActive,
-      setTrackInfo: state.setTrackInfo,
-      setPlaybackTime: state.setPlaybackTime,
-      choreoMode: state.choreoMode,
-      setChoreoMode: state.setChoreoMode,
       isIdleActive: state.isIdleActive(),
       swordColor: state.swordColor,
     })),
@@ -189,7 +185,6 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       if (audio.duration) {
         setProgress((audio.currentTime / audio.duration) * 100);
       }
-      setPlaybackTime({ currentTimeSec: audio.currentTime || 0, durationSec: audio.duration || 0 });
     };
     
     const handleEnded = () => {
@@ -200,14 +195,11 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     audio.addEventListener('ended', handleEnded);
     audio.volume = 0.5; // Feste Lautstärke
 
-    // Keep track info in the store (used for deterministic choreo per track).
-    setTrackInfo({ name: tracks[currentTrackIndex].name, src: tracks[currentTrackIndex].src });
-    
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [currentTrackIndex, nextTrack, setPlaybackTime, setTrackInfo]);
+  }, [currentTrackIndex, nextTrack]);
   
   // AudioContext aktivieren
   const resumeAudioContext = useCallback(async () => {
@@ -419,22 +411,6 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
           })}
         </div>
       </div>
-
-      {/* Choreo mode toggle (DR4GONSWORD only) */}
-      {tracks[currentTrackIndex].name === 'DR4GONSWORD' && (
-        <div className="mb-2 hidden sm:flex w-full justify-center">
-          <button
-            className="rounded border border-grifter-blue bg-black px-2 py-1 text-[10px] font-press-start-2p text-grifter-blue hover:bg-black/80 ui-caps"
-            onClick={() => {
-              const next = choreoMode === 'auto' ? 'live' : choreoMode === 'live' ? 'choreo' : 'auto';
-              setChoreoMode(next);
-            }}
-            title="AUTO: choreo only when available. LIVE: analyzer-driven. CHOREO: force deterministic script."
-          >
-            MODE: {choreoMode.toUpperCase()}
-          </button>
-        </div>
-      )}
 
       {/* Progress Bar direkt unter Trackname */}
       <div className="mb-3 w-full justify-center hidden sm:flex">
