@@ -7,7 +7,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface PowerUpState {
-  // Schwert-Level (1-3)
+  // Schwert-Level (1-4)
   currentLevel: number;
   maxLevel: number;
   
@@ -49,7 +49,7 @@ export const usePowerUpStore = create<PowerUpState>()(
   persist(
     (set) => ({
       currentLevel: 1,
-      maxLevel: 3,
+      maxLevel: 4,
       forgeProgress: 0,
       isForgeComplete: false,
       chargeLevel: 1,

@@ -486,7 +486,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     const swordArt = swordLevels[activeLevel as keyof typeof swordLevels] || swordLevels[1];
     const centeredSwordLines = centerAsciiArt(swordArt);
     const hiltStart = centeredSwordLines.findIndex((l) =>
-      l.includes('__▓█▓__') || l.includes('_▓██▓_') || l.includes('_▓███▓_'),
+      l.includes('__▓█▓__') || l.includes('_▓██▓_') || l.includes('_▓███▓_') || l.includes('_▓████▓_'),
     );
     const mid = centeredSwordLines[0]?.length ? Math.floor(centeredSwordLines[0].length / 2) : 0;
     
@@ -514,7 +514,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   // PERF: cache handle geometry so we don’t recompute `findIndex(...)` inside `isHandlePosition` per character.
   const hiltStartIndex = useMemo(() => {
     return centeredSwordLines.findIndex((line) =>
-      line.includes('__▓█▓__') || line.includes('_▓██▓_') || line.includes('_▓███▓_'),
+      line.includes('__▓█▓__') || line.includes('_▓██▓_') || line.includes('_▓███▓_') || line.includes('_▓████▓_'),
     );
   }, [centeredSwordLines]);
   const middleX = useMemo(() => (centeredSwordLines[0]?.length ? Math.floor(centeredSwordLines[0].length / 2) : 0), [centeredSwordLines]);
@@ -599,8 +599,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     amp01: number;
     px: number;
     beatLatch: boolean;
-    // Beat-event timing (for beat-aligned gating + adaptive min gap).
-    lastBeatEventMs: number;
+    // Beat-hit timing (raw detector hits, not grid beats) for low-latency gating.
+    lastBeatHitMs: number;
     beatIntervalMs: number;
     // Sampled transient state (fixed window so PR1 per-frame smoothing doesn't kill deltas).
     bassSampler: DeltaSampler;
@@ -612,7 +612,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     amp01: 0,
     px: 0,
     beatLatch: false,
-    lastBeatEventMs: -1,
+    lastBeatHitMs: -1,
     beatIntervalMs: 520,
     bassSampler: { lastSampleMs: -1, prevValue: 0, delta: 0 },
     energySampler: { lastSampleMs: -1, prevValue: 0, delta: 0 },
@@ -968,7 +968,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           entropy.amp01 = 0;
           entropy.lastImpulseMs = -1;
           entropy.beatLatch = false;
-          entropy.lastBeatEventMs = -1;
+          entropy.lastBeatHitMs = -1;
           entropy.beatIntervalMs = 520;
           entropy.bassSampler.lastSampleMs = -1;
           entropy.energySampler.lastSampleMs = -1;
@@ -978,15 +978,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           entropy.energyDelta = 0;
         } else {
           // Track beat cadence for adaptive gating (prevents "off" feel on faster BPM).
-          if (beatEvent) {
-            if (entropy.lastBeatEventMs > 0) {
-              const interval = nowMs - entropy.lastBeatEventMs;
+          if (beatEventRaw) {
+            if (entropy.lastBeatHitMs > 0) {
+              const interval = nowMs - entropy.lastBeatHitMs;
               if (interval > 120 && interval < 1500) {
                 // Smooth a bit to avoid jitter.
                 entropy.beatIntervalMs = entropy.beatIntervalMs * 0.65 + interval * 0.35;
               }
             }
-            entropy.lastBeatEventMs = nowMs;
+            entropy.lastBeatHitMs = nowMs;
           }
 
           const snap = reactiveLatestRef.current;
@@ -999,8 +999,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           const bassDelta = entropy.bassDelta;
           const energyDelta = entropy.energyDelta;
 
-          const bassDominant = snap.bass > snap.mid * 1.35 && snap.bass > snap.high * 1.7;
-          const beatWindow = entropy.lastBeatEventMs > 0 && (nowMs - entropy.lastBeatEventMs) <= 160;
+          const bassDominant =
+            snap.bass > snap.mid * 1.45 &&
+            snap.bass > snap.high * 1.85 &&
+            (snap.bass - snap.mid) > 0.055;
+          // Low-latency beat window: use raw beat hits (not grid beats) to avoid perceived lag.
+          const beatWindow = entropy.lastBeatHitMs > 0 && (nowMs - entropy.lastBeatHitMs) <= 120;
           // ENTROPY should be kick/bass driven, not "beatDetected" driven.
           // We gate purely on bass dominance + bass transient, so melodic/synth spikes won't trigger it.
           const crashScore = clamp01(
@@ -1009,20 +1013,24 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               Math.max(0, snap.onset - 0.07) * 1.8 +
               Math.max(0, snap.bass - snap.mid) * 2.4,
           );
-          // If the beat grid is confident, make Entropy feel “musically intentional”:
-          // Prefer downbeats for the big impulse, but still allow extreme crashes to override.
-          const gridLocked = gridConfidence01 >= 0.45;
-          const entropyBarGate = !gridLocked || downbeatEvent || crashScore > 0.92;
-          // Beat-aligned trigger: allow a short window after a detected beat so phase offsets don't kill it.
-          // Fallback: extremely strong crashes can still trigger even if beat detection misses.
-          const mainBeat =
-            entropyBarGate &&
-            ((beatWindow && bassDominant) || crashScore > 0.92) &&
-            snap.bass > 0.14 &&
-            snap.energy > 0.10 &&
-            bassDelta > 0.045 &&
-            crashScore > 0.58;
-          const minGapMs = Math.max(280, Math.min(900, entropy.beatIntervalMs * 0.85));
+
+          // New philosophy: Entropy only fires when it REALLY rumbles.
+          // - Primary: strong bass transient near a raw beat hit (tight, punchy).
+          // - Override: extreme crash can fire even if beat detection misses.
+          const hardCrash = crashScore > 0.94 && bassDelta > 0.07 && snap.bass > 0.20 && bassDominant;
+          const kickHit =
+            beatWindow &&
+            bassDominant &&
+            snap.bass > 0.18 &&
+            snap.energy > 0.11 &&
+            bassDelta > 0.060 &&
+            energyDelta > 0.020 &&
+            crashScore > 0.72;
+
+          const mainBeat = kickHit || hardCrash;
+
+          // Less frequent: avoid “unangebracht” spam in busy sections.
+          const minGapMs = Math.max(420, Math.min(1100, entropy.beatIntervalMs * 1.05));
           if (mainBeat && !entropy.beatLatch && (entropy.lastImpulseMs < 0 || nowMs - entropy.lastImpulseMs >= minGapMs)) {
             entropy.beatLatch = true;
             entropy.lastImpulseMs = nowMs;
@@ -1032,22 +1040,24 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
           const t = entropy.lastImpulseMs > 0 ? nowMs - entropy.lastImpulseMs : 1e9;
           // Snappier: faster attack + faster decay (less “laggy” feel).
-          const attackMs = 14;
-          const decayMs = 120;
+          const attackMs = 10;
+          const decayMs = 95;
           const a = t <= 0 ? 0 : t < attackMs ? t / attackMs : 1;
           const d = Math.exp(-Math.max(0, t - attackMs) / decayMs);
-          entropy.amp01 = Math.max(0, Math.min(1, a * d));
+          // Make strong hits feel stronger (without making weak hits spammy).
+          const boost = 0.78 + clamp01(crashScore) * 0.62;
+          entropy.amp01 = Math.max(0, Math.min(1, a * d * boost));
 
-          const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
+          const forgeTier = Math.max(1, Math.min(4, (currentLevelRef2.current || levelPropRef.current || 1)));
           // Default: smaller displacement. Only go big on real “crash/crescendo”.
           // Default: very compact. Explode hard only when crashScore is high.
-          const tierPx = forgeTier === 1 ? 10 : forgeTier === 2 ? 14 : 18;
+          const tierPx = forgeTier === 1 ? 10 : forgeTier === 2 ? 14 : forgeTier === 3 ? 18 : 22;
           const crash = crashScore;
           // Nonlinear ramp: small most of the time; big on crescendos/crashes.
-          const big = Math.pow(crash, 2.1);
-          const rawPx = tierPx * (0.10 + big * 1.65);
+          const big = Math.pow(crash, 2.0);
+          const rawPx = tierPx * (0.12 + big * 1.95);
           // Hard cap so it never gets "too far" even on extreme passages.
-          const maxPx = forgeTier === 1 ? 14 : forgeTier === 2 ? 18 : 24;
+          const maxPx = forgeTier === 1 ? 14 : forgeTier === 2 ? 18 : forgeTier === 3 ? 24 : 30;
           entropy.px = Math.min(maxPx, rawPx);
         }
       }
@@ -1343,14 +1353,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           // NOTE: Only "spawn" effects (that allocate arrays) should be budgeted.
           // Cheap continuous scalars (like glow) must not starve glitches/edges → prevents “plain tiles dominate”.
           let spawnsUsed = 0;
-          const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
+          const forgeTier = Math.max(1, Math.min(4, (currentLevelRef2.current || levelPropRef.current || 1)));
           const chargeTier = Math.max(1, Math.min(3, chargeLevel || 1));
           const glitchTier = Math.max(0, Math.min(3, currentGlitchLevel || 0));
           // When the grid is confident, quantize “big” events to downbeats for a more musical feel.
           const gridLocked = gridConfidence01 >= 0.45;
           const majorBeat = gridLocked && glitchTier >= 3 ? downbeatEvent : currentBeat;
           // L1 subtle, L2 ~current, L3 much more stacked.
-          const MAX_SPAWNS_PER_UPDATE = forgeTier === 1 ? 1 : forgeTier === 2 ? 2 : 3;
+          const MAX_SPAWNS_PER_UPDATE = forgeTier === 1 ? 1 : forgeTier === 2 ? 2 : forgeTier === 3 ? 3 : 4;
           const canSpawn = () => spawnsUsed < MAX_SPAWNS_PER_UPDATE;
 
           // --- Living Glitches: morph a few characters while a glitch window is active ---
@@ -1392,9 +1402,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           // --- Glow (forge-tiered) ---
           // Glow is continuous + cheap: do not consume the spawn budget.
           if (currentBeat || onset > 0.01 || currentEnergy > 0.03) {
-            const forgeGlowMul = forgeTier === 1 ? 0.65 : forgeTier === 2 ? 1.0 : 1.35;
+            const forgeGlowMul = forgeTier === 1 ? 0.65 : forgeTier === 2 ? 1.0 : forgeTier === 3 ? 1.35 : 1.7;
             const base = (0.025 + 0.22 * Math.min(1, (bass * 0.7 + currentEnergy * 0.3) + beatStrength * 0.25)) * forgeGlowMul;
-            const randomIntensity = base + Math.random() * (forgeTier === 1 ? 0.02 : forgeTier === 2 ? 0.04 : 0.06);
+            const randomIntensity = base + Math.random() * (forgeTier === 1 ? 0.02 : forgeTier === 2 ? 0.04 : forgeTier === 3 ? 0.06 : 0.08);
               setGlowIntensity(randomIntensity);
             }
 
@@ -1436,14 +1446,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               const eqTiles = renderEqTiles(eqGeom, stepped.state, palette);
               // Add a bit of “old chaos” on top (controlled) so it doesn’t feel too sterile.
               let mergedTiles = eqTiles;
-              const forgeChaosMul = forgeTier === 1 ? 0.55 : forgeTier === 2 ? 1.0 : 1.45;
+              const forgeChaosMul = forgeTier === 1 ? 0.55 : forgeTier === 2 ? 1.0 : forgeTier === 3 ? 1.45 : 1.9;
               const chaosChance = Math.min(0.5, (0.05 + onset * 2.2 + beatStrength * 0.12) * forgeChaosMul);
               if ((currentBeat || onset > 0.02) && Math.random() < chaosChance) {
                 const chaos = generateColoredTiles(swordPositions, glitchTier, colorEffectIntensity, Math.min(1, currentEnergy + onset));
                 // Merge with cap (avoid huge arrays); chaos overlays EQ where it overlaps.
                 const byKey = new Map<string, { x: number; y: number; color: string }>();
                 for (const t of eqTiles) byKey.set(`${t.x},${t.y}`, t);
-                const chaosCap = forgeTier === 1 ? 35 : forgeTier === 2 ? 90 : 170;
+                const chaosCap = forgeTier === 1 ? 35 : forgeTier === 2 ? 90 : forgeTier === 3 ? 170 : 260;
                 for (const t of chaos.slice(0, chaosCap)) byKey.set(`${t.x},${t.y}`, t);
                 mergedTiles = Array.from(byKey.values());
               }
@@ -1478,7 +1488,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               for (const level in tempIntensity) {
                 if (Object.prototype.hasOwnProperty.call(tempIntensity, level)) {
                   const numLevel = Number(level) as keyof typeof colorEffectIntensity;
-                const cap = forgeTier === 1 ? 2 : forgeTier === 2 ? 4 : 8;
+                const cap = forgeTier === 1 ? 2 : forgeTier === 2 ? 4 : forgeTier === 3 ? 8 : 12;
                 tempIntensity[numLevel] = Math.min(
                   cap,
                   tempIntensity[numLevel] + Math.floor(currentEnergy * (currentBeat ? 1.2 : 0.6)),
@@ -1828,9 +1838,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             scaffold={baseBgVeins}
             veinsMapRef={veinsMapRef as any}
             overlayConfigRef={bgOverlayConfigRef}
-            width={((staticBackground.length > 0 ? staticBackground[0].length : caveBackground[0]?.length) || 160) * 10}
-            height={((staticBackground.length > 0 ? staticBackground.length : caveBackground.length) || 100) * 14}
-            fontSize={13}
+            // Slightly larger “tiles” so the background doesn’t look tiny/dense.
+            width={((staticBackground.length > 0 ? staticBackground[0].length : caveBackground[0]?.length) || 160) * 11}
+            height={((staticBackground.length > 0 ? staticBackground.length : caveBackground.length) || 100) * 15}
+            fontSize={15}
             fontFamily={'monospace'}
           />
         </div>
