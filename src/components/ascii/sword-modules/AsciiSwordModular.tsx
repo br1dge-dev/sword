@@ -244,7 +244,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     entropyPx: number;
     entropyLatch: boolean;
     entropyBassDelta: number;
+    entropyEnergyDelta: number;
     entropyCrashScore: number;
+    entropyBeatHitAgeMs: number;
+    entropyKickHit: boolean;
     entropyMinGapMs: number;
     entropyBeatIntervalMs: number;
     tilesLen: number;
@@ -599,8 +602,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     amp01: number;
     px: number;
     beatLatch: boolean;
-    // Beat-event timing (for beat-aligned gating + adaptive min gap).
-    lastBeatEventMs: number;
+    // Beat-hit timing (raw detector hits, not grid beats) for low-latency gating.
+    lastBeatHitMs: number;
     beatIntervalMs: number;
     // Sampled transient state (fixed window so PR1 per-frame smoothing doesn't kill deltas).
     bassSampler: DeltaSampler;
@@ -612,7 +615,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     amp01: 0,
     px: 0,
     beatLatch: false,
-    lastBeatEventMs: -1,
+    lastBeatHitMs: -1,
     beatIntervalMs: 520,
     bassSampler: { lastSampleMs: -1, prevValue: 0, delta: 0 },
     energySampler: { lastSampleMs: -1, prevValue: 0, delta: 0 },
@@ -968,7 +971,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           entropy.amp01 = 0;
           entropy.lastImpulseMs = -1;
           entropy.beatLatch = false;
-          entropy.lastBeatEventMs = -1;
+          entropy.lastBeatHitMs = -1;
           entropy.beatIntervalMs = 520;
           entropy.bassSampler.lastSampleMs = -1;
           entropy.energySampler.lastSampleMs = -1;
@@ -978,15 +981,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           entropy.energyDelta = 0;
         } else {
           // Track beat cadence for adaptive gating (prevents "off" feel on faster BPM).
-          if (beatEvent) {
-            if (entropy.lastBeatEventMs > 0) {
-              const interval = nowMs - entropy.lastBeatEventMs;
+          // IMPORTANT: use RAW beat hits here; grid beats can lag and create “late” feel.
+          if (beatEventRaw) {
+            if (entropy.lastBeatHitMs > 0) {
+              const interval = nowMs - entropy.lastBeatHitMs;
               if (interval > 120 && interval < 1500) {
                 // Smooth a bit to avoid jitter.
                 entropy.beatIntervalMs = entropy.beatIntervalMs * 0.65 + interval * 0.35;
               }
             }
-            entropy.lastBeatEventMs = nowMs;
+            entropy.lastBeatHitMs = nowMs;
           }
 
           const snap = reactiveLatestRef.current;
@@ -999,30 +1003,38 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           const bassDelta = entropy.bassDelta;
           const energyDelta = entropy.energyDelta;
 
-          const bassDominant = snap.bass > snap.mid * 1.35 && snap.bass > snap.high * 1.7;
-          const beatWindow = entropy.lastBeatEventMs > 0 && (nowMs - entropy.lastBeatEventMs) <= 160;
+          const bassDominant =
+            snap.bass > snap.mid * 1.42 &&
+            snap.bass > snap.high * 1.85 &&
+            (snap.bass - snap.mid) > 0.045;
+          // Tight “hit window” anchored to raw detector hits (kills perceived lag).
+          const beatHitAge = entropy.lastBeatHitMs > 0 ? nowMs - entropy.lastBeatHitMs : 1e9;
+          const beatWindow = beatHitAge <= 120;
           // ENTROPY should be kick/bass driven, not "beatDetected" driven.
           // We gate purely on bass dominance + bass transient, so melodic/synth spikes won't trigger it.
+          // “Crash score” for ENTROPY should NOT be onset-driven (onset can spike off-beat).
           const crashScore = clamp01(
-            bassDelta * 20 +
-              energyDelta * 8 +
-              Math.max(0, snap.onset - 0.07) * 1.8 +
-              Math.max(0, snap.bass - snap.mid) * 2.4,
+            bassDelta * 24 +
+              energyDelta * 10 +
+              Math.max(0, snap.bass - snap.mid) * 3.2,
           );
-          // If the beat grid is confident, make Entropy feel “musically intentional”:
-          // Prefer downbeats for the big impulse, but still allow extreme crashes to override.
-          const gridLocked = gridConfidence01 >= 0.45;
-          const entropyBarGate = !gridLocked || downbeatEvent || crashScore > 0.92;
-          // Beat-aligned trigger: allow a short window after a detected beat so phase offsets don't kill it.
-          // Fallback: extremely strong crashes can still trigger even if beat detection misses.
-          const mainBeat =
-            entropyBarGate &&
-            ((beatWindow && bassDominant) || crashScore > 0.92) &&
-            snap.bass > 0.14 &&
-            snap.energy > 0.10 &&
-            bassDelta > 0.045 &&
-            crashScore > 0.58;
-          const minGapMs = Math.max(280, Math.min(900, entropy.beatIntervalMs * 0.85));
+
+          // Entropy should ONLY fire when it REALLY rumbles:
+          // - must be within the raw beat-hit window
+          // - must be bass-dominant and transient must be strong
+          const kickHit =
+            beatWindow &&
+            bassDominant &&
+            snap.bass > 0.16 &&
+            snap.energy > 0.11 &&
+            bassDelta > 0.055 &&
+            energyDelta > 0.016 &&
+            crashScore > 0.62;
+
+          const mainBeat = kickHit;
+
+          // Less frequent: avoid “unangebracht” spam in busy sections.
+          const minGapMs = Math.max(360, Math.min(900, entropy.beatIntervalMs * 0.9));
           if (mainBeat && !entropy.beatLatch && (entropy.lastImpulseMs < 0 || nowMs - entropy.lastImpulseMs >= minGapMs)) {
             entropy.beatLatch = true;
             entropy.lastImpulseMs = nowMs;
@@ -1032,11 +1044,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
           const t = entropy.lastImpulseMs > 0 ? nowMs - entropy.lastImpulseMs : 1e9;
           // Snappier: faster attack + faster decay (less “laggy” feel).
-          const attackMs = 14;
-          const decayMs = 120;
+          const attackMs = 10;
+          const decayMs = 95;
           const a = t <= 0 ? 0 : t < attackMs ? t / attackMs : 1;
           const d = Math.exp(-Math.max(0, t - attackMs) / decayMs);
-          entropy.amp01 = Math.max(0, Math.min(1, a * d));
+          const boost = 0.82 + clamp01(crashScore) * 0.55;
+          entropy.amp01 = Math.max(0, Math.min(1, a * d * boost));
 
           const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
           // Default: smaller displacement. Only go big on real “crash/crescendo”.
@@ -1162,13 +1175,23 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               entropyPx: ent.px,
               entropyLatch: ent.beatLatch,
               entropyBassDelta: ent.bassDelta,
+              entropyEnergyDelta: ent.energyDelta,
               entropyCrashScore: clamp01(
-                ent.bassDelta * 20 +
-                  ent.energyDelta * 8 +
-                  Math.max(0, reactive.onset - 0.07) * 1.8 +
-                  Math.max(0, reactive.bass - reactive.mid) * 2.4,
+                ent.bassDelta * 24 +
+                  ent.energyDelta * 10 +
+                  Math.max(0, reactive.bass - reactive.mid) * 3.2,
               ),
-              entropyMinGapMs: Math.max(280, Math.min(900, ent.beatIntervalMs * 0.85)),
+              entropyBeatHitAgeMs: ent.lastBeatHitMs > 0 ? Math.max(0, nowMs - ent.lastBeatHitMs) : -1,
+              entropyKickHit:
+                (ent.lastBeatHitMs > 0 ? (nowMs - ent.lastBeatHitMs) : 1e9) <= 120 &&
+                reactive.bass > reactive.mid * 1.42 &&
+                reactive.bass > reactive.high * 1.85 &&
+                (reactive.bass - reactive.mid) > 0.045 &&
+                reactive.bass > 0.16 &&
+                reactive.energy > 0.11 &&
+                ent.bassDelta > 0.055 &&
+                ent.energyDelta > 0.016,
+              entropyMinGapMs: Math.max(360, Math.min(900, ent.beatIntervalMs * 0.9)),
               entropyBeatIntervalMs: ent.beatIntervalMs,
               tilesLen: currentTilesRef.current.length,
               unicodeLen: unicodeLenRef.current,
@@ -1788,7 +1811,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           <div>beatEvent: {debugEffects?.beatEvent ? '1' : '0'} beatPulse:{debugEffects?.beatDetected ? '1' : '0'}</div>
           <div>gridBeat: {debugEffects?.gridBeatEvent ? '1' : '0'} downbeat:{debugEffects?.downbeatEvent ? '1' : '0'}</div>
           <div>grid bpm: {(debugEffects?.gridBpm ?? 0).toFixed(1)} phase:{(debugEffects?.gridPhase01 ?? 0).toFixed(3)} conf:{(debugEffects?.gridConfidence01 ?? 0).toFixed(2)}</div>
-          <div>entropy gate: dB:{(debugEffects?.entropyBassDelta ?? 0).toFixed(3)} crash:{(debugEffects?.entropyCrashScore ?? 0).toFixed(3)}</div>
+          <div>entropy gate: hitAge:{Math.floor(debugEffects?.entropyBeatHitAgeMs ?? -1)}ms kick:{debugEffects?.entropyKickHit ? '1' : '0'}</div>
+          <div>entropy gate: dB:{(debugEffects?.entropyBassDelta ?? 0).toFixed(3)} dE:{(debugEffects?.entropyEnergyDelta ?? 0).toFixed(3)} crash:{(debugEffects?.entropyCrashScore ?? 0).toFixed(3)}</div>
           <div>gap: min:{Math.floor(debugEffects?.entropyMinGapMs ?? 0)}ms beatInt:{Math.floor(debugEffects?.entropyBeatIntervalMs ?? 0)}ms</div>
           <div>tiles: {debugEffects?.tilesLen ?? 0}</div>
           <div>unicode: {debugEffects?.unicodeLen ?? 0}</div>
