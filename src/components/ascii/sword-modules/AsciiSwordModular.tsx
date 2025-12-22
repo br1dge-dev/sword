@@ -1087,7 +1087,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         if (!idleRef.current) {
           const adaptive = computeAdaptiveColorCycle({
             energy: reactive.energy,
-            beatDetected: beatPulse,
+            beatDetected: beatEvent,
             lastColorChangeTime: lastColorChangeTimeRef.current,
             colorStability: colorStabilityRef.current,
             nowMs: now,
@@ -1103,7 +1103,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
           const optimized = computeOptimizedColorCycle({
             energy: reactive.energy,
-            beatDetected: beatPulse,
+            beatDetected: beatEvent,
             lastColorChangeTime: lastColorChangeTimeRef.current,
             colorStability: colorStabilityRef.current,
             nowMs: now,
@@ -1191,7 +1191,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         // (Paused state should not keep spawning tiles/glow/glitches.)
         if (!idleRef.current && isMusicPlayingRef.current) {
           const currentEnergy = reactive.energy;
-          const currentBeat = beatPulse;
+          const currentBeat = beatEvent;
           const currentGlitchLevel = glitchLevelRef.current;
           const onset = reactive.onset;
           const beatStrength = reactive.beat;
