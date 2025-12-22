@@ -128,7 +128,9 @@ export function stepEqState(
   config: EqConfig,
   peakHoldUntilMs: number[],
 ): { state: EqState; peakHoldUntilMs: number[] } {
-  const dt = lastMs ? nowMs - lastMs : 0;
+  // Clamp dt to avoid tab-sleep/resume spikes from causing huge decay jumps.
+  const rawDt = lastMs ? nowMs - lastMs : 0;
+  const dt = Math.max(0, Math.min(50, rawDt));
   const n = config.barCount;
 
   const levels = prev.levels.length === n ? [...prev.levels] : Array.from({ length: n }, () => 0);

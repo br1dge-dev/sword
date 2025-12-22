@@ -12,6 +12,11 @@ export type ReactivityInput = {
    * Raw FFT magnitudes (0..255). Can be null when not analyzing.
    */
   frequencyData: Uint8Array | null;
+  /**
+   * Monotonic sequence id for frequency snapshots. Prefer this over array identity
+   * to decide when to recompute frequency-derived features (bands/onset).
+   */
+  frequencySeq?: number;
 };
 
 export type ReactivityOutput = {
@@ -91,7 +96,7 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
 
   let lastNow = 0;
   let prevSpectrum: Uint8Array | null = null;
-  let lastSpectrum: Uint8Array | null = null;
+  let lastFreqSeq = -1;
   let cachedBassRaw = 0;
   let cachedMidRaw = 0;
   let cachedHighRaw = 0;
@@ -106,7 +111,9 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
 
   const update = (input: ReactivityInput): ReactivityOutput => {
     const now = input.nowMs;
-    const dt = lastNow ? now - lastNow : 0;
+    // Clamp dt to avoid tab-sleep/resume spikes from blowing up integrators/decays.
+    const rawDt = lastNow ? now - lastNow : 0;
+    const dt = Math.max(0, Math.min(50, rawDt));
     lastNow = now;
 
     // Beat pulse with decay (stable “strength” signal).
@@ -123,13 +130,13 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
       mid = clamp01(smoothAR(mid, 0, dt, bandSmooth));
       high = clamp01(smoothAR(high, 0, dt, bandSmooth));
       onset = clamp01(smoothAR(onset, 0, dt, onsetSmooth));
-      lastSpectrum = null;
+      lastFreqSeq = -1;
       return { energy, bass, mid, high, onset, beat };
     }
 
-    // Only recompute expensive spectrum-derived values when the input array identity changes.
-    // (AudioAnalyzer emits copied Uint8Arrays; identity changes only when new data arrives.)
-    if (freq !== lastSpectrum) {
+    const seq = typeof input.frequencySeq === 'number' ? input.frequencySeq : -1;
+    const shouldRecompute = seq !== -1 ? seq !== lastFreqSeq : true;
+    if (shouldRecompute) {
       const bassEnd = Math.floor(freq.length * bands.bassEnd);
       const midEnd = Math.floor(freq.length * bands.midEnd);
       cachedBassRaw = avgBand(freq, 0, bassEnd) / 255;
@@ -137,8 +144,10 @@ export function createReactivityController(opts: ReactivityControllerOptions = {
       cachedHighRaw = avgBand(freq, midEnd, freq.length) / 255;
       cachedFluxRaw = computeOnsetFluxNormalized(freq, prevSpectrum);
 
-      prevSpectrum = freq; // Keep reference (safe: analyzer emits copies)
-      lastSpectrum = freq;
+      // Keep a snapshot for next flux computation. Even if the underlying pipeline changes
+      // to reuse Uint8Arrays, this stays correct.
+      prevSpectrum = freq.slice();
+      lastFreqSeq = seq !== -1 ? seq : (lastFreqSeq + 1);
     }
 
     bass = clamp01(smoothAR(bass, cachedBassRaw, dt, bandSmooth));
