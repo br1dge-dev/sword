@@ -194,12 +194,12 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('ended', handleEnded);
     audio.volume = 0.5; // Feste Lautstärke
-    
+
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [nextTrack]);
+  }, [currentTrackIndex, nextTrack]);
   
   // AudioContext aktivieren
   const resumeAudioContext = useCallback(async () => {
