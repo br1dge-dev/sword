@@ -2,16 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAudioReactionStore } from "@/store/audioReactionStore";
+import { useShallow } from "zustand/react/shallow";
 import type { ChoreoTrack } from "@/lib/choreo/choreoTypes";
 import { sampleChoreo, type ChoreoSample } from "@/lib/choreo/choreoRuntime";
 
 export function useChoreoTrack() {
-  const { currentTrackName, currentTrackSrc, currentTimeSec, choreoMode } = useAudioReactionStore((s) => ({
-    currentTrackName: s.currentTrackName,
-    currentTrackSrc: s.currentTrackSrc,
-    currentTimeSec: s.currentTimeSec,
-    choreoMode: s.choreoMode,
-  }));
+  const { currentTrackName, currentTrackSrc, currentTimeSec, choreoMode } = useAudioReactionStore(
+    useShallow((s) => ({
+      currentTrackName: s.currentTrackName,
+      currentTrackSrc: s.currentTrackSrc,
+      currentTimeSec: s.currentTimeSec,
+      choreoMode: s.choreoMode,
+    })),
+  );
 
   const isDr4gonsword = currentTrackName === "DR4GONSWORD";
   const wantsChoreo = choreoMode === "choreo" || (choreoMode === "auto" && isDr4gonsword);
