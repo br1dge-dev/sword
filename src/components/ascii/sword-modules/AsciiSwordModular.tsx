@@ -275,11 +275,30 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const [baseBgVeins, setBaseBgVeins] = useState<Array<{ x: number; y: number; color: string }>>([]);
   const baseBgVeinsRef = useRef<Array<{ x: number; y: number; color: string }>>([]);
   const baseBgPositionsRef = useRef<Array<{ x: number; y: number }>>([]);
+  const baseBgDimsRef = useRef<{ w: number; h: number }>({ w: 160, h: 100 });
+  // Radial bins for cheap “center-out” ring sampling (packed coords: (y<<16)|x)
+  const baseBgRadialBinsRef = useRef<number[][]>([]);
+  const bgBurstRef = useRef<{ startMs: number; beatId: number }>({ startMs: -1, beatId: -1 });
   const organicPatchesRef = useRef(createOrganicPatchState());
 
   useEffect(() => {
     baseBgVeinsRef.current = baseBgVeins;
     baseBgPositionsRef.current = baseBgVeins.map((v) => ({ x: v.x, y: v.y }));
+
+    // Build radial bins so we can pick scaffold points around an expanding radius ring without scanning the whole field.
+    const { w, h } = baseBgDimsRef.current;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    const maxR = Math.ceil(Math.sqrt(cx * cx + cy * cy)) + 2;
+    const bins: number[][] = Array.from({ length: maxR + 1 }, () => []);
+    for (let i = 0; i < baseBgVeins.length; i++) {
+      const v = baseBgVeins[i];
+      const dx = v.x - cx;
+      const dy = v.y - cy;
+      const r = Math.max(0, Math.min(maxR, Math.floor(Math.sqrt(dx * dx + dy * dy))));
+      bins[r].push(((v.y & 0xffff) << 16) | (v.x & 0xffff));
+    }
+    baseBgRadialBinsRef.current = bins;
   }, [baseBgVeins]);
 
   // OPTIMIERT: Memoisierte Berechnungen für bessere Performance
@@ -337,6 +356,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     const scaffoldCount = Math.min(1600, Math.max(750, Math.floor((bgWidth * bgHeight) / 16)));
     const scaffold = generateColoredVeins(bgWidth, bgHeight, scaffoldCount, viewportWidth, viewportHeight)
       .map((v) => ({ ...v, color: '#646B74' }));
+    baseBgDimsRef.current = { w: bgWidth, h: bgHeight };
     setBaseBgVeins(scaffold);
 
     // Reset overlay state on init for determinism.
@@ -361,6 +381,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       const scaffoldCount = Math.min(1600, Math.max(750, Math.floor((bgWidth * bgHeight) / 16)));
       const scaffold = generateColoredVeins(bgWidth, bgHeight, scaffoldCount, viewportWidth, viewportHeight)
         .map((v) => ({ ...v, color: '#646B74' }));
+      baseBgDimsRef.current = { w: bgWidth, h: bgHeight };
       setBaseBgVeins(scaffold);
 
       // Keep overlay, but re-render combined output after resize.
@@ -1167,17 +1188,48 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               upsertVeinsInMap(veinsMapRef.current as any, res.emitted, now);
             }
 
-            // Occasional extra “burst” on beat/onset (feels like patches breathe + cough color).
-            if (beatEvent || reactive.onset > 0.28) {
-              const burst = generateBeatVeins(
-                bgWidth,
-                bgHeight,
-                Math.min(1, reactive.energy * 1.15),
-                beatEvent,
-                typeof window !== 'undefined' ? window.innerWidth : bgWidth,
-                typeof window !== 'undefined' ? window.innerHeight : bgHeight,
-              ).slice(0, 160);
-              if (burst.length) upsertVeinsInMap(veinsMapRef.current as any, burst, now);
+            // Center-out burst wave anchored behind the sword:
+            // start a short-lived “ring wave” on each beat and sample scaffold points on an expanding radius.
+            if (beatEvent) {
+              bgBurstRef.current.startMs = nowMs;
+              bgBurstRef.current.beatId = beatIdRef.current;
+            }
+
+            const burstStart = bgBurstRef.current.startMs;
+            if (burstStart > 0) {
+              const age = nowMs - burstStart;
+              const BURST_MS = 650;
+              if (age <= BURST_MS) {
+                const bins = baseBgRadialBinsRef.current;
+                const maxR = Math.max(0, bins.length - 1);
+                const { w, h } = baseBgDimsRef.current;
+                const minDim = Math.max(1, Math.min(w, h));
+
+                // Expand faster with energy; reaches near-edge within BURST_MS.
+                const speed = (minDim * (0.32 + reactive.energy * 0.22)) / BURST_MS;
+                const radius = Math.max(0, Math.min(maxR, Math.floor(age * speed)));
+
+                // Thickness grows with intensity; keep bounded for perf.
+                const thickness = Math.max(1, Math.min(4, 1 + Math.floor(reactive.energy * 3)));
+                const count = Math.max(22, Math.min(140, Math.floor(34 + reactive.energy * 110 + reactive.beat * 60)));
+
+                const burst: Array<{ x: number; y: number; color: string }> = [];
+                const seed = bgBurstRef.current.beatId * 911 + radius * 131;
+                for (let i = 0; i < count; i++) {
+                  const rr = Math.max(0, Math.min(maxR, radius + ((i % (thickness * 2 + 1)) - thickness)));
+                  const pts = bins[rr];
+                  if (!pts || pts.length === 0) continue;
+                  const pickIdx = Math.floor(hash01(i, rr, seed) * pts.length);
+                  const packed = pts[pickIdx] as number;
+                  const x = packed & 0xffff;
+                  const y = (packed >>> 16) & 0xffff;
+                  const ci = (Math.floor(hash01(x, y, seed) * accentColors.length) + radius) % accentColors.length;
+                  burst.push({ x, y, color: accentColors[ci] });
+                }
+                if (burst.length) upsertVeinsInMap(veinsMapRef.current as any, burst, now);
+              } else if (age > BURST_MS + 80) {
+                bgBurstRef.current.startMs = -1;
+              }
             }
           }
 
@@ -1543,7 +1595,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     setUnicodeGlitches([]);
     setEdgeEffects([]);
     setGlitchChars([]);
-    setBlurredChars([]);
+          setBlurredChars([]);
     setSkewedChars([]);
     setFadedChars([]);
 
