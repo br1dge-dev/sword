@@ -55,7 +55,6 @@ import { computeAdaptiveColorCycle, computeOptimizedColorCycle } from './effects
 import {
   computeBeatVeinLifetimeMs,
   mapToVeins,
-  mapToVeinsWithFade,
   pruneVeinsByLifetime,
   pruneVeinsByLifetimeWithFade,
   replaceVeinsInMap,
@@ -280,6 +279,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const baseBgRadialBinsRef = useRef<number[][]>([]);
   const bgBurstRef = useRef<{ startMs: number; beatId: number }>({ startMs: -1, beatId: -1 });
   const organicPatchesRef = useRef(createOrganicPatchState());
+  const bgOverlayConfigRef = useRef<{ playing: boolean; lifetimeMs: number; fadeMs: number }>({
+    playing: false,
+    lifetimeMs: 9000,
+    fadeMs: 7000,
+  });
+  const bgPruneAtMsRef = useRef<number>(0);
 
   useEffect(() => {
     baseBgVeinsRef.current = baseBgVeins;
@@ -362,7 +367,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     // Reset overlay state on init for determinism.
     veinsMapRef.current.clear();
     organicPatchesRef.current = createOrganicPatchState();
-    setColoredVeins(scaffold);
     return () => {
       clearAllIntervals();
       clearBackgroundCache();
@@ -386,8 +390,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
       // Keep overlay, but re-render combined output after resize.
       const now = Date.now();
-      const overlay = mapToVeinsWithFade(veinsMapRef.current as any, now, 9000, 6500);
-      setColoredVeins([...scaffold, ...overlay]);
+      // Overlay is drawn directly from `veinsMapRef` inside `AsciiBackgroundCanvas`.
+      // We only keep the scaffold state in React.
     };
     const debouncedResize = () => {
       if (resizeTimeout) {
@@ -610,7 +614,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const [coloredTiles, setColoredTiles] = useState<Array<{x: number, y: number, color: string}>>([]);
   const [glitchChars, setGlitchChars] = useState<Array<{x: number, y: number, char: string}>>([]);
   const [caveBackground, setCaveBackground] = useState<string[][]>([]);
-  const [coloredVeins, setColoredVeins] = useState<Array<{x: number, y: number, color: string}>>([]);
   const [edgeEffects, setEdgeEffects] = useState<Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}, rotation?: number, fontSize?: number}>>([]);
   const [unicodeGlitches, setUnicodeGlitches] = useState<Array<{x: number, y: number, char: string}>>([]);
   const [blurredChars, setBlurredChars] = useState<Array<{x: number, y: number}>>([]);
@@ -1236,6 +1239,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           // Afterglow: longer life + fade-out, no hard cut.
           const lifetimeMs = playing ? Math.floor(9000 + reactive.energy * 9000) : 2500;
           const fadeMs = playing ? 7000 : 2500;
+          // Provide config to background canvas without rerendering React.
+          bgOverlayConfigRef.current.playing = playing;
+          bgOverlayConfigRef.current.lifetimeMs = lifetimeMs;
+          bgOverlayConfigRef.current.fadeMs = fadeMs;
 
           // Hard cap overlay size (prevent runaway)
           const MAX_OVERLAY = 2200;
@@ -1257,12 +1264,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             }
           }
 
-          pruneVeinsByLifetimeWithFade(veinsMapRef.current as any, now, lifetimeMs, fadeMs);
-          const overlay = mapToVeinsWithFade(veinsMapRef.current as any, now, lifetimeMs, fadeMs);
-
-          // Combine stable scaffold + overlay (overlay wins on same cell).
-          const combined = baseBgVeinsRef.current.length ? [...baseBgVeinsRef.current, ...overlay] : overlay;
-          setColoredVeins(combined);
+          // Prune only a few times per second (canvas draws fade; prune only removes hard-expired entries).
+          if (nowMs >= bgPruneAtMsRef.current) {
+            bgPruneAtMsRef.current = nowMs + (playing ? 120 : 300);
+            pruneVeinsByLifetimeWithFade(veinsMapRef.current as any, now, lifetimeMs, fadeMs);
+          }
         }
 
         // Only generate playback effects when music is actually playing.
@@ -1754,7 +1760,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             pattern={staticBackground.length > 0 ? staticBackground : caveBackground}
             patternB={staticBackgroundNext ?? undefined}
             patternBlend={staticBackgroundBlend}
-            veins={coloredVeins}
+            scaffold={baseBgVeins}
+            veinsMapRef={veinsMapRef as any}
+            overlayConfigRef={bgOverlayConfigRef}
             width={((staticBackground.length > 0 ? staticBackground[0].length : caveBackground[0]?.length) || 160) * 10}
             height={((staticBackground.length > 0 ? staticBackground.length : caveBackground.length) || 100) * 14}
             fontSize={13}
