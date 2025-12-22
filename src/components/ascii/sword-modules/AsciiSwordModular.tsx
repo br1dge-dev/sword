@@ -1009,9 +1009,14 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               Math.max(0, snap.onset - 0.07) * 1.8 +
               Math.max(0, snap.bass - snap.mid) * 2.4,
           );
+          // If the beat grid is confident, make Entropy feel “musically intentional”:
+          // Prefer downbeats for the big impulse, but still allow extreme crashes to override.
+          const gridLocked = gridConfidence01 >= 0.45;
+          const entropyBarGate = !gridLocked || downbeatEvent || crashScore > 0.92;
           // Beat-aligned trigger: allow a short window after a detected beat so phase offsets don't kill it.
           // Fallback: extremely strong crashes can still trigger even if beat detection misses.
           const mainBeat =
+            entropyBarGate &&
             ((beatWindow && bassDominant) || crashScore > 0.92) &&
             snap.bass > 0.14 &&
             snap.energy > 0.10 &&
@@ -1341,6 +1346,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           const forgeTier = Math.max(1, Math.min(3, (currentLevelRef2.current || levelPropRef.current || 1)));
           const chargeTier = Math.max(1, Math.min(3, chargeLevel || 1));
           const glitchTier = Math.max(0, Math.min(3, currentGlitchLevel || 0));
+          // When the grid is confident, quantize “big” events to downbeats for a more musical feel.
+          const gridLocked = gridConfidence01 >= 0.45;
+          const majorBeat = gridLocked && glitchTier >= 3 ? downbeatEvent : currentBeat;
           // L1 subtle, L2 ~current, L3 much more stacked.
           const MAX_SPAWNS_PER_UPDATE = forgeTier === 1 ? 1 : forgeTier === 2 ? 2 : 3;
           const canSpawn = () => spawnsUsed < MAX_SPAWNS_PER_UPDATE;
@@ -1499,6 +1507,10 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             currentEnergy > 0.32 && (reactive.high > 0.16 || reactive.mid > 0.18 || reactive.bass > 0.18);
           if ((beatStrength > 0.85 || onset > 0.03 || (glitchTier >= 2 && highEnergyPressure)) && canSpawn() && now >= unicodeGlitchUntilRef.current) {
             const tempGlitchLevel = Math.min(3, Math.floor(glitchTier + (currentEnergy * 1.2)));
+            // If L3 and grid locked, prefer downbeats for the big burst. Keep high-energy pressure as fallback.
+            if (gridLocked && tempGlitchLevel >= 3 && !majorBeat && !(highEnergyPressure && onset > 0.05)) {
+              // Skip this tick; wait for downbeat (or a very strong passage) for the big glitch burst.
+            } else {
             // Glitch L3 should primarily affect the blade; handle/hilt get only subtle echoes.
             const unicodeBase = tempGlitchLevel >= 3 ? bladePositionsRef.current : swordPositions;
             const unicode = generateUnicodeGlitches(unicodeBase, tempGlitchLevel);
@@ -1513,6 +1525,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             unicodeGlitchMorphAtRef.current = now + 60;
             spawnsUsed++;
             }
+            }
 
           // --- DOS glitch chars (reintroduced, tiered) ---
           if (glitchCharsActiveRef.current && now >= glitchCharsUntilRef.current) {
@@ -1521,7 +1534,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           }
           const wantsGlitchChars =
             glitchTier >= 2 &&
-            (currentBeat || beatStrength > 0.7 || onset > 0.04 || highEnergyPressure) &&
+            (majorBeat || beatStrength > 0.7 || onset > 0.04 || highEnergyPressure) &&
             canSpawn() &&
             now >= glitchCharsUntilRef.current;
           if (wantsGlitchChars) {
@@ -1556,8 +1569,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       setFadedChars([]);
           }
           const wantsBlur = glitchTier >= 2 && (onset > 0.03 || beatStrength > 0.55 || highEnergyPressure) && now >= blurUntilRef.current;
-          const wantsSkew = glitchTier >= 2 && (currentBeat || beatStrength > 0.7 || highEnergyPressure) && now >= skewUntilRef.current;
-          const wantsFade = glitchTier >= 3 && (currentBeat || onset > 0.05 || highEnergyPressure) && now >= fadeUntilRef.current;
+          const wantsSkew = glitchTier >= 2 && (majorBeat || beatStrength > 0.7 || highEnergyPressure) && now >= skewUntilRef.current;
+          const wantsFade = glitchTier >= 3 && (majorBeat || onset > 0.05 || highEnergyPressure) && now >= fadeUntilRef.current;
           if (wantsBlur && canSpawn()) {
             setBlurredChars(generateBlurredChars(glitchTier >= 3 ? bladePositionsRef.current : swordPositions, glitchTier));
             blurActiveRef.current = true;
@@ -1585,15 +1598,16 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
           if ((beatStrength > 0.6 || onset > 0.02 || currentEnergy > 0.03) && edgePositions.length > 0) {
               // Regenerate if expired or on new beat.
-              if (!edgeEffectsActiveRef.current || currentBeat) {
+              const chargeBeat = gridLocked && chargeTier >= 3 ? (downbeatEvent || currentBeat) : currentBeat;
+              if (!edgeEffectsActiveRef.current || chargeBeat) {
                 if (!canSpawn()) {
                   // Keep existing edge effects until expiry; don't spawn new ones if we're out of budget this tick.
                 } else {
                 const { effects, cleanupMs } = generateReactiveEdgeEffects({
                   edgePositions,
                   chargeLevel,
-                energy: Math.min(1, currentEnergy + onset * 0.9 + (chargeTier >= 3 ? beatStrength * 0.25 : 0)),
-                  beatDetected: currentBeat,
+                energy: Math.min(1, currentEnergy + onset * 0.9 + (chargeTier >= 3 ? beatStrength * 0.25 : 0) + (downbeatEvent && chargeTier >= 3 ? 0.08 : 0)),
+                  beatDetected: chargeBeat,
                 });
                 setEdgeEffects(effects);
                 edgeEffectsActiveRef.current = true;
