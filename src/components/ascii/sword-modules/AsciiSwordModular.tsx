@@ -158,18 +158,38 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const lastBeatTimeMs = storeLastBeatMs;
   const beatId = storeBeatId;
 
-  // Frequenzdaten aus dem Store holen (für band/onset-basierte Reaktivität)
-  const frequencyData = useAudioReactionStore((s) => s.frequencyData);
-  const frequencySeq = useAudioReactionStore((s) => s.frequencySeq);
-  const frequencyDataRef = useRef<Uint8Array | null>(frequencyData);
-  const frequencySeqRef = useRef<number>(frequencySeq);
+  // Frequency snapshots update often; avoid rerender storms by subscribing into refs directly.
+  const frequencyDataRef = useRef<Uint8Array | null>(useAudioReactionStore.getState().frequencyData);
+  const frequencySeqRef = useRef<number>(useAudioReactionStore.getState().frequencySeq);
+  const frequencyHzRef = useRef<number>(0);
+  const freqRateRef = useRef<{ lastMs: number; lastSeq: number }>({ lastMs: -1, lastSeq: -1 });
 
   useEffect(() => {
-    frequencyDataRef.current = frequencyData;
-  }, [frequencyData]);
-  useEffect(() => {
-    frequencySeqRef.current = frequencySeq;
-  }, [frequencySeq]);
+    let lastSeq = frequencySeqRef.current;
+    return useAudioReactionStore.subscribe((state) => {
+      const seq = state.frequencySeq;
+      if (seq === lastSeq) return;
+      lastSeq = seq;
+      frequencySeqRef.current = seq;
+      frequencyDataRef.current = state.frequencyData;
+
+      // Cheap rate estimate for debug HUD (Hz).
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const r = freqRateRef.current;
+      if (r.lastMs < 0) {
+        r.lastMs = now;
+        r.lastSeq = seq;
+        return;
+      }
+      const dt = now - r.lastMs;
+      if (dt >= 500) {
+        const dSeq = seq - r.lastSeq;
+        frequencyHzRef.current = dt > 0 ? (dSeq * 1000) / dt : 0;
+        r.lastMs = now;
+        r.lastSeq = seq;
+      }
+    });
+  }, []);
 
   // NOTE: This must be "mount-gated" to avoid hydration mismatches in Next.js
   // (server-rendered HTML must match the client's first render).
@@ -194,6 +214,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     high: number;
     onset: number;
     beat: number;
+    freqHz: number;
     freqLen: number;
     idle: boolean;
     isMusicPlaying: boolean;
@@ -1080,6 +1101,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               high: reactive.high,
               onset: reactive.onset,
               beat: reactive.beat,
+              freqHz: frequencyHzRef.current,
               freqLen: frequencyDataRef.current?.length ?? 0,
               idle: idleRef.current,
               isMusicPlaying: isMusicPlayingRef.current,
@@ -1699,6 +1721,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
           <div>idleVisual: {debugReactive?.idleVisual ? '1' : '0'}</div>
           <div>tilesLen: {debugReactive?.tilesLen ?? 0}</div>
           <div>freqLen: {debugReactive?.freqLen ?? 0}</div>
+          <div>freqHz: {(debugReactive?.freqHz ?? 0).toFixed(1)}</div>
           <div>energy: {(debugReactive?.energy ?? 0).toFixed(3)}</div>
           <div>bass: {(debugReactive?.bass ?? 0).toFixed(3)}</div>
           <div>mid: {(debugReactive?.mid ?? 0).toFixed(3)}</div>
