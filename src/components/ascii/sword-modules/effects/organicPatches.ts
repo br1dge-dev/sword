@@ -176,7 +176,9 @@ export function tickOrganicPatches(
 ): OrganicPatchTickOutput {
   const { nowMs, width, height, energy, onset, beat, beatDetected, baseVeinPositions } = input;
   const maxEmits = Math.max(0, input.maxEmits | 0);
-  const dtMs = state.lastNowMs ? Math.max(0, nowMs - state.lastNowMs) : 16;
+  // Clamp dt to avoid tab-sleep/resume spikes from causing huge jumps.
+  const rawDt = state.lastNowMs ? Math.max(0, nowMs - state.lastNowMs) : 16;
+  const dtMs = clamp(rawDt, 0, 50);
   state.lastNowMs = nowMs;
 
   // --- Macro pattern blending (no hard cuts) ---
