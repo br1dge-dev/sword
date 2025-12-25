@@ -1,12 +1,16 @@
 # SWORD (GR1FTSWORD)
 
-An interactive **ASCII sword + music** experience built with Next.js. The UI reacts to audio energy/beat and includes idle animations when music isn’t playing.
+An interactive **ASCII sword + music** experience built with Next.js. The UI reacts to audio energy/beat with smooth, beat-quantized visuals and includes idle animations when music isn't playing.
 
 ## Features
 
-- **Audio-reactive ASCII visuals**: sword + background react to energy/beat
+- **Audio-reactive ASCII visuals**: sword + background react to energy/beat with smooth animations
+- **Beat-quantized effects**: entropy explosions and sword impacts are precisely synchronized to kicks/drums
 - **Built-in music playback**: bundled tracks in `public/music`
 - **Idle mode**: subtle animation when playback is stopped
+- **Forge levels (1-4)**: progressive visual intensity and effect complexity
+- **Background canvas layering**: optimized performance for smooth 60fps animations
+- **PLL beat grid**: stable BPM detection and phase alignment for musical quantization
 - **Debug build fingerprint**: `/api/build` + optional on-screen badge via `?debug=1`
 
 ## Tech stack (current)
