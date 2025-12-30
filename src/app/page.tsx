@@ -209,8 +209,8 @@ export default function HomePage() {
           }`}>
             <div className="scale-125 origin-center ui-caps">
               <AudioControlPanel 
-                onBeat={handleBeat} 
-                onEnergyChange={handleEnergyChange} 
+            onBeat={handleBeat} 
+            onEnergyChange={handleEnergyChange} 
               />
             </div>
           </div>
@@ -222,8 +222,8 @@ export default function HomePage() {
             isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}>
             <div className="scale-125 origin-center ui-caps">
-              <SideButtons />
-            </div>
+          <SideButtons />
+        </div>
           </div>
         )}
         
@@ -232,11 +232,11 @@ export default function HomePage() {
           <div className={`absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-300 ${
             isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}>
-            <MobileControlsOverlay 
+          <MobileControlsOverlay
               isOpen={isModalOpen}
               onToggle={(open: boolean) => setIsModalOpen(open)}
-              onBeat={handleBeat}
-              onEnergyChange={handleEnergyChange}
+            onBeat={handleBeat}
+            onEnergyChange={handleEnergyChange}
               onToggleUI={() => setIsUIVisible((v) => !v)}
               onOpenWtf={() => setIsWtfOpen(true)}
               onToggleLeaderboard={() => setIsLeaderboardOpen((v) => !v)}

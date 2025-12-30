@@ -570,10 +570,10 @@ const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
           height: '100%',
         }}
       />
-      <canvas
+    <canvas
         ref={overlayCanvasRef}
-        width={width}
-        height={height}
+      width={width}
+      height={height}
         style={{
           position: 'absolute',
           inset: 0,
@@ -583,7 +583,7 @@ const AsciiBackgroundCanvas: React.FC<AsciiBackgroundCanvasProps> = ({
           width: '100%',
           height: '100%',
         }}
-      />
+    />
     </div>
   );
 };
