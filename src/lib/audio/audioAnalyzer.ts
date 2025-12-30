@@ -254,7 +254,7 @@ export class AudioAnalyzer {
     }
 
     const now = performance.now();
-
+    
     const analyzeIntervalMs = this.options.analyzeInterval ?? 50;
 
     // Respect configured interval; schedule via rAF for smoother pacing.
@@ -268,7 +268,7 @@ export class AudioAnalyzer {
       // TS 5.9+ types `Uint8Array` as `Uint8Array<ArrayBufferLike>`; WebAudio expects `Uint8Array<ArrayBuffer>`.
       // This is safe because `AnalyserNode` writes into the provided typed array.
       this.analyser.getByteFrequencyData(this.frequencyData as any);
-
+      
       // Emit frequency snapshots to consumers (throttled + copied because WebAudio mutates in-place).
       if (this.options.onFrequency) {
         const freqIntervalMs = this.options.frequencyInterval ?? 50;
@@ -354,7 +354,7 @@ export class AudioAnalyzer {
           this.options.onEnergy(energy);
         }
       }
-
+      
       // NEU: Verbesserte Beat-Erkennung mit adaptiven Schwellenwerten
       const currentThreshold = this.trackAnalysisComplete ? this.adaptiveThreshold : this.options.energyThreshold!;
       const currentSensitivity = this.trackAnalysisComplete ? this.adaptiveSensitivity : this.options.beatSensitivity!;
@@ -392,7 +392,7 @@ export class AudioAnalyzer {
       // Die High-Energy-Beat-Detection ist entfernt!
       this.prevEnergyForBeat = energy;
       this.prevBassForBeat = bassEnergy;
-
+      
       this.lastAnalyzeTime = now;
       this.animationFrameId = requestAnimationFrame(() => this.analyze());
       
@@ -638,7 +638,7 @@ export class AudioAnalyzer {
     
     if (this.gainNode) {
       this.gainNode.disconnect();
-      this.gainNode = null;
+    this.gainNode = null;
     }
     
     if (this.audioContext) {

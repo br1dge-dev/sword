@@ -64,7 +64,7 @@ export default function MobileControlsOverlay({
 
           <div className="w-full flex flex-col items-center gap-6">
             <div className="scale-[0.95] origin-top ui-caps">
-              <SideButtons className="items-center" />
+            <SideButtons className="items-center" />
             </div>
           </div>
 

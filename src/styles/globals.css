@@ -140,7 +140,7 @@
     pointer-events: none;
     z-index: 10;
   }
-
+  
   /* Light scanlines (requested: leicht sichtbar) */
   .scanlines-light::before {
     content: "";
@@ -169,7 +169,7 @@
   .crt-glow {
     position: relative;
   }
-
+  
   .crt-glow::before {
     content: "";
     position: absolute;

@@ -190,7 +190,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
       }
     });
   }, []);
-
+  
   // NOTE: This must be "mount-gated" to avoid hydration mismatches in Next.js
   // (server-rendered HTML must match the client's first render).
   const [debugReactiveEnabled, setDebugReactiveEnabled] = useState(false);
@@ -1333,7 +1333,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               let toDrop = veinsMapRef.current.size - MAX_OVERLAY;
               // Avoid iterating MapIterator directly (TS downlevelIteration/target mismatch in this project).
               for (const key of Array.from(veinsMapRef.current.keys())) {
-                veinsMapRef.current.delete(key);
+            veinsMapRef.current.delete(key);
                 toDrop--;
                 if (toDrop <= 0) break;
               }

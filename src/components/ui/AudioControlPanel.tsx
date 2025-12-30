@@ -64,9 +64,9 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   // Audio-Reaction-Store
   const { setMusicPlaying, setAudioActive, isIdleActive, swordColor } = useAudioReactionStore(
     useShallow((state) => ({
-      setMusicPlaying: state.setMusicPlaying,
-      setAudioActive: state.setAudioActive,
-      isIdleActive: state.isIdleActive(),
+    setMusicPlaying: state.setMusicPlaying,
+    setAudioActive: state.setAudioActive,
+    isIdleActive: state.isIdleActive(),
       swordColor: state.swordColor,
     })),
   );
@@ -175,7 +175,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       // console.error('Error switching track:', err);
     }
   }, [currentTrackIndex, isAnalyzing, isInitialized, isPlaying, setAudioActive, setMusicPlaying, start]);
-
+  
   // Audio-Element Event Handler
   useEffect(() => {
     const audio = audioRef.current;
@@ -194,7 +194,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('ended', handleEnded);
     audio.volume = 0.5; // Feste Lautstärke
-
+    
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('ended', handleEnded);
