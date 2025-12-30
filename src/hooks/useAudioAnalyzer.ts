@@ -115,7 +115,7 @@ export function useAudioAnalyzer(options?: UseAudioAnalyzerOptions): UseAudioAna
           if (e > 0.015) { // Reduziert von 0.03 für empfindlichere Reaktion
             setAudioActive(true);
           }
-
+          
           // Zusätzlich: UI/Caller Callback
           externalOnEnergy?.(e);
         },
