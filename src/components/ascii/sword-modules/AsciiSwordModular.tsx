@@ -1261,6 +1261,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               downbeatEvent,
               baseVeinPositions: baseBgPositionsRef.current,
               maxEmits: 380,
+              gridPhase01,
+              gridBpm,
             });
             organicPatchesRef.current = res.state;
             if (res.emitted.length) {
