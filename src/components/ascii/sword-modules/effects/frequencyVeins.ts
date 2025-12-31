@@ -1,13 +1,17 @@
 export type FrequencyVein = { x: number; y: number; color: string };
 
-export function generateFrequencyVeins(opts: {
+export type FrequencyVeinInput = {
   frequencyData: Uint8Array;
   bgWidth: number;
   bgHeight: number;
   nowMs: number;
   beatDetected: boolean;
-}): FrequencyVein[] {
-  const { frequencyData, bgWidth, bgHeight, nowMs, beatDetected } = opts;
+  gridPhase01?: number;
+  gridBpm?: number;
+};
+
+export function generateFrequencyVeins(opts: FrequencyVeinInput): FrequencyVein[] {
+  const { frequencyData, bgWidth, bgHeight, nowMs, beatDetected, gridPhase01, gridBpm } = opts;
 
   // Frequenzbereiche bestimmen
   const bassEnd = Math.floor(frequencyData.length * 0.2);
@@ -27,6 +31,10 @@ export function generateFrequencyVeins(opts: {
   // Beat-Pulsieren
   const pulse = beatDetected ? 1.5 : 1.0;
 
+  // BPM-synced phase for animations
+  const hasBpmSync = gridBpm && gridBpm > 0 && typeof gridPhase01 === 'number';
+  const phase = hasBpmSync ? gridPhase01 : nowMs / 1000;
+
   // Cluster-Positionen (unten, mitte, oben)
   const clusters = [
     { y: Math.floor(bgHeight * 0.8), count: bassCluster, color: '#3EE6FF' },
@@ -39,10 +47,11 @@ export function generateFrequencyVeins(opts: {
 
   clusters.forEach((cluster, i) => {
     for (let c = 0; c < cluster.count; c++) {
-      const spread = Math.floor(bgWidth * 0.3 + Math.sin(nowMs / 600 + i) * 10);
-      const centerX = Math.floor(bgWidth / 2 + Math.sin(nowMs / 1000 + i * 2) * (bgWidth / 4));
+      // BPM-synced animation: uses gridPhase01 * 2π for true musical sync
+      const spread = Math.floor(bgWidth * 0.3 + Math.sin(phase * Math.PI * 2 + i) * 10);
+      const centerX = Math.floor(bgWidth / 2 + Math.sin(phase * Math.PI * 2 * 2 + i * 2) * (bgWidth / 4));
       const angle = (c / cluster.count) * Math.PI * 2;
-      const radius = (pulse * 8) + Math.sin(nowMs / 400 + c) * 4;
+      const radius = (pulse * 8) + Math.sin(phase * Math.PI * 2 * 4 + c) * 4;
       const x = Math.floor(centerX + Math.cos(angle) * spread + Math.random() * 2);
       const y = Math.floor(cluster.y + Math.sin(angle) * radius + Math.random() * 2);
       veins.push({ x, y, color: cluster.color });

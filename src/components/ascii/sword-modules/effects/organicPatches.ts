@@ -58,7 +58,7 @@ export type OrganicPatchTickInput = {
   onset: number;
   /** 0..1 (smoothed beat strength) */
   beat: number;
-  /** raw beat boolean (for “events”) */
+  /** raw beat boolean (for "events") */
   beatDetected: boolean;
   /**
    * Quantized downbeat (bar start) when beat grid is confident.
@@ -69,6 +69,10 @@ export type OrganicPatchTickInput = {
   baseVeinPositions: Array<{ x: number; y: number }>;
   /** hard cap per tick for performance */
   maxEmits: number;
+  /** BPM-synced phase (0..1 per beat) for BPM-synchronous animations */
+  gridPhase01?: number;
+  /** Current BPM from beat grid (0 when not locked) */
+  gridBpm?: number;
 };
 
 export type OrganicPatchTickOutput = {
@@ -130,45 +134,62 @@ function flowVecForMode(
   energy: number,
   onset: number,
   beat: number,
+  gridPhase01: number = 0,
+  gridBpm: number = 0,
 ) {
   const cx = width * 0.5;
   const cy = height * 0.5;
   const dx = x - cx;
   const dy = y - cy;
   const n = norm(dx, dy);
-  const phase = nowMs / 1000;
 
-  // NOTE: Keep these gentle; “sync” comes from beat/onset modulation, not raw speed.
+  const hasBpmSync = gridBpm > 0 && gridPhase01 >= 0;
+  const beatCount = hasBpmSync ? Math.floor(gridBpm / 60 * nowMs / 1000) : 0;
+
+  // BPM-synced phase: 0→1 per beat, wrapped
+  const phase = hasBpmSync
+    ? gridPhase01
+    : nowMs / 1000;
+
+  // NOTE: Keep these gentle; "sync" comes from beat/onset modulation, not raw speed.
   switch (mode % 5) {
     case 0: {
       // Breathing drift (subtle)
-      const a = Math.sin(phase * (0.7 + energy * 0.6) + wobble);
-      const b = Math.cos(phase * (0.6 + energy * 0.5) + wobble * 1.3);
+      // BPM-synced: one breath per beat (or faster with energy)
+      const breathFreq = hasBpmSync ? 1 + energy * 0.5 : (0.7 + energy * 0.6);
+      const a = Math.sin(phase * breathFreq * Math.PI * 2 + wobble);
+      const b = Math.cos(phase * (0.6 + energy * 0.5) * Math.PI * 2 + wobble * 1.3);
       return norm(a, b);
     }
     case 1: {
       // Swirl (perpendicular to center vector)
-      const swirl = 0.35 + energy * 0.8 + beat * 0.9;
-      return norm(-n.y * swirl + Math.sin(phase + wobble) * 0.2, n.x * swirl + Math.cos(phase + wobble) * 0.2);
+      // BPM-synced: faster swirl on beat
+      const swirlBase = 0.35 + energy * 0.8;
+      const beatBoost = hasBpmSync && beat > 0.3 ? beat * 0.9 : 0;
+      const swirl = swirlBase + beatBoost;
+      return norm(-n.y * swirl + Math.sin(phase * Math.PI * 2 + wobble) * 0.2, n.x * swirl + Math.cos(phase * Math.PI * 2 + wobble) * 0.2);
     }
     case 2: {
       // Horizontal wave field
       const f = 0.055 + energy * 0.04;
-      const a = Math.sin((y * f) + phase * (1.2 + beat * 1.0) + wobble);
-      const b = Math.cos((x * f) + phase * (0.9 + onset * 2.0) + wobble);
+      const waveSpeed = hasBpmSync ? (1.2 + beat * 1.0) : 1;
+      const a = Math.sin((y * f) + phase * waveSpeed * Math.PI * 2 + wobble);
+      const b = Math.cos((x * f) + phase * (0.9 + onset * 2.0) * Math.PI * 2 + wobble);
       return norm(a, b * 0.75);
     }
     case 3: {
       // Vertical wave field
       const f = 0.06 + energy * 0.05;
-      const a = Math.sin((x * f) + phase * (1.1 + beat * 1.1) + wobble);
-      const b = Math.cos((y * f) + phase * (1.0 + onset * 2.2) + wobble);
+      const waveSpeed = hasBpmSync ? (1.1 + beat * 1.1) : 1;
+      const a = Math.sin((x * f) + phase * waveSpeed * Math.PI * 2 + wobble);
+      const b = Math.cos((y * f) + phase * (1.0 + onset * 2.2) * Math.PI * 2 + wobble);
       return norm(a * 0.75, b);
     }
     case 4: {
-      // Radial “push” (stronger on beat)
-      const push = 0.25 + beat * 1.2 + onset * 0.6;
-      return norm(n.x * push + Math.sin(phase + wobble) * 0.15, n.y * push + Math.cos(phase + wobble) * 0.15);
+      // Radial "push" (stronger on beat)
+      const pushBase = 0.25 + beat * 1.2 + onset * 0.6;
+      const pulse = hasBpmSync ? Math.sin(gridPhase01 * Math.PI * 2) * 0.15 : 0;
+      return norm(n.x * pushBase + Math.sin(phase * Math.PI * 2 + wobble) * 0.15 + pulse, n.y * pushBase + Math.cos(phase * Math.PI * 2 + wobble) * 0.15 + pulse);
     }
     default:
       return { x: 0, y: 0 };
@@ -324,9 +345,12 @@ export function tickOrganicPatches(
   // Update patches
   patches = patches.map((p, idx) => {
     const wobble = p.wobble + 0.05 + energy * 0.07;
-    // Beat-synced breathing (more “in time” than free-running sin)
-    const beatPhase = nowMs / (520 - energy * 140);
-    const breath = 0.62 + Math.sin(beatPhase + wobble + idx * 0.7) * (0.18 + beat * 0.22);
+
+    // BPM-synced breathing - oscillates with the beat grid phase
+    // Uses gridPhase01 (0→1 per beat) for true musical sync
+    const hasBpmSync = typeof input.gridPhase01 === 'number' && input.gridBpm && input.gridBpm > 0;
+    const beatPhase = hasBpmSync ? input.gridPhase01! : (nowMs / (520 - energy * 140));
+    const breath = 0.62 + Math.sin(beatPhase * Math.PI * 2 + wobble + idx * 0.7) * (0.18 + beat * 0.22);
 
     // Expand targets under “intense passages”
     const baseTarget = 10 + idx * 2;
@@ -353,8 +377,8 @@ export function tickOrganicPatches(
     }
 
     // Flow-field motion with blending between macro modes (“sickering” transitions).
-    const a = flowVecForMode(state.macroMode, p.x, p.y, width, height, nowMs, wobble, energy, onset, beat);
-    const b = flowVecForMode(state.nextMacroMode, p.x, p.y, width, height, nowMs, wobble, energy, onset, beat);
+    const a = flowVecForMode(state.macroMode, p.x, p.y, width, height, nowMs, wobble, energy, onset, beat, input.gridPhase01, input.gridBpm);
+    const b = flowVecForMode(state.nextMacroMode, p.x, p.y, width, height, nowMs, wobble, energy, onset, beat, input.gridPhase01, input.gridBpm);
     const flow = vecLerp(a.x, a.y, b.x, b.y, state.macroBlend01);
 
     const speed = 0.25 + energy * 0.85 + beat * 0.9;
