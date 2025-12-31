@@ -40,9 +40,9 @@ export class AudioAnalyzer {
   private lastFrequencyEmitTime: number = 0;
   private options: AudioAnalyzerOptions = {
     beatSensitivity: 1.0,
-    energyThreshold: 0.02, // Reduziert für empfindlichere Reaktionen
-    analyzeInterval: 50,
-    frequencyInterval: 50,
+    energyThreshold: 0.015, // Niedriger für empfindlichere Reaktion bei 16ms Intervallen
+    analyzeInterval: 16, // ~60Hz für bessere Audio-Video-Synchronisation
+    frequencyInterval: 16, // ~60Hz Frequenz-Emit
   };
   private initializationPromise: Promise<void> | null = null;
   private reconnectAttempts: number = 0;

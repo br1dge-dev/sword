@@ -106,9 +106,9 @@ export type ReactivityControllerOptions = {
 import { createBeatGridState, stepBeatGrid } from '@/lib/reactive/beatGrid';
 
 export function createReactivityController(opts: ReactivityControllerOptions = {}) {
-  const energySmooth = opts.energySmoothing ?? { attackMs: 80, releaseMs: 220 };
-  const bandSmooth = opts.bandSmoothing ?? { attackMs: 70, releaseMs: 180 };
-  const onsetSmooth = opts.onsetSmoothing ?? { attackMs: 35, releaseMs: 140 };
+  const energySmooth = opts.energySmoothing ?? { attackMs: 35, releaseMs: 80 };
+  const bandSmooth = opts.bandSmoothing ?? { attackMs: 30, releaseMs: 70 };
+  const onsetSmooth = opts.onsetSmoothing ?? { attackMs: 15, releaseMs: 50 };
   const beatDecayMs = opts.beatDecayMs ?? 220;
   const bands = opts.bands ?? { bassEnd: 0.2, midEnd: 0.6 };
   const enableBeatGrid = opts.enableBeatGrid ?? true;
