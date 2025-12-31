@@ -902,7 +902,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
   // rAF scheduler for tile/glitch/edge updates to avoid setTimeout bursts and timer jitter.
   useEffect(() => {
-    const TICK_MS = 50; // matches previous internal throttle
+    const TICK_MS = 16; // matches ~60Hz for tight audio-video sync
 
     let cancelled = false;
 
@@ -995,9 +995,9 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
           const snap = reactiveLatestRef.current;
           // Bass-transient gate: entropy should follow kick/bass, not melodic/synth spikes.
-          // IMPORTANT: We sample deltas on a ~50ms window, otherwise per-frame smoothing (PR1)
-          // makes per-frame deltas too small and entropy effectively never triggers.
-          const SAMPLE_MS = 50;
+          // IMPORTANT: We sample deltas on a ~16ms window for tighter bass-transient response.
+          // Per-frame smoothing otherwise makes deltas too small for reliable entropy triggering.
+          const SAMPLE_MS = 16;
           entropy.bassDelta = sampleDelta(entropy.bassSampler, nowMs, snap.bass, SAMPLE_MS);
           entropy.energyDelta = sampleDelta(entropy.energySampler, nowMs, snap.energy, SAMPLE_MS);
           const bassDelta = entropy.bassDelta;
