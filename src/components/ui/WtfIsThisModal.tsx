@@ -1,13 +1,29 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 type Props = {
   open: boolean;
   onClose: () => void;
 };
 
+const HIGHLIGHT_COLORS = ['#F8E16C', '#FF3EC8', '#3EE6FF'] as const;
+
 export default function WtfIsThisModal({ open, onClose }: Props) {
+  const [highlightIdx, setHighlightIdx] = useState(() => Math.floor(Math.random() * 9));
+  const [highlightColor, setHighlightColor] = useState(
+    () => HIGHLIGHT_COLORS[Math.floor(Math.random() * HIGHLIGHT_COLORS.length)],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const interval = setInterval(() => {
+      setHighlightIdx(Math.floor(Math.random() * 9));
+      setHighlightColor(HIGHLIGHT_COLORS[Math.floor(Math.random() * HIGHLIGHT_COLORS.length)]);
+    }, 1800);
+    return () => clearInterval(interval);
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -39,12 +55,10 @@ export default function WtfIsThisModal({ open, onClose }: Props) {
         </button>
 
         <div className="mb-6">
-          <div className="text-grifter-blue font-press-start-2p text-lg tracking-wider">
-            Welcome to{" "}
-            <span className="text-[#F8E16C]">G</span>
-            <span className="text-[#FF3EC8]">R</span>
-            <span className="text-[#3EE6FF]">1</span>
-            FTSWORD
+          <div className="text-grifter-blue font-press-start-2p text-lg tracking-wider select-none">
+            {'Welcome to GR1FTSWORD'.split('').map((char, i) => (
+              <span key={i} style={i === 13 + highlightIdx ? { color: highlightColor } : {}}>{char}</span>
+            ))}
           </div>
         </div>
 
