@@ -26,7 +26,6 @@ export default function WtfIsThisModal({ open, onClose }: Props) {
       aria-modal="true"
       aria-label="WTF is this?"
       onMouseDown={(e) => {
-        // click outside closes
         if (e.target === e.currentTarget) onClose();
       }}
     >
@@ -44,22 +43,34 @@ export default function WtfIsThisModal({ open, onClose }: Props) {
             WTF IS THIS?
           </div>
           <div className="text-grifter-blue/70 text-sm mt-1">
-            A tiny ASCII + music-reactive “blade” playground.
+            Welcome to GR1FTSWORD.
           </div>
         </div>
 
-        <div className="space-y-3 text-grifter-blue text-base leading-snug">
+        <div className="space-y-4 text-grifter-blue text-base leading-snug">
           <div>
-            <span className="font-press-start-2p text-xs text-[#F8E16C]">PLAY</span>{" "}
-            starts the track. The sword becomes a 16‑bar equalizer and reacts to intensity + hits.
+            This is an ASCII-based crypto AI application with onchain mechanics.
+            But honestly? The real deal is way simpler:
           </div>
+
           <div>
-            <span className="font-press-start-2p text-xs text-[#3EE6FF]">POWER‑UPS</span>{" "}
-            let you add charge/glitch/forge effects (desktop left controls; mobile via the settings button).
+            <span className="font-press-start-2p text-xs text-[#F8E16C]">JUST PLAY MUSIC</span>{" "}
+            and vibe with rhythmically jumping ASCII symbols. That&apos;s it.
+            The sword reacts to every beat. Every bass drop. Every peak.
           </div>
+
+          <hr className="border-grifter-blue/30" />
+
           <div>
-            <span className="font-press-start-2p text-xs text-[#FF3EC8]">TIP</span>{" "}
-            If it feels too calm, push glitch/charge and pick a louder section of the track.
+            <span className="font-press-start-2p text-xs text-[#00FCA6] block mb-1">SWORD EVOLUTION</span>
+            Your participation shapes the sword&apos;s future. Complete daily challenges
+            successfully, and the sword evolves by 1/10 of its current level.
+            After 10 days = first evolution. Keep pushing.
+          </div>
+
+          <div>
+            <span className="font-press-start-2p text-xs text-[#FF3EC8] block mb-1">EARN $EDGE</span>
+            Through music enjoyment. Every day. The rhythm is your profit.
           </div>
         </div>
 
@@ -75,5 +86,3 @@ export default function WtfIsThisModal({ open, onClose }: Props) {
     </div>
   );
 }
-
-
