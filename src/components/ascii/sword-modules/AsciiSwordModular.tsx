@@ -909,19 +909,21 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     const frame = (nowMs: number) => {
       if (cancelled) return;
 
-      // Process ripples from store - always from CENTER of canvas
+      // Process ripples from store - always from CENTER of the actual pattern
       {
         const storeRipples = useAudioReactionStore.getState().ripples;
         const rippleNow = Date.now();
         const RIPPLE_LIFETIME_MS = 1200;
         const RIPPLE_MAX_RADIUS = 45;
 
-        // Grid dimensions (what the canvas uses)
-        const { width: gridWidth, height: gridHeight } = getBackgroundDimensions();
+        // Use the ACTUAL pattern that gets rendered (same as passed to AsciiBackgroundCanvas)
+        const activePattern = staticBackground.length > 0 ? staticBackground : caveBackground;
+        const patternCols = activePattern[0]?.length || 0;
+        const patternRows = activePattern.length || 0;
 
-        // CENTER of grid - this is where ripples originate
-        const centerX = Math.floor(gridWidth / 2);
-        const centerY = Math.floor(gridHeight / 2);
+        // CENTER of pattern - veins are indexed 0..patternCols-1, so center is cols/2
+        const centerX = Math.floor(patternCols / 2);
+        const centerY = Math.floor(patternRows / 2);
 
         for (const ripple of storeRipples) {
           const rippleAge = rippleNow - ripple.birth;
@@ -948,7 +950,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               const rx = Math.floor(centerX + Math.cos(angle) * layerR);
               const ry = Math.floor(centerY + Math.sin(angle) * layerR);
 
-              if (rx >= 0 && rx < gridWidth && ry >= 0 && ry < gridHeight) {
+              if (rx >= 0 && rx < patternCols && ry >= 0 && ry < patternRows) {
                 rippleVeins.push({ x: rx, y: ry, color: rippleColor });
               }
             }
