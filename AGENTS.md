@@ -3,8 +3,13 @@
 ## Overview
 Interactive ASCII sword + music experience with audio-reactive visuals. The UI reacts to audio energy/beat with smooth, beat-quantized animations. Includes idle mode when music isn't playing.
 
-**Status:** Active development  
+**Status:** Active development
 **Branch:** `fix/entropy-gating-telemetry` (check with `git branch --show-current`)
+
+## Package Manager
+- **Node.js:** Homebrew (`/opt/homebrew/bin/node`, v25.2.1)
+- **npm:** Homebrew (`/opt/homebrew/bin/npm`, v11.7.0)
+- **Wichtig:** `export PATH="/opt/homebrew/bin:$PATH"` oder Vollpfad nutzen
 
 ## Tech Stack
 - **Framework:** Next.js 16.x (App Router)
@@ -53,6 +58,7 @@ src/
 
 ## Common Tasks
 ```bash
+export PATH="/opt/homebrew/bin:$PATH"
 npm ci           # Clean install
 npm run dev      # Dev server on :3000
 npm run lint     # ESLint check

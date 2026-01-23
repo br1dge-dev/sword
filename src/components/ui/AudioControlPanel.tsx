@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAudioAnalyzer, globalAnalyzer } from '../../hooks/useAudioAnalyzer';
 import { useAudioReactionStore } from '../../store/audioReactionStore';
 import { useShallow } from 'zustand/react/shallow';
+import type { HitMap } from '@/store/challengeStore';
 
 interface AudioControlPanelProps {
   className?: string;
@@ -49,6 +50,19 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const [visualBeatActive, setVisualBeatActive] = useState(false);
   const [lastEnergy, setLastEnergy] = useState(0);
   
+  // Challenge Mode State
+  const [mode, setMode] = useState<'music' | 'challenge'>('music');
+  const [challengePhase, setChallengePhase] = useState<'idle' | 'countdown' | 'active' | 'results'>('idle');
+  const [countdown, setCountdown] = useState(3);
+  const [timeLeft, setTimeLeft] = useState(45);
+  const [hits, setHits] = useState<{time: number; hit: boolean}[]>([]);
+  const [combo, setCombo] = useState(0);
+  const [hitMap, setHitMap] = useState<HitMap | null>(null);
+  const [maxPossibleHits, setMaxPossibleHits] = useState(0);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const challengeRafRef = useRef<number | undefined>(undefined);
+  const isPlayingChallengeRef = useRef(false);
+  
   const initializationAttemptedRef = useRef<boolean>(false);
   // ENTFERNT: Logging-Variablen (lastLogTimeRef, logThrottleInterval)
 
@@ -62,12 +76,17 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   // };
   
   // Audio-Reaction-Store
-  const { setMusicPlaying, setAudioActive, isIdleActive, swordColor } = useAudioReactionStore(
+  const { setMusicPlaying, setAudioActive, isIdleActive, swordColor, triggerBeat, updateEnergy, stopIdle, addRipple, clearRipples } = useAudioReactionStore(
     useShallow((state) => ({
     setMusicPlaying: state.setMusicPlaying,
     setAudioActive: state.setAudioActive,
     isIdleActive: state.isIdleActive(),
       swordColor: state.swordColor,
+      triggerBeat: state.triggerBeat,
+      updateEnergy: state.updateEnergy,
+      stopIdle: state.stopIdle,
+      addRipple: state.addRipple,
+      clearRipples: state.clearRipples,
     })),
   );
 
@@ -134,6 +153,155 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       // throttledLog('Stopping audio analysis', true);
     }
   }, [isInitialized, isAnalyzing, start, stop, isPlaying]);
+
+  // Load hitmap when challenge mode is enabled
+  useEffect(() => {
+    if (mode === 'challenge' && !hitMap) {
+      fetch('/hitmaps/gr1ftsword.json')
+        .then(res => res.json())
+        .then((data: HitMap) => {
+          setHitMap(data);
+          // Calculate max possible hits in the challenge window
+          const startTime = data.challengeConfig.startOffset;
+          const endTime = startTime + data.challengeConfig.duration;
+          const hitsInWindow = data.fullHitMap.filter(t => t >= startTime && t <= endTime).length;
+          setMaxPossibleHits(hitsInWindow);
+        })
+        .catch(err => console.error('Failed to load hitmap:', err));
+    }
+  }, [mode, hitMap]);
+
+  // Reset challenge state when switching modes
+  useEffect(() => {
+    if (mode === 'music') {
+      setChallengePhase('idle');
+      setHits([]);
+      setCombo(0);
+      clearRipples();
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      if (challengeRafRef.current) {
+        cancelAnimationFrame(challengeRafRef.current);
+        challengeRafRef.current = undefined;
+      }
+      isPlayingChallengeRef.current = false;
+    }
+  }, [mode, clearRipples]);
+
+  // Handle challenge START
+  const handleChallengeStart = useCallback(() => {
+    if (!audioRef.current || !hitMap || isPlayingChallengeRef.current) return;
+    
+    isPlayingChallengeRef.current = true;
+    stopIdle();
+    setMusicPlaying(true);
+    clearRipples();
+    setHits([]);
+    setCombo(0);
+    
+    const startAt = Math.max(0, hitMap.challengeConfig.startOffset - 3);
+    audioRef.current.src = `/music/${hitMap.track}`;
+    audioRef.current.currentTime = startAt;
+    audioRef.current.volume = 0.5;
+    audioRef.current.play().catch(err => {
+      console.error('Play failed:', err);
+      isPlayingChallengeRef.current = false;
+    });
+    
+    setChallengePhase('countdown');
+    setCountdown(3);
+    
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    
+    let c = 3;
+    countdownTimerRef.current = setInterval(() => {
+      c--;
+      setCountdown(c);
+      if (c <= 0) {
+        if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+        setChallengePhase('active');
+        setTimeLeft(hitMap.challengeConfig.duration);
+      }
+    }, 1000);
+  }, [hitMap, stopIdle, setMusicPlaying, clearRipples]);
+
+  // Track time during active challenge
+  useEffect(() => {
+    if (challengePhase !== 'active' || !audioRef.current || !hitMap) return;
+    
+    const config = hitMap.challengeConfig;
+    const endTime = config.startOffset + config.duration;
+    
+    const tick = () => {
+      const t = audioRef.current?.currentTime || 0;
+      const remaining = Math.max(0, endTime - t);
+      setTimeLeft(remaining);
+      
+      if (remaining <= 0) {
+        setChallengePhase('results');
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        setMusicPlaying(false);
+        isPlayingChallengeRef.current = false;
+        return;
+      }
+      
+      challengeRafRef.current = requestAnimationFrame(tick);
+    };
+    
+    challengeRafRef.current = requestAnimationFrame(tick);
+    return () => { 
+      if (challengeRafRef.current) cancelAnimationFrame(challengeRafRef.current); 
+    };
+  }, [challengePhase, hitMap, setMusicPlaying]);
+
+  // Handle challenge click - now handled globally via window event listener
+  // Keeping this for reference but not using it directly
+
+  // Calculate challenge stats
+  const successfulHits = hits.filter(h => h.hit).length;
+  const accuracy = maxPossibleHits > 0 ? (successfulHits / maxPossibleHits) * 100 : 0;
+  const passed = accuracy >= 70; // 70% of max possible hits
+
+  // Expose challenge click handler for fullscreen click area
+  const isChallengeActive = mode === 'challenge' && challengePhase === 'active';
+  
+  // Global click handler for challenge mode (attached to window)
+  useEffect(() => {
+    if (!isChallengeActive) return;
+    
+    const handleGlobalClick = (e: MouseEvent) => {
+      if (!audioRef.current || !hitMap) return;
+      
+      const currentTime = audioRef.current.currentTime;
+      const tolerance = hitMap.challengeConfig.toleranceMs / 1000;
+      
+      let closestDelta = Infinity;
+      for (const beatTime of hitMap.fullHitMap) {
+        const delta = Math.abs(currentTime - beatTime);
+        if (delta < closestDelta) closestDelta = delta;
+      }
+      
+      const isHit = closestDelta <= tolerance;
+      
+      setHits(prev => [...prev, { time: currentTime, hit: isHit }]);
+      setCombo(prev => isHit ? prev + 1 : 0);
+      
+      const intensity = isHit ? 0.95 + Math.min(combo * 0.03, 0.2) : 0.7;
+      addRipple(e.clientX, e.clientY, isHit, intensity);
+      
+      triggerBeat();
+      updateEnergy(isHit ? 0.9 : 0.5);
+      setTimeout(() => updateEnergy(0.15), 150);
+    };
+    
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, [isChallengeActive, hitMap, combo, addRipple, triggerBeat, updateEnergy]);
   
   // Nächsten Track (stabil, damit Event-Handler sauber sind)
   const nextTrack = useCallback(async (autoplay = false) => {
@@ -336,7 +504,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const activeBars = Math.max(1, Math.floor(Math.min(1, lastEnergy * 1.8) * 8));
 
   return (
-    <div className={`flex flex-col items-center ${className}`} style={{ width: '100%', maxWidth: '240px' }}>
+    <div className={`flex flex-col items-center ${className}`} style={{ width: '100%', maxWidth: '280px' }}>
       {/* Audio-Element */}
       <audio
         ref={audioRef}
@@ -345,8 +513,35 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         className="hidden"
       />
 
-      {/* Player Buttons ganz oben */}
-      <div className="flex items-center justify-center gap-3 mb-3 w-full">
+      {/* Mode Switch - always visible */}
+      <div className="flex items-center justify-center mb-4 w-full">
+        <button
+          onClick={() => setMode('music')}
+          className={`px-3 py-2 text-[10px] font-press-start-2p border-2 rounded-l transition-all whitespace-nowrap ${
+            mode === 'music' 
+              ? 'bg-[#3EE6FF] text-black border-[#3EE6FF]' 
+              : 'bg-black text-[#3EE6FF] border-[#3EE6FF]/40'
+          }`}
+        >
+          MUSIC
+        </button>
+        <button
+          onClick={() => setMode('challenge')}
+          className={`px-3 py-2 text-[10px] font-press-start-2p border-2 border-l-0 rounded-r transition-all whitespace-nowrap ${
+            mode === 'challenge' 
+              ? 'bg-[#00FCA6] text-black border-[#00FCA6]' 
+              : 'bg-black text-[#00FCA6] border-[#00FCA6]/40'
+          }`}
+        >
+          CHALLENGE
+        </button>
+      </div>
+
+      {/* MUSIC MODE */}
+      {mode === 'music' && (
+        <>
+          {/* Player Buttons */}
+          <div className="flex items-center justify-center gap-3 mb-3 w-full">
         <button
           onClick={() => prevTrack()}
           className="w-10 h-10 flex items-center justify-center rounded-[4px] border-2 border-grifter-blue font-press-start-2p bg-black relative pixel-btn transition-all duration-150 hover:bg-[#1a1a1a] hover:border-cyan-300 hover:shadow-[0_0_8px_#3EE6FF] hover:scale-105"
@@ -474,6 +669,97 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
           )}
         </div>
       </div>
+        </>
+      )}
+
+      {/* CHALLENGE MODE */}
+      {mode === 'challenge' && (
+        <div className="w-full flex flex-col items-center">
+          {/* Idle: Show START button */}
+          {challengePhase === 'idle' && (
+            <button
+              onClick={handleChallengeStart}
+              className="px-6 py-3 font-press-start-2p text-sm rounded hover:opacity-90 transition-opacity"
+              style={{ 
+                backgroundColor: '#00FCA6',
+                color: '#000000',
+                boxShadow: '0 0 20px rgba(0,252,166,0.5)' 
+              }}
+            >
+              START
+            </button>
+          )}
+          
+          {/* Countdown */}
+          {challengePhase === 'countdown' && (
+            <div 
+              className="text-6xl font-press-start-2p text-grifter-green"
+              style={{ textShadow: '0 0 30px #00FCA6' }}
+            >
+              {countdown}
+            </div>
+          )}
+          
+          {/* Active: Show stats - clicks handled globally */}
+          {challengePhase === 'active' && (
+            <div className="w-full flex flex-col items-center">
+              <div 
+                className="text-3xl font-press-start-2p mb-2"
+                style={{ 
+                  color: accuracy >= 70 ? '#00FCA6' : accuracy >= 50 ? '#F8E16C' : '#FF3EC8',
+                  textShadow: '0 0 10px currentColor',
+                }}
+              >
+                {accuracy.toFixed(0)}%
+              </div>
+              {combo > 1 && (
+                <div className="text-grifter-green font-press-start-2p text-xs mb-1" style={{ textShadow: '0 0 8px #00FCA6' }}>
+                  {combo}x COMBO
+                </div>
+              )}
+              <div className="text-grifter-blue/70 text-xs font-mono mb-2">
+                {successfulHits}/{maxPossibleHits} hits • {Math.ceil(timeLeft)}s
+              </div>
+              <div className="text-grifter-green/60 text-xs font-press-start-2p animate-pulse">
+                TAP ANYWHERE
+              </div>
+            </div>
+          )}
+          
+          {/* Results */}
+          {challengePhase === 'results' && (
+            <div className="w-full flex flex-col items-center">
+              <div 
+                className="text-lg font-press-start-2p mb-2"
+                style={{ 
+                  color: passed ? '#00FCA6' : '#FF3EC8',
+                  textShadow: '0 0 12px currentColor',
+                }}
+              >
+                {passed ? 'PASSED!' : 'FAILED'}
+              </div>
+              <div className="text-3xl font-press-start-2p text-white mb-2">
+                {accuracy.toFixed(1)}%
+              </div>
+              <div className="text-grifter-blue/80 text-xs mb-3">
+                {successfulHits} / {maxPossibleHits} beats hit
+              </div>
+              <button
+                onClick={() => {
+                  setChallengePhase('idle');
+                  setHits([]);
+                  setCombo(0);
+                  clearRipples();
+                  isPlayingChallengeRef.current = false;
+                }}
+                className="px-4 py-2 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded hover:bg-grifter-blue hover:text-black transition-colors"
+              >
+                RETRY
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <style jsx>{`
         .track-label-style {
