@@ -918,8 +918,13 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
         // Use the ACTUAL pattern that gets rendered (same as passed to AsciiBackgroundCanvas)
         const activePattern = staticBackground.length > 0 ? staticBackground : caveBackground;
-        const patternCols = activePattern[0]?.length || 0;
-        const patternRows = activePattern.length || 0;
+        const patternCols = activePattern[0]?.length || 120;  // fallback to default
+        const patternRows = activePattern.length || 100;      // fallback to default
+
+        // Skip if no pattern yet
+        if (patternCols === 0 || patternRows === 0) {
+          // Pattern not loaded yet, skip ripple processing
+        } else {
 
         // CENTER of pattern - veins are indexed 0..patternCols-1, so center is cols/2
         const centerX = Math.floor(patternCols / 2);
@@ -964,6 +969,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             });
           }
         }
+        } // end if patternCols/patternRows > 0
       }
 
       // Per-frame time update for smooth render-time modulation (avoid 50ms quantization).
