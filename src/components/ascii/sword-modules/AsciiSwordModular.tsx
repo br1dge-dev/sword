@@ -916,24 +916,12 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         const RIPPLE_LIFETIME_MS = 1200;
         const RIPPLE_MAX_RADIUS = 45;
 
-        // Use the ACTUAL pattern that gets rendered (same as passed to AsciiBackgroundCanvas)
-        const activePattern = staticBackground.length > 0 ? staticBackground : caveBackground;
-        const patternCols = activePattern[0]?.length || 120;  // fallback to default
-        const patternRows = activePattern.length || 100;      // fallback to default
+        // Use baseBgDimsRef - this is always up-to-date (not stale closure)
+        const { w: patternCols, h: patternRows } = baseBgDimsRef.current;
 
-        // Skip if no pattern yet
-        if (patternCols === 0 || patternRows === 0) {
-          // Pattern not loaded yet, skip ripple processing
-        } else {
-
-        // CENTER of pattern - veins are indexed 0..patternCols-1, so center is cols/2
+        // CENTER of pattern
         const centerX = Math.floor(patternCols / 2);
         const centerY = Math.floor(patternRows / 2);
-        
-        // DEBUG - remove after fix
-        if (storeRipples.length > 0) {
-          console.log('[Ripple DEBUG] pattern:', patternCols, 'x', patternRows, '=> center:', centerX, centerY, 'staticBg:', staticBackground.length, 'caveBg:', caveBackground.length);
-        }
 
         for (const ripple of storeRipples) {
           const rippleAge = rippleNow - ripple.birth;
@@ -974,7 +962,6 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
             });
           }
         }
-        } // end if patternCols/patternRows > 0
       }
 
       // Per-frame time update for smooth render-time modulation (avoid 50ms quantization).
