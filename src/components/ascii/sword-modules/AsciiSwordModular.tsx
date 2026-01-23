@@ -643,6 +643,8 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   const [coloredTiles, setColoredTiles] = useState<Array<{x: number, y: number, color: string}>>([]);
   const [glitchChars, setGlitchChars] = useState<Array<{x: number, y: number, char: string}>>([]);
   const [caveBackground, setCaveBackground] = useState<string[][]>([]);
+  // Ref to track actual pattern dimensions (for ripple centering)
+  const patternDimsRef = useRef<{ cols: number; rows: number }>({ cols: 120, rows: 100 });
   const [edgeEffects, setEdgeEffects] = useState<Array<{x: number, y: number, char?: string, color?: string, offset?: {x: number, y: number}, rotation?: number, fontSize?: number}>>([]);
   const [unicodeGlitches, setUnicodeGlitches] = useState<Array<{x: number, y: number, char: string}>>([]);
   const [blurredChars, setBlurredChars] = useState<Array<{x: number, y: number}>>([]);
@@ -916,18 +918,15 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         const RIPPLE_LIFETIME_MS = 1200;
         const RIPPLE_MAX_RADIUS = 45;
 
-        // Get current grid dimensions
-        const { w: patternCols, h: patternRows } = baseBgDimsRef.current;
+        // Get current grid dimensions, but clamp to actual pattern limits
+        // (generateCaveBackground clamps to MAX_BG_WIDTH=200, MAX_BG_HEIGHT=120)
+        const { w, h } = baseBgDimsRef.current;
+        const patternCols = Math.min(w, 200);  // MAX_BG_WIDTH
+        const patternRows = Math.min(h, 120);  // MAX_BG_HEIGHT
 
-        // CENTER of pattern - simple and robust
-        // The veins map uses grid coordinates (0 to patternCols-1)
-        // Center is simply half of each dimension
+        // CENTER of pattern
         const centerX = Math.round(patternCols / 2);
         const centerY = Math.round(patternRows / 2);
-        
-        if (storeRipples.length > 0) {
-          console.log('[Ripple] dims:', patternCols, 'x', patternRows, 'center:', centerX, centerY, 'viewport:', window.innerWidth, 'x', window.innerHeight);
-        }
 
         for (const ripple of storeRipples) {
           const rippleAge = rippleNow - ripple.birth;
