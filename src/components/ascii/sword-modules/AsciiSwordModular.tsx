@@ -924,6 +924,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         const centerX = Math.floor(patternCols / 2);
         const centerY = Math.floor(patternRows / 2);
 
+        // Debug: log center calculation
+        if (storeRipples.length > 0 && rippleNow % 2000 < 16) {
+          console.log('[Ripple] patternCols:', patternCols, 'patternRows:', patternRows, '=> center:', centerX, centerY);
+        }
+
         for (const ripple of storeRipples) {
           const rippleAge = rippleNow - ripple.birth;
           if (rippleAge < 0 || rippleAge > RIPPLE_LIFETIME_MS) continue;
