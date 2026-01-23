@@ -916,12 +916,18 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         const RIPPLE_LIFETIME_MS = 1200;
         const RIPPLE_MAX_RADIUS = 45;
 
-        // Use baseBgDimsRef - this is always up-to-date (not stale closure)
+        // Get current grid dimensions
         const { w: patternCols, h: patternRows } = baseBgDimsRef.current;
 
-        // CENTER of pattern
-        const centerX = Math.floor(patternCols / 2);
-        const centerY = Math.floor(patternRows / 2);
+        // CENTER of pattern - simple and robust
+        // The veins map uses grid coordinates (0 to patternCols-1)
+        // Center is simply half of each dimension
+        const centerX = Math.round(patternCols / 2);
+        const centerY = Math.round(patternRows / 2);
+        
+        if (storeRipples.length > 0) {
+          console.log('[Ripple] dims:', patternCols, 'x', patternRows, 'center:', centerX, centerY, 'viewport:', window.innerWidth, 'x', window.innerHeight);
+        }
 
         for (const ripple of storeRipples) {
           const rippleAge = rippleNow - ripple.birth;
