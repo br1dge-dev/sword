@@ -29,6 +29,20 @@ interface UpdateEnergyOptions {
   forceIdle?: boolean;
 }
 
+// Ripple effect for challenge mode clicks (viewport coordinates)
+export interface BackgroundRipple {
+  id: number;
+  viewportX: number;  // X coordinate in viewport pixels
+  viewportY: number;  // Y coordinate in viewport pixels
+  birth: number;      // performance.now() timestamp
+  hit: boolean;       // true = successful hit (green), false = miss (pink)
+  intensity: number;  // 0-1, affects brightness and spread speed
+}
+
+// Ripple configuration
+const RIPPLE_LIFETIME_MS = 600;  // How long a ripple lives (faster = punchier)
+const MAX_RIPPLES = 25;          // Max concurrent ripples
+
 interface AudioReactionState {
   energy: number;
   beatDetected: boolean;
@@ -55,6 +69,19 @@ interface AudioReactionState {
   frequencySeq: number;
   setFrequencyData: (data: Uint8Array) => void;
   
+  // Background ripples for challenge mode
+  ripples: BackgroundRipple[];
+  /**
+   * Monotonic sequence id for ripples (increments when ripples change).
+   * Use this to trigger re-renders only when needed.
+   */
+  rippleSeq: number;
+  /**
+   * Accumulated click intensity over recent time window.
+   * Used to brighten background during intense clicking.
+   */
+  clickIntensity: number;
+  
   // Aktionen
   updateEnergy: (energy: number, opts?: UpdateEnergyOptions) => void;
   triggerBeat: (timeMs?: number) => void;
@@ -65,7 +92,18 @@ interface AudioReactionState {
   startIdle: () => void;
   stopIdle: () => void;
   isIdleActive: () => boolean;
+  
+  // Ripple actions
+  addRipple: (gridX: number, gridY: number, hit: boolean, intensity?: number) => void;
+  clearRipples: () => void;
+  getActiveRipples: () => BackgroundRipple[];
 }
+
+// Global ripple ID counter
+let rippleIdCounter = 0;
+
+// Click intensity decay
+let clickIntensityDecayInterval: NodeJS.Timeout | null = null;
 
 export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   energy: 0,
@@ -79,6 +117,9 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
   swordColor: '#00FCA6',
   frequencyData: null,
   frequencySeq: 0,
+  ripples: [],
+  rippleSeq: 0,
+  clickIntensity: 0,
   setSwordColor: (color) => set({ swordColor: color }),
   setFrequencyData: (data) => set((s) => ({ frequencyData: data, frequencySeq: (s.frequencySeq + 1) | 0 })),
   
@@ -246,7 +287,65 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
     // throttledLog("Idle animation stopped", true);
   },
   
-  isIdleActive: () => idleActive
+  isIdleActive: () => idleActive,
+
+  // Ripple system for challenge mode background effects
+  addRipple: (viewportX, viewportY, hit, intensity = 0.9) => {
+    const now = Date.now();
+    const newRipple: BackgroundRipple = {
+      id: ++rippleIdCounter,
+      viewportX,
+      viewportY,
+      birth: now,
+      hit,
+      intensity: Math.min(1, Math.max(0, intensity)),
+    };
+
+    console.log('[Store] addRipple called:', { x: viewportX, y: viewportY, hit, intensity, id: newRipple.id });
+
+    set((state) => {
+      // Filter out expired ripples and add new one
+      const activeRipples = state.ripples.filter(r => now - r.birth < RIPPLE_LIFETIME_MS);
+      const updatedRipples = [...activeRipples, newRipple].slice(-MAX_RIPPLES);
+      
+      // Increase click intensity (capped at 1)
+      const newClickIntensity = Math.min(1, state.clickIntensity + 0.15);
+      
+      // Start decay interval if not running
+      if (!clickIntensityDecayInterval) {
+        clickIntensityDecayInterval = setInterval(() => {
+          const current = useAudioReactionStore.getState();
+          if (current.clickIntensity > 0) {
+            set({ clickIntensity: Math.max(0, current.clickIntensity - 0.03) });
+          } else {
+            if (clickIntensityDecayInterval) {
+              clearInterval(clickIntensityDecayInterval);
+              clickIntensityDecayInterval = null;
+            }
+          }
+        }, 50);
+      }
+      
+      return {
+        ripples: updatedRipples,
+        rippleSeq: (state.rippleSeq + 1) | 0,
+        clickIntensity: newClickIntensity,
+      };
+    });
+  },
+  
+  clearRipples: () => {
+    set({ ripples: [], rippleSeq: 0, clickIntensity: 0 });
+    if (clickIntensityDecayInterval) {
+      clearInterval(clickIntensityDecayInterval);
+      clickIntensityDecayInterval = null;
+    }
+  },
+  
+  getActiveRipples: () => {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    return get().ripples.filter(r => now - r.birth < RIPPLE_LIFETIME_MS);
+  },
 }));
 
 // OPTIMIERT: Hook für automatisches Beat-Reset

@@ -147,7 +147,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   }, [level]);
   
   // Audio-Reaktionsdaten abrufen
-  const { energy: storeEnergy, beatDetected: storeBeat, lastBeatTimeMs: storeLastBeatMs, beatId: storeBeatId, isMusicPlaying, idle } = useSwordAudioState();
+  const { energy: storeEnergy, beatDetected: storeBeat, lastBeatTimeMs: storeLastBeatMs, beatId: storeBeatId, isMusicPlaying, idle, ripples, clickIntensity } = useSwordAudioState();
 
   // Treat "paused" as idle-visual state immediately (store idle starts after delay; visuals shouldn't keep raging).
   const idleVisual = idle || !isMusicPlaying;
@@ -908,6 +908,62 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
 
     const frame = (nowMs: number) => {
       if (cancelled) return;
+
+      // Process ripples from store - always from CENTER of pattern
+      {
+        const storeRipples = useAudioReactionStore.getState().ripples;
+        const rippleNow = Date.now();
+        const RIPPLE_LIFETIME_MS = 1200;
+        const RIPPLE_MAX_RADIUS = 45;
+
+        // Pattern dimensions
+        const patternCols = staticBackground[0]?.length || caveBackground[0]?.length || 120;
+        const patternRows = staticBackground.length || caveBackground.length || 100;
+
+        // CENTER of pattern - this is where ripples originate
+        const centerX = Math.floor(patternCols / 2);
+        const centerY = Math.floor(patternRows / 2);
+
+        for (const ripple of storeRipples) {
+          const rippleAge = rippleNow - ripple.birth;
+          if (rippleAge < 0 || rippleAge > RIPPLE_LIFETIME_MS) continue;
+
+          const progress = rippleAge / RIPPLE_LIFETIME_MS;
+          const easeOut = 1 - Math.pow(1 - progress, 3);
+          const currentRadius = Math.floor(easeOut * RIPPLE_MAX_RADIUS);
+
+          const frameKey = `ripple_${ripple.id}_r${currentRadius}`;
+          if (veinsMapRef.current.has(frameKey)) continue;
+
+          const rippleColor = ripple.hit ? '#00FFAA' : '#FF00FF';
+          const rippleVeins: Array<{ x: number; y: number; color: string }> = [];
+
+          const r = currentRadius;
+          const pointCount = Math.max(32, Math.floor(r * 6));
+
+          for (let i = 0; i < pointCount; i++) {
+            const angle = (i / pointCount) * Math.PI * 2;
+
+            for (let layer = -1; layer <= 1; layer++) {
+              const layerR = Math.max(0, r + layer * 0.7);
+              const rx = Math.floor(centerX + Math.cos(angle) * layerR);
+              const ry = Math.floor(centerY + Math.sin(angle) * layerR);
+
+              if (rx >= 0 && rx < patternCols && ry >= 0 && ry < patternRows) {
+                rippleVeins.push({ x: rx, y: ry, color: rippleColor });
+              }
+            }
+          }
+
+          if (rippleVeins.length > 0) {
+            upsertVeinsInMap(veinsMapRef.current as any, rippleVeins, rippleNow);
+            veinsMapRef.current.set(frameKey, {
+              vein: { x: centerX, y: centerY, color: rippleColor },
+              birth: rippleNow
+            });
+          }
+        }
+      }
 
       // Per-frame time update for smooth render-time modulation (avoid 50ms quantization).
       shimmerRef.current.nowMs = nowMs;
