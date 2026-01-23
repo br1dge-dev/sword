@@ -147,7 +147,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
   }, [level]);
   
   // Audio-Reaktionsdaten abrufen
-  const { energy: storeEnergy, beatDetected: storeBeat, lastBeatTimeMs: storeLastBeatMs, beatId: storeBeatId, isMusicPlaying, idle, ripples, clickIntensity } = useSwordAudioState();
+  const { energy: storeEnergy, beatDetected: storeBeat, lastBeatTimeMs: storeLastBeatMs, beatId: storeBeatId, isMusicPlaying, idle } = useSwordAudioState();
 
   // Treat "paused" as idle-visual state immediately (store idle starts after delay; visuals shouldn't keep raging).
   const idleVisual = idle || !isMusicPlaying;
