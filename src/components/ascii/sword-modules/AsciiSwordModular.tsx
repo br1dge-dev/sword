@@ -929,6 +929,11 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
         // CENTER of pattern - veins are indexed 0..patternCols-1, so center is cols/2
         const centerX = Math.floor(patternCols / 2);
         const centerY = Math.floor(patternRows / 2);
+        
+        // DEBUG - remove after fix
+        if (storeRipples.length > 0) {
+          console.log('[Ripple DEBUG] pattern:', patternCols, 'x', patternRows, '=> center:', centerX, centerY, 'staticBg:', staticBackground.length, 'caveBg:', caveBackground.length);
+        }
 
         for (const ripple of storeRipples) {
           const rippleAge = rippleNow - ripple.birth;
