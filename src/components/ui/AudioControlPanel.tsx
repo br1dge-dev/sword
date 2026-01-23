@@ -186,9 +186,15 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         cancelAnimationFrame(challengeRafRef.current);
         challengeRafRef.current = undefined;
       }
+      // Stop challenge audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setMusicPlaying(false);
       isPlayingChallengeRef.current = false;
     }
-  }, [mode, clearRipples]);
+  }, [mode, clearRipples, setMusicPlaying]);
 
   // Handle challenge START
   const handleChallengeStart = useCallback(() => {
