@@ -731,11 +731,11 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       {/* CHALLENGE MODE */}
       {mode === 'challenge' && (
         <div className="w-full flex flex-col items-center">
-          {/* Idle: Show START button */}
+            {/* Idle: Show START button */}
           {challengePhase === 'idle' && (
             <button
               onClick={handleChallengeStart}
-              className="px-6 py-3 font-press-start-2p text-sm rounded hover:opacity-90 transition-opacity"
+              className="px-6 py-3 font-press-start-2p text-xs rounded hover:opacity-90 transition-opacity"
               style={{ 
                 backgroundColor: '#00FCA6',
                 color: '#000000',
@@ -774,7 +774,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
               {/* Combo display */}
               {combo > 0 && (
                 <div 
-                  className="font-press-start-2p text-sm mb-2 transition-all duration-100"
+                  className="font-press-start-2p text-xs mb-2 transition-all duration-100"
                   style={{ 
                     color: combo >= 5 ? '#00FCA6' : '#3EE6FF',
                     textShadow: `0 0 ${8 + combo}px currentColor`,
@@ -785,14 +785,14 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
               )}
               
               {/* Hit counter - shows your hits, not total possible */}
-              <div className="flex items-center gap-3 text-xs font-mono mb-2">
+              <div className="flex items-center gap-3 text-xs font-press-start-2p mb-2">
                 <span className="text-grifter-green">{successfulHits} ✓</span>
                 {missClicks > 0 && <span className="text-grifter-pink">{missClicks} ✗</span>}
                 <span className="text-grifter-blue/60">{Math.ceil(timeLeft)}s</span>
               </div>
               
               {/* Subtle tap hint */}
-              <div className="text-grifter-blue/40 text-[10px] font-press-start-2p">
+              <div className="text-grifter-blue/40 text-xs font-press-start-2p">
                 TAP TO THE BEAT
               </div>
             </div>
@@ -813,7 +813,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
               <div className="text-4xl font-press-start-2p text-white mb-3">
                 {accuracy.toFixed(0)}%
               </div>
-              <div className="flex items-center gap-4 text-xs font-mono mb-4">
+              <div className="flex items-center gap-4 text-xs font-press-start-2p mb-4">
                 <span className="text-grifter-green">{successfulHits} hits</span>
                 {missClicks > 0 && <span className="text-grifter-pink">{missClicks} miss</span>}
                 {missedBeats > 0 && <span className="text-grifter-blue/60">{missedBeats} skipped</span>}
