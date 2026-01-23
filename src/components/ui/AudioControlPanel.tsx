@@ -282,7 +282,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       const startTime = hitMap.challengeConfig.startOffset;
       
       // Find beats that have passed (beyond tolerance window) and weren't hit
-      const hitTimes = new Set(hits.filter(h => h.hit).map(h => h.time));
+      const hitTimesArray = hits.filter(h => h.hit).map(h => h.time);
       
       let newMissed = 0;
       for (const beatTime of hitMap.fullHitMap) {
@@ -291,13 +291,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         if (beatTime <= lastCheckedBeatRef.current) continue; // Already counted
         
         // Check if this beat was hit (within tolerance)
-        let wasHit = false;
-        for (const hitTime of hitTimes) {
-          if (Math.abs(hitTime - beatTime) <= tolerance) {
-            wasHit = true;
-            break;
-          }
-        }
+        const wasHit = hitTimesArray.some(hitTime => Math.abs(hitTime - beatTime) <= tolerance);
         
         if (!wasHit) {
           newMissed++;
