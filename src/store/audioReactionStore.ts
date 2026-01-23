@@ -301,7 +301,7 @@ export const useAudioReactionStore = create<AudioReactionState>((set, get) => ({
       intensity: Math.min(1, Math.max(0, intensity)),
     };
 
-    console.log('[Store] addRipple called:', { x: viewportX, y: viewportY, hit, intensity, id: newRipple.id });
+
 
     set((state) => {
       // Filter out expired ripples and add new one
