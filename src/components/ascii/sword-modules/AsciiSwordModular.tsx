@@ -909,25 +909,19 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
     const frame = (nowMs: number) => {
       if (cancelled) return;
 
-      // Process ripples from store - always from CENTER of pattern
+      // Process ripples from store - always from CENTER of canvas
       {
         const storeRipples = useAudioReactionStore.getState().ripples;
         const rippleNow = Date.now();
         const RIPPLE_LIFETIME_MS = 1200;
         const RIPPLE_MAX_RADIUS = 45;
 
-        // Pattern dimensions
-        const patternCols = staticBackground[0]?.length || caveBackground[0]?.length || 120;
-        const patternRows = staticBackground.length || caveBackground.length || 100;
+        // Grid dimensions (what the canvas uses)
+        const { width: gridWidth, height: gridHeight } = getBackgroundDimensions();
 
-        // CENTER of pattern - this is where ripples originate
-        const centerX = Math.floor(patternCols / 2);
-        const centerY = Math.floor(patternRows / 2);
-
-        // Debug: log center calculation
-        if (storeRipples.length > 0 && rippleNow % 2000 < 16) {
-          console.log('[Ripple] patternCols:', patternCols, 'patternRows:', patternRows, '=> center:', centerX, centerY);
-        }
+        // CENTER of grid - this is where ripples originate
+        const centerX = Math.floor(gridWidth / 2);
+        const centerY = Math.floor(gridHeight / 2);
 
         for (const ripple of storeRipples) {
           const rippleAge = rippleNow - ripple.birth;
@@ -954,7 +948,7 @@ export default function AsciiSwordModular({ level = 1, directEnergy, directBeat 
               const rx = Math.floor(centerX + Math.cos(angle) * layerR);
               const ry = Math.floor(centerY + Math.sin(angle) * layerR);
 
-              if (rx >= 0 && rx < patternCols && ry >= 0 && ry < patternRows) {
+              if (rx >= 0 && rx < gridWidth && ry >= 0 && ry < gridHeight) {
                 rippleVeins.push({ x: rx, y: ry, color: rippleColor });
               }
             }
