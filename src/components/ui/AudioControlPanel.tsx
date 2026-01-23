@@ -268,10 +268,66 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   // Handle challenge click - now handled globally via window event listener
   // Keeping this for reference but not using it directly
 
-  // Calculate challenge stats
+  // Track missed beats (beats that passed without being hit)
+  const [missedBeats, setMissedBeats] = useState(0);
+  const lastCheckedBeatRef = useRef<number>(-1);
+  
+  // Check for missed beats during active challenge
+  useEffect(() => {
+    if (challengePhase !== 'active' || !audioRef.current || !hitMap) return;
+    
+    const checkMissedBeats = () => {
+      const currentTime = audioRef.current?.currentTime || 0;
+      const tolerance = hitMap.challengeConfig.toleranceMs / 1000;
+      const startTime = hitMap.challengeConfig.startOffset;
+      
+      // Find beats that have passed (beyond tolerance window) and weren't hit
+      const hitTimes = new Set(hits.filter(h => h.hit).map(h => h.time));
+      
+      let newMissed = 0;
+      for (const beatTime of hitMap.fullHitMap) {
+        if (beatTime < startTime) continue;
+        if (beatTime > currentTime - tolerance) break; // Haven't passed yet
+        if (beatTime <= lastCheckedBeatRef.current) continue; // Already counted
+        
+        // Check if this beat was hit (within tolerance)
+        let wasHit = false;
+        for (const hitTime of hitTimes) {
+          if (Math.abs(hitTime - beatTime) <= tolerance) {
+            wasHit = true;
+            break;
+          }
+        }
+        
+        if (!wasHit) {
+          newMissed++;
+        }
+        lastCheckedBeatRef.current = beatTime;
+      }
+      
+      if (newMissed > 0) {
+        setMissedBeats(prev => prev + newMissed);
+      }
+    };
+    
+    const interval = setInterval(checkMissedBeats, 100);
+    return () => clearInterval(interval);
+  }, [challengePhase, hitMap, hits]);
+  
+  // Reset missed beats when challenge resets
+  useEffect(() => {
+    if (challengePhase === 'idle') {
+      setMissedBeats(0);
+      lastCheckedBeatRef.current = -1;
+    }
+  }, [challengePhase]);
+  
+  // Calculate challenge stats - accuracy based on total attempts (hits + misses)
   const successfulHits = hits.filter(h => h.hit).length;
-  const accuracy = maxPossibleHits > 0 ? (successfulHits / maxPossibleHits) * 100 : 0;
-  const passed = accuracy >= 70; // 70% of max possible hits
+  const missClicks = hits.filter(h => !h.hit).length;
+  const totalAttempts = successfulHits + missClicks + missedBeats;
+  const accuracy = totalAttempts > 0 ? (successfulHits / totalAttempts) * 100 : 100;
+  const passed = accuracy >= 70;
 
   // Expose challenge click handler for fullscreen click area
   const isChallengeActive = mode === 'challenge' && challengePhase === 'active';
@@ -709,25 +765,41 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
           {/* Active: Show stats - clicks handled globally */}
           {challengePhase === 'active' && (
             <div className="w-full flex flex-col items-center">
+              {/* Big accuracy percentage */}
               <div 
-                className="text-3xl font-press-start-2p mb-2"
+                className="text-4xl font-press-start-2p mb-1 transition-all duration-150"
                 style={{ 
                   color: accuracy >= 70 ? '#00FCA6' : accuracy >= 50 ? '#F8E16C' : '#FF3EC8',
-                  textShadow: '0 0 10px currentColor',
+                  textShadow: `0 0 ${12 + combo * 2}px currentColor`,
+                  transform: combo > 3 ? `scale(${1 + combo * 0.02})` : 'scale(1)',
                 }}
               >
                 {accuracy.toFixed(0)}%
               </div>
-              {combo > 1 && (
-                <div className="text-grifter-green font-press-start-2p text-xs mb-1" style={{ textShadow: '0 0 8px #00FCA6' }}>
-                  {combo}x COMBO
+              
+              {/* Combo display */}
+              {combo > 0 && (
+                <div 
+                  className="font-press-start-2p text-sm mb-2 transition-all duration-100"
+                  style={{ 
+                    color: combo >= 5 ? '#00FCA6' : '#3EE6FF',
+                    textShadow: `0 0 ${8 + combo}px currentColor`,
+                  }}
+                >
+                  {combo}x
                 </div>
               )}
-              <div className="text-grifter-blue/70 text-xs font-mono mb-2">
-                {successfulHits}/{maxPossibleHits} hits • {Math.ceil(timeLeft)}s
+              
+              {/* Hit counter - shows your hits, not total possible */}
+              <div className="flex items-center gap-3 text-xs font-mono mb-2">
+                <span className="text-grifter-green">{successfulHits} ✓</span>
+                {missClicks > 0 && <span className="text-grifter-pink">{missClicks} ✗</span>}
+                <span className="text-grifter-blue/60">{Math.ceil(timeLeft)}s</span>
               </div>
-              <div className="text-grifter-green/60 text-xs font-press-start-2p animate-pulse">
-                TAP ANYWHERE
+              
+              {/* Subtle tap hint */}
+              <div className="text-grifter-blue/40 text-[10px] font-press-start-2p">
+                TAP TO THE BEAT
               </div>
             </div>
           )}
@@ -742,19 +814,23 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
                   textShadow: '0 0 12px currentColor',
                 }}
               >
-                {passed ? 'PASSED!' : 'FAILED'}
+                {passed ? 'PASSED!' : 'TRY AGAIN'}
               </div>
-              <div className="text-3xl font-press-start-2p text-white mb-2">
-                {accuracy.toFixed(1)}%
+              <div className="text-4xl font-press-start-2p text-white mb-3">
+                {accuracy.toFixed(0)}%
               </div>
-              <div className="text-grifter-blue/80 text-xs mb-3">
-                {successfulHits} / {maxPossibleHits} beats hit
+              <div className="flex items-center gap-4 text-xs font-mono mb-4">
+                <span className="text-grifter-green">{successfulHits} hits</span>
+                {missClicks > 0 && <span className="text-grifter-pink">{missClicks} miss</span>}
+                {missedBeats > 0 && <span className="text-grifter-blue/60">{missedBeats} skipped</span>}
               </div>
               <button
                 onClick={() => {
                   setChallengePhase('idle');
                   setHits([]);
                   setCombo(0);
+                  setMissedBeats(0);
+                  lastCheckedBeatRef.current = -1;
                   clearRipples();
                   isPlayingChallengeRef.current = false;
                 }}
