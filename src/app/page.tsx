@@ -300,6 +300,7 @@ export default function HomePage() {
           >
             <IoMdTrophy className="text-grifter-blue text-3xl" />
           </button>
+
         </div>
         )}
 

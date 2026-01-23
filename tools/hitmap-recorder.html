@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hit-Map Recorder - GR1FTSWORD</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            color: #fff;
+            letter-spacing: 2px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 0.9rem;
+        }
+        
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        .upload-section {
+            background: #151515;
+            border: 2px dashed #333;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: border-color 0.3s;
+        }
+        
+        .upload-section:hover {
+            border-color: #555;
+        }
+        
+        .upload-section input[type="file"] {
+            display: none;
+        }
+        
+        .upload-btn {
+            background: #222;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            padding: 12px 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .upload-btn:hover {
+            background: #333;
+            border-color: #666;
+        }
+        
+        .track-name {
+            margin-top: 15px;
+            color: #888;
+            font-size: 0.85rem;
+        }
+        
+        .player-section {
+            background: #151515;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            display: none;
+        }
+        
+        .player-section.active {
+            display: block;
+        }
+        
+        .track-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .track-name-display {
+            font-size: 1.1rem;
+            color: #fff;
+        }
+        
+        .duration {
+            color: #666;
+            font-size: 0.85rem;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #252525;
+            border-radius: 2px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #444;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        
+        .progress-fill.playing {
+            background: #00ff88;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        
+        .control-btn {
+            background: #222;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            padding: 15px 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            min-width: 120px;
+            transition: all 0.2s;
+        }
+        
+        .control-btn:hover:not(:disabled) {
+            background: #333;
+            border-color: #666;
+        }
+        
+        .control-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        .control-btn.primary {
+            background: #1a1a1a;
+            border-color: #00ff88;
+            color: #00ff88;
+        }
+        
+        .control-btn.primary:hover {
+            background: #00ff88;
+            color: #0a0a0a;
+        }
+        
+        .hit-button-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        
+        .hit-btn {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #1a1a1a, #252525);
+            border: 3px solid #333;
+            color: #888;
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            user-select: none;
+        }
+        
+        .hit-btn:hover {
+            border-color: #555;
+            color: #aaa;
+        }
+        
+        .hit-btn:active, .hit-btn.hit {
+            border-color: #00ff88;
+            color: #00ff88;
+            background: #1a1a1a;
+            transform: scale(0.95);
+        }
+        
+        .hit-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-box {
+            background: #1a1a1a;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .timestamp-list {
+            background: #1a1a1a;
+            border-radius: 6px;
+            padding: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .timestamp-list h3 {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .timestamps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .timestamp {
+            background: #252525;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: #00ff88;
+            font-family: monospace;
+        }
+        
+        .export-section {
+            background: #151515;
+            border-radius: 8px;
+            padding: 30px;
+            display: none;
+        }
+        
+        .export-section.active {
+            display: block;
+        }
+        
+        .export-btn {
+            background: #222;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            padding: 15px 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            width: 100%;
+            transition: all 0.2s;
+        }
+        
+        .export-btn:hover {
+            background: #333;
+            border-color: #666;
+        }
+        
+        .output {
+            background: #0d0d0d;
+            border: 1px solid #252525;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #666;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .output.active {
+            display: block;
+        }
+        
+        .reset-btn {
+            background: transparent;
+            border: 1px solid #444;
+            color: #888;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+            margin-top: 15px;
+            transition: all 0.2s;
+        }
+        
+        .reset-btn:hover {
+            border-color: #ff4444;
+            color: #ff4444;
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444;
+        }
+    </style>
+</head>
+<body>
+    <h1>HIT-MAP RECORDER</h1>
+    <p class="subtitle">GR1FTSWORD - Track Analysis Tool</p>
+    
+    <div class="container">
+        <!-- Upload Section -->
+        <div class="upload-section" id="uploadSection">
+            <label class="upload-btn">
+                Mount MP3 Track
+                <input type="file" id="fileInput" accept="audio/mp3,audio/mpeg,audio/*">
+            </label>
+            <p class="track-name" id="trackName">No track mounted</p>
+        </div>
+        
+        <!-- Player Section -->
+        <div class="player-section" id="playerSection">
+            <div class="track-info">
+                <span class="track-name-display" id="trackNameDisplay">-</span>
+                <span class="duration" id="durationDisplay">0:00 / 0:00</span>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            
+            <div class="controls">
+                <button class="control-btn" id="playBtn" disabled>Play</button>
+                <button class="control-btn" id="stopBtn" disabled>Stop</button>
+                <button class="control-btn" id="resetBtn" disabled>Reset</button>
+            </div>
+            
+            <div class="hit-button-container">
+                <button class="hit-btn" id="hitBtn" disabled>
+                    CLICK IN THE BEAT
+                </button>
+            </div>
+            
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-value" id="hitCount">0</div>
+                    <div class="stat-label">Hits</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="currentTime">0:00</div>
+                    <div class="stat-label">Position</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="lastHitTime">-</div>
+                    <div class="stat-label">Last Hit</div>
+                </div>
+            </div>
+            
+            <div class="timestamp-list">
+                <h3>Recorded Timestamps</h3>
+                <div class="timestamps" id="timestampList">
+                    <span style="color: #555; font-size: 0.8rem;">No hits recorded yet</span>
+                </div>
+            </div>
+            
+            <button class="reset-btn" id="clearBtn" style="display: none;">Clear All</button>
+        </div>
+        
+        <!-- Export Section -->
+        <div class="export-section" id="exportSection">
+            <button class="export-btn" id="exportBtn">Export JSON</button>
+            <div class="output" id="output"></div>
+        </div>
+    </div>
+    
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const trackName = document.getElementById('trackName');
+        const playerSection = document.getElementById('playerSection');
+        const trackNameDisplay = document.getElementById('trackNameDisplay');
+        const durationDisplay = document.getElementById('durationDisplay');
+        const progressFill = document.getElementById('progressFill');
+        const playBtn = document.getElementById('playBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const hitBtn = document.getElementById('hitBtn');
+        const hitCount = document.getElementById('hitCount');
+        const currentTimeDisplay = document.getElementById('currentTime');
+        const lastHitTime = document.getElementById('lastHitTime');
+        const timestampList = document.getElementById('timestampList');
+        const exportSection = document.getElementById('exportSection');
+        const exportBtn = document.getElementById('exportBtn');
+        const output = document.getElementById('output');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        let audioContext;
+        let audioBuffer;
+        let sourceNode;
+        let startTime = 0;
+        let pauseTime = 0;
+        let isPlaying = false;
+        let timestamps = [];
+        let animationFrame;
+        
+        // File upload handler
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            trackName.textContent = file.name;
+            
+            const arrayBuffer = await file.arrayBuffer();
+            
+            // Create audio context and decode
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+            
+            // Update UI
+            trackNameDisplay.textContent = file.name;
+            durationDisplay.textContent = `0:00 / ${formatTime(audioBuffer.duration)}`;
+            
+            playerSection.classList.add('active');
+            exportSection.classList.add('active');
+            
+            playBtn.disabled = false;
+            stopBtn.disabled = false;
+            resetBtn.disabled = false;
+            hitBtn.disabled = false;
+            clearBtn.style.display = 'inline-block';
+            
+            console.log('Track loaded:', {
+                name: file.name,
+                duration: audioBuffer.duration,
+                sampleRate: audioBuffer.sampleRate,
+                length: audioBuffer.length
+            });
+        });
+        
+        // Play button
+        playBtn.addEventListener('click', () => {
+            if (isPlaying) return;
+            
+            sourceNode = audioContext.createBufferSource();
+            sourceNode.buffer = audioBuffer;
+            sourceNode.connect(audioContext.destination);
+            
+            const offset = pauseTime;
+            sourceNode.start(0, offset);
+            startTime = audioContext.currentTime - offset;
+            isPlaying = true;
+            
+            playBtn.disabled = true;
+            hitBtn.disabled = false;
+            progressFill.classList.add('playing');
+            
+            updateProgress();
+        });
+        
+        // Stop button
+        stopBtn.addEventListener('click', () => {
+            if (!isPlaying) return;
+            
+            if (sourceNode) {
+                sourceNode.stop();
+                sourceNode = null;
+            }
+            
+            pauseTime = audioContext.currentTime - startTime;
+            isPlaying = false;
+            playBtn.disabled = false;
+            hitBtn.disabled = true;
+            progressFill.classList.remove('playing');
+            
+            cancelAnimationFrame(animationFrame);
+        });
+        
+        // Reset button
+        resetBtn.addEventListener('click', () => {
+            stop();
+            pauseTime = 0;
+            startTime = 0;
+            updateUI();
+        });
+        
+        // Hit button
+        hitBtn.addEventListener('click', () => {
+            if (!isPlaying) return;
+            
+            // FIX: Use audioContext.currentTime instead of audio.currentTime
+            const timestamp = audioContext.currentTime - startTime;
+            timestamps.push(timestamp);
+            
+            // Visual feedback
+            hitBtn.classList.add('hit');
+            setTimeout(() => hitBtn.classList.remove('hit'), 100);
+            
+            lastHitTime.textContent = timestamp.toFixed(3);
+            updateUI();
+        });
+        
+        // Clear button
+        clearBtn.addEventListener('click', () => {
+            timestamps = [];
+            updateUI();
+        });
+        
+        // Export button
+        exportBtn.addEventListener('click', () => {
+            const trackNameValue = document.getElementById('trackNameDisplay').textContent;
+            const exportData = {
+                track: trackNameValue,
+                hitMap: timestamps.map(t => parseFloat(t.toFixed(3))),
+                created: new Date().toISOString(),
+                duration: audioBuffer.duration,
+                hitCount: timestamps.length
+            };
+            
+            const json = JSON.stringify(exportData, null, 2);
+            output.textContent = json;
+            output.classList.add('active');
+        });
+        
+        // Helper functions
+        function stop() {
+            if (isPlaying && sourceNode) {
+                sourceNode.stop();
+                sourceNode = null;
+            }
+            isPlaying = false;
+            playBtn.disabled = false;
+            hitBtn.disabled = true;
+            progressFill.classList.remove('playing');
+            cancelAnimationFrame(animationFrame);
+        }
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        function updateProgress() {
+            if (!isPlaying) return;
+            
+            const current = audioContext.currentTime - startTime;
+            
+            if (current >= audioBuffer.duration) {
+                stop();
+                pauseTime = 0;
+                startTime = 0;
+                updateUI();
+                return;
+            }
+            
+            const progress = (current / audioBuffer.duration) * 100;
+            progressFill.style.width = `${progress}%`;
+            durationDisplay.textContent = `${formatTime(current)} / ${formatTime(audioBuffer.duration)}`;
+            
+            animationFrame = requestAnimationFrame(updateProgress);
+        }
+        
+        function updateUI() {
+            const current = isPlaying 
+                ? audioContext.currentTime - startTime 
+                : pauseTime;
+            
+            hitCount.textContent = timestamps.length;
+            currentTimeDisplay.textContent = formatTime(current);
+            
+            // Update timestamp list
+            if (timestamps.length === 0) {
+                timestampList.innerHTML = '<span style="color: #555; font-size: 0.8rem;">No hits recorded yet</span>';
+            } else {
+                timestampList.innerHTML = timestamps
+                    .map(t => `<span class="timestamp">${t.toFixed(3)}s</span>`)
+                    .join('');
+            }
+        }
+        
+        // Keyboard shortcut for hit (spacebar)
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && isPlaying && !hitBtn.disabled) {
+                e.preventDefault();
+                hitBtn.click();
+            }
+        });
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (audioContext) {
+                audioContext.close();
+            }
+        });
+    </script>
+</body>
+</html>

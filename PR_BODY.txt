@@ -1,0 +1,32 @@
+## Summary
+
+This PR improves audio-video synchronization and immersion in the Sword installation.
+
+## Changes
+
+### Performance
+- **Reduce audio-video latency from 50ms to 16ms** (~60Hz analysis loop)
+- Faster smoothing attack/release times for snappier visual response
+- Updated TICK_MS and SAMPLE_MS to 16ms for consistent timing
+
+### Immersion
+- **BPM-synchronous animations** instead of free-running sine waves
+- Organic patches breathing synced to beat grid phase (gridPhase01)
+- Flow fields (swirl, waves, radial push) use gridPhase01 when BPM-locked
+- Frequency veins animation uses gridPhase01 * 2π harmonics
+- Graceful fallback to time-based animation when no BPM lock
+
+## Files Changed
+- `src/lib/audio/audioAnalyzer.ts` - Analysis intervals reduced to 16ms
+- `src/components/ascii/sword-modules/effects/reactivityController.ts` - Faster smoothing
+- `src/components/ascii/sword-modules/AsciiSwordModular.tsx` - 16ms tick, pass gridPhase01 to effects
+- `src/components/ascii/sword-modules/effects/organicPatches.ts` - BPM-synced breathing & flow fields
+- `src/components/ascii/sword-modules/effects/frequencyVeins.ts` - BPM-synced vein animation
+
+## Testing
+Test with music at different BPMs - animations should feel more "in time" with the beat. The sync is most noticeable on:
+- Organic patch breathing (expansion/contraction)
+- Flow field motion directions
+- Background vein pulsations
+
+When no BPM is detected, the system gracefully falls back to time-based animation.
