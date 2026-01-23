@@ -59,9 +59,7 @@ export default function WtfIsThisModal({ open, onClose }: Props) {
               SWORD EVOLUTION
             </div>
             <div>
-              Your daily challenge performance shapes the sword&apos;s growth.
-              Complete challenges successfully and the sword evolves by 1/10 of its level.
-              10 days of consistency = first evolution.
+              Daily challenges drive the sword&apos;s growth. Complete them and the sword evolves by 1/10 of its level. 10 days = first evolution.
             </div>
           </div>
 
