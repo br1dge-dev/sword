@@ -9,6 +9,12 @@ const CONTRACT_ADDRESSES = {
   [baseSepolia.id]: '0x0000000000000000000000000000000000000000' as `0x${string}`,
 } as const;
 
+// Check if contract is deployed (not zero address)
+const isContractDeployed = (chainId?: number): boolean => {
+  const address = getContractAddress(chainId);
+  return address !== '0x0000000000000000000000000000000000000000';
+};
+
 // Use testnet in development, mainnet in production
 const DEFAULT_CHAIN_ID = process.env.NODE_ENV === 'production' ? base.id : baseSepolia.id;
 
@@ -134,30 +140,33 @@ export function useActiveChallenge() {
  * Get user's current state
  */
 export function useUserState() {
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
+  const contractDeployed = isContractDeployed(chain?.id);
   
   const { data, isLoading, error, refetch } = useReadContract({
-    address: getContractAddress(),
+    address: getContractAddress(chain?.id),
     abi: SWORD_EVOLUTION_ABI,
     functionName: 'getUserState',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address,
+      enabled: !!address && contractDeployed,
     },
   });
 
   // Convert internal level representation (10-30) to display (1.0-3.0)
   const toDisplayLevel = (internalLevel: number) => internalLevel / 10;
 
+  // If contract not deployed, return null for canClaimToday to indicate "unknown"
   return {
     levelForge: data?.[0] ? toDisplayLevel(data[0]) : 1.0,
     levelCharge: data?.[1] ? toDisplayLevel(data[1]) : 1.0,
     levelGlitch: data?.[2] ? toDisplayLevel(data[2]) : 1.0,
-    totalMinted: data?.[3] ? Number(data[3]) / 1e18 : 0, // Convert from wei
-    canClaimToday: data?.[4] ?? false,
+    totalMinted: data?.[3] ? Number(data[3]) / 1e18 : 0,
+    canClaimToday: contractDeployed ? (data?.[4] ?? true) : null, // null = unknown (contract not deployed)
     isLoading,
     error,
     refetch,
+    contractDeployed,
   };
 }
 
@@ -165,23 +174,30 @@ export function useUserState() {
  * Get global evolution state
  */
 export function useGlobalState() {
+  const { chain } = useAccount();
+  const contractDeployed = isContractDeployed(chain?.id);
+  
   const { data, isLoading, error, refetch } = useReadContract({
-    address: getContractAddress(),
+    address: getContractAddress(chain?.id),
     abi: SWORD_EVOLUTION_ABI,
     functionName: 'getGlobalState',
+    query: {
+      enabled: contractDeployed,
+    },
   });
 
   const aspectNames = ['FORGE', 'CHARGE', 'GLITCH'] as const;
 
   return {
-    evolutionDay: data?.[0] ? Number(data[0]) : 1,
-    claimsMadeToday: data?.[1] ?? 0,
-    claimsRemaining: data?.[2] ?? 10,
-    activeAspect: aspectNames[data?.[3] ?? 0],
+    evolutionDay: data?.[0] ? Number(data[0]) : null, // null = unknown
+    claimsMadeToday: data?.[1] ?? null,
+    claimsRemaining: data?.[2] ?? null,
+    activeAspect: data?.[3] !== undefined ? aspectNames[data[3]] : null,
     evolutionComplete: data?.[4] ?? false,
     isLoading,
     error,
     refetch,
+    contractDeployed,
   };
 }
 

@@ -3,89 +3,68 @@
 /**
  * ForgeProgressBar Component
  * 
- * Zeigt einen Fortschrittsbalken für den Schmiedeprozess an, mit Feuer- und Hammer-Buttons.
+ * Zeigt das FORGE-Level an. Bei verbundenem Wallet wird das Level aus dem Contract gelesen,
+ * ansonsten aus dem lokalen Store (Demo-Modus).
  */
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
+import { useWalletStatus, useUserState, useGlobalState } from '@/hooks/useContract';
 
 interface ForgeProgressBarProps {
   className?: string;
 }
 
 export default function ForgeProgressBar({ className = '' }: ForgeProgressBarProps) {
-  const { 
-    forgeProgress, 
-    isForgeComplete, 
-    increaseForgeProgress, 
-    startPowerUp, 
-    currentLevel,
-    maxLevel
-  } = usePowerUpStore();
+  // Local store (fallback/demo mode)
+  const { currentLevel: localLevel } = usePowerUpStore();
   
-  const [fireButtonCooldown, setFireButtonCooldown] = useState(false);
-  const [hammerButtonPressed, setHammerButtonPressed] = useState(false);
+  // Contract state
+  const { isConnected } = useWalletStatus();
+  const { levelForge: contractLevel, isLoading } = useUserState();
+  const { activeAspect } = useGlobalState();
   
-  const isMaxLevel = currentLevel >= maxLevel;
+  // Use contract level if connected, otherwise local
+  const displayLevel = isConnected ? contractLevel : localLevel;
+  const isActiveAspect = isConnected && activeAspect === 'FORGE';
   
-  // Feuer-Button-Handler
-  const handleFireClick = () => {
-    if (fireButtonCooldown || isForgeComplete || isMaxLevel) return;
-    
-    increaseForgeProgress();
-    setFireButtonCooldown(true);
-    
-    // Cooldown für den Feuer-Button
-    setTimeout(() => {
-      setFireButtonCooldown(false);
-    }, 500);
-  };
+  // Convert level (1.0-3.0) to progress (0-100%)
+  // Level 1.0 = 0%, Level 2.0 = 50%, Level 3.0 = 100%
+  const levelProgress = ((displayLevel - 1) / 2) * 100;
+  const isMaxLevel = displayLevel >= 3.0;
   
-  // Hammer-Button-Handler
-  const handleHammerClick = () => {
-    if (!isForgeComplete || hammerButtonPressed) return;
-    
-    setHammerButtonPressed(true);
-    
-    // Visueller Effekt beim Klicken
-    setTimeout(() => {
-      startPowerUp();
-      setHammerButtonPressed(false);
-    }, 300);
-  };
-  
-  // Berechne Farben für die Progress-Bar-Tiles basierend auf dem Fortschritt
+  // Berechne Farben für die Progress-Bar-Tiles
   const getTileColor = (index: number, totalTiles: number) => {
-    const tileProgress = (index + 1) / totalTiles * 100;
+    const tileThreshold = (index / totalTiles) * 100;
     
     if (isMaxLevel) {
       return 'bg-orange-500'; // Alle Tiles sind glühend im MAX-Level
-    } else if (tileProgress > forgeProgress) {
+    } else if (tileThreshold >= levelProgress) {
       return 'bg-gray-800'; // Leere Tiles
-    } else if (forgeProgress < 50) {
-      return 'bg-gray-400'; // Kaltes Metall
-    } else if (forgeProgress < 90) {
-      return 'bg-yellow-600'; // Erwärmendes Metall
+    } else if (levelProgress < 25) {
+      return 'bg-gray-400'; // Kaltes Metall (Level 1.0-1.5)
+    } else if (levelProgress < 75) {
+      return 'bg-yellow-600'; // Erwärmendes Metall (Level 1.5-2.5)
     } else {
-      return 'bg-orange-500'; // Glühendes Metall
+      return 'bg-orange-500'; // Glühendes Metall (Level 2.5-3.0)
     }
   };
   
   // Generiere die Progress-Bar-Tiles
   const renderProgressTiles = () => {
-    const totalTiles = 10; // Genau 10 Tiles
+    const totalTiles = 10;
     const tiles = [];
     
     for (let i = 0; i < totalTiles; i++) {
-      const tileProgress = (i + 1) / totalTiles * 100;
-      const isActive = isMaxLevel || tileProgress <= forgeProgress;
+      const tileThreshold = (i / totalTiles) * 100;
+      const isActive = isMaxLevel || tileThreshold < levelProgress;
       
       tiles.push(
         <div 
           key={i}
-          className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
+          className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0 transition-all duration-300`}
           style={{
-            boxShadow: isActive && (isMaxLevel || forgeProgress >= 90) ? 'inset 0 0 3px rgba(255,165,0,0.8)' : 
-                      isActive && forgeProgress >= 50 ? 'inset 0 0 2px rgba(255,255,0,0.5)' : 
+            boxShadow: isActive && (isMaxLevel || levelProgress >= 75) ? 'inset 0 0 3px rgba(255,165,0,0.8)' : 
+                      isActive && levelProgress >= 25 ? 'inset 0 0 2px rgba(255,255,0,0.5)' : 
                       'none'
           }}
         />
@@ -98,98 +77,36 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
   return (
     <div className={`flex flex-col ${className}`}>
       <div className="flex flex-col">
-        {/* Überschrift "FORGE" im Pixel-Font-Stil, linksbündig */}
-        <div className="mb-1 text-xs font-bold font-press-start-2p text-left text-[#00FCA6]" 
+        {/* Überschrift "FORGE" mit Level-Anzeige */}
+        <div className="mb-1 text-xs font-bold font-press-start-2p text-left flex items-center gap-2" 
              style={{ 
-               textShadow: '0 0 1px #00FCA6',
+               color: isActiveAspect ? '#00FCA6' : '#F8E16C',
+               textShadow: isActiveAspect ? '0 0 8px #00FCA6' : '0 0 1px #F8E16C',
                letterSpacing: '0.05em'
              }}>
-          FORGE - LVL {currentLevel}
+          <span>FORGE</span>
+          {isLoading ? (
+            <span className="text-gray-500">...</span>
+          ) : (
+            <span>LVL {Math.floor(displayLevel)}</span>
+          )}
         </div>
         
-        <div className="flex items-center gap-2">
-          {/* Fortschrittsbalken mit genau 10 Tiles */}
-          <div className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex
-                         ${isMaxLevel ? 'max-level-shine' : ''}`}
-               style={{ 
-                 boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
-                 imageRendering: 'pixelated'
-               }}>
-            {renderProgressTiles()}
-            
-            {/* MAX-Text bei maximalem Level */}
-            {isMaxLevel && (
-              <div className="max-level-text text-[#00FCA6]">MAX</div>
-            )}
-          </div>
+        {/* Fortschrittsbalken */}
+        <div className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex
+                       ${isMaxLevel ? 'max-level-shine' : ''}`}
+             style={{ 
+               boxShadow: isActiveAspect ? '0 0 8px rgba(0,252,166,0.4)' : 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
+               imageRendering: 'pixelated'
+             }}>
+          {renderProgressTiles()}
           
-          {/* Feuer-Button */}
-          <button
-            onClick={handleFireClick}
-            disabled={fireButtonCooldown || isForgeComplete || isMaxLevel}
-            className={`w-6 h-6 flex items-center justify-center 
-                       border border-gray-700 bg-gray-800 
-                       ${fireButtonCooldown ? 'opacity-50' : 'hover:border-orange-500'} 
-                       ${isForgeComplete || isMaxLevel ? 'opacity-50 cursor-not-allowed' : ''}`}
-            style={{ 
-              boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(255,165,0,0.3)',
-              imageRendering: 'pixelated',
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
-              backgroundSize: '4px 4px'
-            }}
-          >
-            {/* Feuer-Icon (Pixel-Art-Stil) */}
-            <div className="relative w-3 h-3">
-              {/* Basis-Flamme */}
-              <div className="absolute bottom-0 left-0 w-1 h-1 bg-orange-500"></div>
-              <div className="absolute bottom-0 left-1 w-1 h-2 bg-orange-400"></div>
-              <div className="absolute bottom-0 left-2 w-1 h-1 bg-orange-500"></div>
-              <div className="absolute bottom-1 left-1 w-1 h-1 bg-yellow-400"></div>
-              {/* Glüheffekt */}
-              <div className="absolute inset-0 opacity-70"
-                   style={{ 
-                     boxShadow: '0 0 3px rgba(255,165,0,0.8)'
-                   }}>
-              </div>
-            </div>
-          </button>
-          
-          {/* Hammer-Button */}
-          <button
-            onClick={handleHammerClick}
-            disabled={!isForgeComplete}
-            className={`w-6 h-6 flex items-center justify-center 
-                       border ${isForgeComplete ? 'border-blue-700' : 'border-gray-700'} 
-                       ${hammerButtonPressed ? 'bg-blue-900' : 'bg-gray-800'} 
-                       ${isForgeComplete ? 'hover:border-blue-500' : 'opacity-50 cursor-not-allowed'}`}
-            style={{ 
-              boxShadow: isForgeComplete ? 
-                'inset 0 0 3px rgba(0,0,0,0.8), 0 0 3px rgba(100,149,237,0.5)' : 
-                'inset 0 0 3px rgba(0,0,0,0.8)',
-              imageRendering: 'pixelated',
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
-              backgroundSize: '4px 4px',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            {/* Hammer-Icon (Pixel-Art-Stil) */}
-            <div className="relative w-3 h-3">
-              {/* Hammerkopf */}
-              <div className="absolute top-0 left-0 w-2 h-1 bg-gray-400"></div>
-              {/* Hammerstiel */}
-              <div className="absolute top-1 left-1 w-1 h-2 bg-yellow-800"></div>
-              {/* Glüheffekt wenn aktiviert */}
-              {isForgeComplete && (
-                <div className="absolute inset-0 opacity-70"
-                     style={{ 
-                       boxShadow: '0 0 3px rgba(255,165,0,0.8)'
-                     }}>
-                </div>
-              )}
-            </div>
-          </button>
+          {/* MAX-Text bei maximalem Level */}
+          {isMaxLevel && (
+            <div className="max-level-text text-[#00FCA6]">MAX</div>
+          )}
         </div>
       </div>
     </div>
   );
-} 
+}
