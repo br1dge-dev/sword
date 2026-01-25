@@ -5,6 +5,9 @@ import { useAudioAnalyzer, globalAnalyzer } from '../../hooks/useAudioAnalyzer';
 import { useAudioReactionStore } from '../../store/audioReactionStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { HitMap } from '@/store/challengeStore';
+import { useWalletStatus, useUserState, useGlobalState, useClaimChallenge } from '../../hooks/useContract';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { generateChallengeProof } from '../../lib/merkle';
 
 interface AudioControlPanelProps {
   className?: string;
@@ -52,7 +55,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   
   // Challenge Mode State
   const [mode, setMode] = useState<'music' | 'challenge'>('music');
-  const [challengePhase, setChallengePhase] = useState<'idle' | 'countdown' | 'active' | 'results'>('idle');
+  const [challengePhase, setChallengePhase] = useState<'idle' | 'countdown' | 'active' | 'results' | 'claiming'>('idle');
   const [countdown, setCountdown] = useState(3);
   const [timeLeft, setTimeLeft] = useState(45);
   const [hits, setHits] = useState<{time: number; hit: boolean}[]>([]);
@@ -62,6 +65,18 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const challengeRafRef = useRef<number | undefined>(undefined);
   const isPlayingChallengeRef = useRef(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const [claimSuccess, setClaimSuccess] = useState(false);
+
+  // Contract Integration
+  const { isConnected, address } = useWalletStatus();
+  const { canClaimToday, refetch: refetchUserState, contractDeployed } = useUserState();
+  const { evolutionDay, claimsRemaining, activeAspect, evolutionComplete, contractDeployed: globalContractDeployed } = useGlobalState();
+  const { claim, isPending: isClaimPending, isConfirming, isSuccess: isClaimSuccess, error: claimTxError } = useClaimChallenge();
+  const { openConnectModal } = useConnectModal();
+  
+  // Contract not deployed = allow playing in demo mode
+  const isContractLive = contractDeployed && globalContractDeployed;
   
   const initializationAttemptedRef = useRef<boolean>(false);
   // ENTFERNT: Logging-Variablen (lastLogTimeRef, logThrottleInterval)
@@ -315,6 +330,20 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       lastCheckedBeatRef.current = -1;
     }
   }, [challengePhase]);
+
+  // Handle successful claim
+  useEffect(() => {
+    if (isClaimSuccess) {
+      setClaimSuccess(true);
+    }
+  }, [isClaimSuccess]);
+
+  // Handle claim transaction error
+  useEffect(() => {
+    if (claimTxError) {
+      setClaimError(claimTxError.message || 'Transaction failed');
+    }
+  }, [claimTxError]);
   
   // Calculate challenge stats - accuracy based on total attempts (hits + misses)
   const successfulHits = hits.filter(h => h.hit).length;
@@ -731,19 +760,83 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       {/* CHALLENGE MODE */}
       {mode === 'challenge' && (
         <div className="w-full flex flex-col items-center">
-            {/* Idle: Show START button */}
+          {/* Evolution Status Bar - only show if contract is live */}
+          {isContractLive && evolutionDay !== null && (
+            <div className="w-full flex justify-between items-center text-xs font-press-start-2p mb-3 px-1">
+              <span className="text-grifter-blue/60">DAY {evolutionDay}/60</span>
+              <span 
+                className="font-bold"
+                style={{ 
+                  color: activeAspect === 'FORGE' ? '#F8E16C' : activeAspect === 'CHARGE' ? '#3EE6FF' : '#FF3EC8',
+                  textShadow: `0 0 8px currentColor`
+                }}
+              >
+                {activeAspect}
+              </span>
+              <span className="text-grifter-green/60">{claimsRemaining}/10</span>
+            </div>
+          )}
+
+          {/* Idle: Show START button or connect wallet */}
           {challengePhase === 'idle' && (
-            <button
-              onClick={handleChallengeStart}
-              className="px-6 py-3 font-press-start-2p text-xs rounded hover:opacity-90 transition-opacity"
-              style={{ 
-                backgroundColor: '#00FCA6',
-                color: '#000000',
-                boxShadow: '0 0 20px rgba(0,252,166,0.5)' 
-              }}
-            >
-              START
-            </button>
+            <>
+              {/* Contract not deployed - show demo mode */}
+              {!isContractLive ? (
+                <div className="flex flex-col items-center">
+                  <div className="text-grifter-blue/40 font-press-start-2p text-xs mb-3">DEMO MODE</div>
+                  <button
+                    onClick={handleChallengeStart}
+                    className="px-6 py-3 font-press-start-2p text-xs rounded hover:opacity-90 transition-opacity"
+                    style={{ 
+                      backgroundColor: '#00FCA6',
+                      color: '#000000',
+                      boxShadow: '0 0 20px rgba(0,252,166,0.5)' 
+                    }}
+                  >
+                    START
+                  </button>
+                </div>
+              ) : !isConnected ? (
+                <button
+                  onClick={() => openConnectModal?.()}
+                  className="px-6 py-3 font-press-start-2p text-xs rounded hover:opacity-90 transition-opacity"
+                  style={{ 
+                    backgroundColor: '#3EE6FF',
+                    color: '#000000',
+                    boxShadow: '0 0 20px rgba(62,230,255,0.5)' 
+                  }}
+                >
+                  CONNECT
+                </button>
+              ) : evolutionComplete ? (
+                <div className="text-center">
+                  <div className="text-grifter-green font-press-start-2p text-sm mb-2">EVOLUTION COMPLETE</div>
+                  <div className="text-grifter-blue/60 font-press-start-2p text-xs">60 days finished!</div>
+                </div>
+              ) : canClaimToday === false ? (
+                <div className="text-center">
+                  <div className="text-grifter-pink font-press-start-2p text-xs mb-2">ALREADY CLAIMED</div>
+                  <div className="text-grifter-blue/60 font-press-start-2p text-xs">Come back tomorrow!</div>
+                </div>
+              ) : claimsRemaining === 0 ? (
+                <div className="text-center">
+                  <div className="text-grifter-yellow font-press-start-2p text-xs mb-2">NO CLAIMS LEFT</div>
+                  <div className="text-grifter-blue/60 font-press-start-2p text-xs">Day {evolutionDay} complete!</div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleChallengeStart}
+                  className="px-6 py-3 font-press-start-2p text-xs rounded hover:opacity-90 transition-opacity"
+                  style={{ 
+                    backgroundColor: '#00FCA6',
+                    color: '#000000',
+                    boxShadow: '0 0 20px rgba(0,252,166,0.5)' 
+                  }}
+                >
+                  START
+                </button>
+              )}
+            </>
           )}
           
           {/* Countdown */}
@@ -818,20 +911,84 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
                 {missClicks > 0 && <span className="text-grifter-pink">{missClicks} miss</span>}
                 {missedBeats > 0 && <span className="text-grifter-blue/60">{missedBeats} skipped</span>}
               </div>
-              <button
-                onClick={() => {
-                  setChallengePhase('idle');
-                  setHits([]);
-                  setCombo(0);
-                  setMissedBeats(0);
-                  lastCheckedBeatRef.current = -1;
-                  clearRipples();
-                  isPlayingChallengeRef.current = false;
-                }}
-                className="px-4 py-2 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded hover:bg-grifter-blue hover:text-black transition-colors"
-              >
-                RETRY
-              </button>
+              
+              {/* Show Claim button if passed, connected, and can claim */}
+              {passed && isConnected && canClaimToday && !claimSuccess ? (
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      if (!hitMap || !address) return;
+                      setClaimError(null);
+                      try {
+                        const startOffsetMs = hitMap.challengeConfig.startOffset * 1000;
+                        const proof = generateChallengeProof(
+                          address as `0x${string}`,
+                          Math.floor(accuracy),
+                          startOffsetMs,
+                          hitMap as unknown as import('../../lib/merkle').Hitmap
+                        );
+                        await claim(proof, Math.floor(accuracy));
+                      } catch (err) {
+                        setClaimError(err instanceof Error ? err.message : 'Claim failed');
+                      }
+                    }}
+                    disabled={isClaimPending || isConfirming}
+                    className="px-6 py-3 font-press-start-2p text-xs rounded transition-all disabled:opacity-50"
+                    style={{ 
+                      backgroundColor: '#00FCA6',
+                      color: '#000000',
+                      boxShadow: '0 0 20px rgba(0,252,166,0.5)' 
+                    }}
+                  >
+                    {isClaimPending ? 'SIGNING...' : isConfirming ? 'CONFIRMING...' : 'CLAIM 100 $EDGE'}
+                  </button>
+                  {claimError && (
+                    <div className="text-grifter-pink font-press-start-2p text-xs text-center">
+                      {claimError}
+                    </div>
+                  )}
+                </div>
+              ) : claimSuccess ? (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="text-grifter-green font-press-start-2p text-sm">+100 $EDGE CLAIMED!</div>
+                  <div className="text-grifter-blue/60 font-press-start-2p text-xs">
+                    {activeAspect} +0.1 LVL
+                  </div>
+                  <button
+                    onClick={() => {
+                      setChallengePhase('idle');
+                      setHits([]);
+                      setCombo(0);
+                      setMissedBeats(0);
+                      lastCheckedBeatRef.current = -1;
+                      clearRipples();
+                      isPlayingChallengeRef.current = false;
+                      setClaimSuccess(false);
+                      setClaimError(null);
+                      refetchUserState();
+                    }}
+                    className="px-4 py-2 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded hover:bg-grifter-blue hover:text-black transition-colors mt-2"
+                  >
+                    DONE
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setChallengePhase('idle');
+                    setHits([]);
+                    setCombo(0);
+                    setMissedBeats(0);
+                    lastCheckedBeatRef.current = -1;
+                    clearRipples();
+                    isPlayingChallengeRef.current = false;
+                    setClaimError(null);
+                  }}
+                  className="px-4 py-2 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded hover:bg-grifter-blue hover:text-black transition-colors"
+                >
+                  RETRY
+                </button>
+              )}
             </div>
           )}
         </div>
