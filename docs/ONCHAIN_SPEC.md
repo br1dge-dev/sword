@@ -26,18 +26,20 @@ A single smart contract that handles:
 | Name | EDGE |
 | Symbol | EDGE |
 | Decimals | 18 |
-| Max Supply | 6,000,000 (60 days × 10 claims × 100 × ~1000 users) |
+| Max Supply | 60,000 (60 days × 10 claims/day × 100 $EDGE) |
 | Minting | Immediately on successful claim |
 
 ### Challenge System
 
 | Property | Value |
 |----------|-------|
-| Claims per Day | Max 10 per wallet |
+| Claims per Day (global) | Max 10 (first 10 users) |
+| Claims per Wallet per Day | Max 1 |
 | $EDGE per Claim | 100 |
-| Max $EDGE per Wallet per Day | 1,000 |
+| Max $EDGE per Day (global) | 1,000 |
 | Min Score for Success | 70% |
-| Challenge Duration | 24 hours (rotates at midnight UTC) |
+| Challenge Window | 45 seconds |
+| Challenge Rotation | Daily at midnight UTC |
 
 ### Level Progression (Rotating Aspects)
 
@@ -64,36 +66,63 @@ The active aspect **rotates automatically** every 10 days:
 
 ## Track Pool System
 
-### Rotating Daily Challenge
+### Concept
+
+Each track = one song with a complete hitmap (full duration).
+Daily challenge = pseudo-random 45-second window from a pseudo-random track.
+
+### Daily Challenge Selection
 
 ```
-Day N → Hash(N) → Select Track from Pool → Challenge for that day
+Day N → seed = keccak256(N, "GR1FTSWORD")
+     → trackId = seed % numActiveTracks
+     → startOffset = (seed >> 128) % (trackDuration - 45 seconds)
+     → Challenge: Track[trackId] from startOffset to startOffset + 45s
 ```
 
-- Tracks rotate pseudo-randomly every 24 hours
-- Each track has a `weight` for selection probability
-- New tracks can be added by owner without contract upgrade
+This ensures:
+- Same challenge for all users on the same day
+- Different track/window each day
+- Deterministic (can be verified)
+- Not repetitive (random window within song)
 
 ### Track Data Structure
 
 ```solidity
 struct Track {
     string name;           // "GR1FTSWORD"
-    uint256 totalDays;     // Number of unique challenge days in this track
-    uint256 weight;        // Selection probability weight (higher = more frequent)
+    uint256 durationMs;    // Total track duration in milliseconds
     bool active;           // Can be disabled without removal
 }
+
+// Merkle root covers the FULL hitmap (all beats in the song)
+// Frontend filters to 45s window based on startOffset
+mapping(uint256 => bytes32) public trackMerkleRoots;  // trackId → root
 ```
 
-### Challenge Selection
+### Challenge Selection (On-Chain)
 
 ```solidity
-function getActiveChallenge() public view returns (uint256 trackId, uint256 dayInTrack) {
-    uint256 globalDay = block.timestamp / 24 hours;
+function getActiveChallenge() public view returns (
+    uint256 trackId,
+    string memory trackName,
+    uint256 startOffsetMs,
+    uint256 endOffsetMs
+) {
+    uint256 globalDay = block.timestamp / 1 days;
     uint256 seed = uint256(keccak256(abi.encodePacked(globalDay, "GR1FTSWORD")));
     
-    // Select track based on weighted random from seed
-    // Select day within track: seed % track.totalDays
+    // Select track
+    trackId = seed % numActiveTracks;
+    Track storage track = tracks[trackId];
+    
+    // Select 45s window within track
+    uint256 windowMs = 45_000;
+    uint256 maxStart = track.durationMs - windowMs;
+    startOffsetMs = (seed >> 128) % maxStart;
+    endOffsetMs = startOffsetMs + windowMs;
+    
+    return (trackId, track.name, startOffsetMs, endOffsetMs);
 }
 ```
 
@@ -134,7 +163,17 @@ mapping(bytes32 => bytes32) public challengeRoots;  // keccak(trackId, day) → 
 
 ---
 
-## User State
+## State
+
+### Global State
+
+```solidity
+uint256 public currentDay;           // Evolution day counter (1-60)
+uint8 public claimsToday;            // Global claims today (max 10)
+uint256 public lastClaimTimestamp;   // For resetting claimsToday at midnight
+```
+
+### User State
 
 ```solidity
 struct UserState {
@@ -142,10 +181,10 @@ struct UserState {
     uint8 levelCharge;          // 10-30
     uint8 levelGlitch;          // 10-30
     uint256 totalMintedEdge;    // Total $EDGE minted to this user
-    uint256 lastSuccessDay;     // Global day number of last successful claim
-    uint8 claimsToday;          // Claims made today (max 10)
-    uint256 lastClaimDay;       // For resetting claimsToday
+    uint256 lastClaimDay;       // Prevents double-claim same day
 }
+
+mapping(address => UserState) public users;
 ```
 
 **Note:** Levels stored as 10-30 internally (10 = 1.0, 15 = 1.5, 30 = 3.0) for 0.1 precision without floats.
@@ -158,7 +197,7 @@ struct UserState {
 
 ```solidity
 /// @notice Claim a challenge completion
-/// @param merkleProof Proof of valid hits
+/// @param merkleProof Proof of valid hits within the 45s window
 /// @param score Percentage score (0-100)
 function claimChallenge(
     bytes32[] calldata merkleProof,
@@ -168,8 +207,9 @@ function claimChallenge(
 /// @notice Get current active challenge info
 function getActiveChallenge() external view returns (
     uint256 trackId,
-    uint256 dayInTrack,
     string memory trackName,
+    uint256 startOffsetMs,
+    uint256 endOffsetMs,
     uint8 activeAspect  // 0=Forge, 1=Charge, 2=Glitch
 );
 
@@ -178,43 +218,42 @@ function getUserState(address user) external view returns (
     uint8 levelForge,
     uint8 levelCharge,
     uint8 levelGlitch,
-    uint256 totalMintedEdge,
-    uint8 claimsToday
+    uint256 totalMintedEdge
 );
 
-/// @notice Get global evolution day (1-60)
-function getEvolutionDay() external view returns (uint256);
+/// @notice Get global state
+function getGlobalState() external view returns (
+    uint256 evolutionDay,      // 1-60
+    uint8 claimsToday,         // 0-10
+    uint8 activeAspect         // 0=Forge, 1=Charge, 2=Glitch
+);
 
-/// @notice Get currently active aspect for level-ups
-function getActiveAspect() external view returns (uint8);  // 0=Forge, 1=Charge, 2=Glitch
+/// @notice Check if user can claim today
+function canClaim(address user) external view returns (bool);
+
+/// @notice Get remaining claims for today (global)
+function remainingClaimsToday() external view returns (uint8);
 ```
 
 ### Admin Functions
 
 ```solidity
 /// @notice Add a new track to the pool
+/// @param name Track display name
+/// @param durationMs Total track duration in milliseconds
+/// @param merkleRoot Merkle root of the FULL hitmap
 function addTrack(
     string calldata name,
-    uint256 totalDays,
-    uint256 weight
-) external onlyOwner returns (uint256 trackId);
-
-/// @notice Set merkle root for a track-day combination
-function setMerkleRoot(
-    uint256 trackId,
-    uint256 day,
+    uint256 durationMs,
     bytes32 merkleRoot
-) external onlyOwner;
-
-/// @notice Batch set multiple merkle roots
-function setMerkleRootsBatch(
-    uint256 trackId,
-    uint256[] calldata days,
-    bytes32[] calldata roots
-) external onlyOwner;
+) external onlyOwner returns (uint256 trackId);
 
 /// @notice Toggle track active status
 function setTrackActive(uint256 trackId, bool active) external onlyOwner;
+
+/// @notice Advance evolution day (only if at least 1 claim today)
+/// @dev Called automatically or by keeper at midnight UTC
+function advanceDay() external;
 ```
 
 ### Events
@@ -223,7 +262,7 @@ function setTrackActive(uint256 trackId, bool active) external onlyOwner;
 event ChallengeClaimed(
     address indexed user,
     uint256 indexed trackId,
-    uint256 dayInTrack,
+    uint256 startOffsetMs,
     uint8 score,
     uint256 edgeMinted
 );
@@ -234,10 +273,16 @@ event LevelUp(
     uint8 newLevel         // 10-30 (1.0-3.0)
 );
 
+event DayAdvanced(
+    uint256 indexed newDay,
+    uint8 claimsYesterday,
+    bool levelUpTriggered
+);
+
 event TrackAdded(
     uint256 indexed trackId,
     string name,
-    uint256 totalDays
+    uint256 durationMs
 );
 ```
 
@@ -327,15 +372,21 @@ function setMaxLevel(uint8 newMax) external onlyOwner;
 ### Adding New Tracks
 
 ```solidity
-// 1. Add track
-uint256 trackId = await contract.addTrack("NEW_TRACK", 45, 10);
+// Generate merkle root from full hitmap
+const hitmap = loadHitmap("NEW_TRACK.json");
+const merkleRoot = generateMerkleRoot(hitmap.beats);
 
-// 2. Set merkle roots for all days
-const roots = generateMerkleRoots(newTrackHitmaps);
-await contract.setMerkleRootsBatch(trackId, days, roots);
+// Add track (single transaction)
+uint256 trackId = await contract.addTrack(
+    "NEW_TRACK",
+    hitmap.durationMs,
+    merkleRoot
+);
 
 // Track is now in rotation!
 ```
+
+**Simple:** One hitmap per track, one merkle root. The 45s window is calculated on-chain.
 
 ---
 
