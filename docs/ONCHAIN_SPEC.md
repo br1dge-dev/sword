@@ -426,25 +426,25 @@ uint256 trackId = await contract.addTrack(
 
 ## Implementation Checklist
 
-### Phase 1: Contract
-- [ ] Write `SwordEvolution.sol` (ERC-20 + Challenge + Levels)
-- [ ] Merkle Proof verification logic
-- [ ] Aspect rotation logic (day % 30 / 10)
+### Phase 1: Contract ✅
+- [x] Write `SwordEvolution.sol` (ERC-20 + Challenge + Levels)
+- [x] Merkle Proof verification logic
+- [x] Aspect rotation logic (day % 30 / 10)
 - [ ] Unit tests
 - [ ] Deploy to Base Sepolia (testnet)
 
 ### Phase 2: Merkle Roots
-- [ ] Script to generate Merkle tree from hitmap JSON
+- [x] Script to generate Merkle tree from hitmap JSON (`src/lib/merkle/index.ts`)
 - [ ] Generate roots for GR1FTSWORD track (60 days)
 - [ ] Batch upload roots to contract
 
-### Phase 3: Frontend
-- [ ] wagmi/RainbowKit wallet connection
-- [ ] `useContract` hooks for reading state
-- [ ] Merkle proof generation in browser
-- [ ] Claim transaction flow
-- [ ] Active aspect highlight in UI
-- [ ] Leaderboard (query balances)
+### Phase 3: Frontend ✅
+- [x] wagmi/RainbowKit wallet connection
+- [x] `useContract` hooks for reading state
+- [x] Merkle proof generation in browser
+- [x] Claim transaction flow
+- [x] Active aspect highlight in UI
+- [ ] Leaderboard (query balances) - currently mock data
 
 ### Phase 4: Launch
 - [ ] Deploy to Base Mainnet
