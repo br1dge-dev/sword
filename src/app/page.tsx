@@ -8,7 +8,7 @@
  */
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAudioReactionStore } from '@/store/audioReactionStore';
 import { usePowerUpStore } from '@/store/powerUpStore';
 import AsciiSword from '@/components/ascii/AsciiSword';
@@ -19,6 +19,8 @@ import BuildBadge from '@/components/ui/BuildBadge';
 import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle } from 'react-icons/io';
 import { useShallow } from 'zustand/react/shallow';
 import WtfIsThisModal from '@/components/ui/WtfIsThisModal';
+import { HitIndicator } from '@/components/ui/HitIndicator';
+import { useChallenge } from '@/hooks/useChallenge';
 
 const HIGHLIGHT_COLORS = ['#F8E16C', '#FF3EC8', '#3EE6FF'] as const;
 
@@ -43,6 +45,44 @@ export default function HomePage() {
   // keep store import to preserve future usage patterns; currently no X-RAY / POWER modes
   usePowerUpStore(useShallow(() => ({})));
   const swordColorSafe = swordColor ?? '#00FCA6';
+  
+  // Challenge state
+  const {
+    isActive: isChallengeActive,
+    registerHit,
+    getUpcomingBeats,
+    score: challengeScore,
+  } = useChallenge();
+  
+  const [lastHitResult, setLastHitResult] = useState<{ hit: boolean; delta: number } | null>(null);
+  const [upcomingBeats, setUpcomingBeats] = useState<number[]>([]);
+  
+  // Update upcoming beats at 60fps when challenge is active
+  useEffect(() => {
+    if (!isChallengeActive) {
+      setUpcomingBeats([]);
+      return;
+    }
+    
+    let rafId: number;
+    const updateBeats = () => {
+      setUpcomingBeats(getUpcomingBeats(2000));
+      rafId = requestAnimationFrame(updateBeats);
+    };
+    rafId = requestAnimationFrame(updateBeats);
+    
+    return () => cancelAnimationFrame(rafId);
+  }, [isChallengeActive, getUpcomingBeats]);
+  
+  // Handle hit from indicator
+  const handleChallengeHit = useCallback(() => {
+    const result = registerHit();
+    if (result) {
+      setLastHitResult({ hit: result.hit, delta: result.delta });
+      // Clear after animation
+      setTimeout(() => setLastHitResult(null), 200);
+    }
+  }, [registerHit]);
   
   // Für den Titel: Random Highlight
   const leaderboardTitle = 'L3ADERBOARD';
@@ -175,6 +215,16 @@ export default function HomePage() {
             directBeat={beatDetected} 
           />
         </div>
+        
+        {/* Hit Indicator - nur wenn Challenge aktiv */}
+        {isClient && isChallengeActive && (
+          <HitIndicator
+            upcomingBeats={upcomingBeats}
+            isActive={isChallengeActive}
+            onHit={handleChallengeHit}
+            lastHitResult={lastHitResult}
+          />
+        )}
         
         {/* AudioControlPanel: Desktop only. Mobile lives behind the gear overlay so the sword stays the hero. */}
         {isClient && isDesktop && (
