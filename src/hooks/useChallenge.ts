@@ -54,6 +54,10 @@ const chain = process.env.NEXT_PUBLIC_CHAIN === 'mainnet' ? base : baseSepolia;
 const CHALLENGE_WINDOW_MS = 45_000;
 const HIT_TOLERANCE_MS = 150;
 
+// Demo mode: generate fake beats when no contract/hitmap available
+const DEMO_BPM = 120;
+const DEMO_BEAT_INTERVAL = 60_000 / DEMO_BPM; // ms between beats
+
 export interface ChallengeHit {
   timestamp: number; // Relative to challenge start
   beatIndex: number;
@@ -126,6 +130,15 @@ export function useChallenge() {
   const aspects = ['FORGE', 'CHARGE', 'GLITCH'] as const;
   const activeAspect = aspects[aspectIndex] ?? 'FORGE';
   
+  // Generate demo hitmap (when no real hitmap available)
+  const generateDemoHitMap = useCallback(() => {
+    const beats: number[] = [];
+    for (let t = DEMO_BEAT_INTERVAL; t < CHALLENGE_WINDOW_MS; t += DEMO_BEAT_INTERVAL) {
+      beats.push(t);
+    }
+    return beats;
+  }, []);
+  
   // Load hitmap for track
   const loadHitMap = useCallback(async (track: string) => {
     try {
@@ -145,17 +158,16 @@ export function useChallenge() {
     } catch (e) {
       console.warn('[useChallenge] Failed to load hitmap:', e);
     }
-    return [];
-  }, [startOffsetMs, endOffsetMs]);
+    // Fallback to demo hitmap
+    const demoHits = generateDemoHitMap();
+    setHitMap(demoHits);
+    return demoHits;
+  }, [startOffsetMs, endOffsetMs, generateDemoHitMap]);
   
-  // Start challenge
+  // Start challenge (works with or without contract)
   const startChallenge = useCallback(async () => {
-    if (!trackName) return;
-    
-    const loadedHitMap = await loadHitMap(trackName);
-    if (loadedHitMap.length === 0) {
-      console.warn('[useChallenge] No hitmap available');
-    }
+    // Load hitmap (will use demo if no real one available)
+    const loadedHitMap = await loadHitMap(trackName || 'demo');
     
     setIsActive(true);
     setHits([]);

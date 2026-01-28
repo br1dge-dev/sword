@@ -52,6 +52,10 @@ export default function HomePage() {
     registerHit,
     getUpcomingBeats,
     score: challengeScore,
+    startChallenge,
+    stopChallenge,
+    progress: challengeProgress,
+    timeRemaining,
   } = useChallenge();
   
   const [lastHitResult, setLastHitResult] = useState<{ hit: boolean; delta: number } | null>(null);
@@ -269,9 +273,44 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* Challenge Score Display - top right when active */}
+        {isClient && isChallengeActive && (
+          <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
+            <div className="bg-black/80 border border-grifter-blue rounded-lg px-4 py-2 backdrop-blur-sm">
+              <div className="text-xs font-mono text-grifter-blue/60 mb-1">SCORE</div>
+              <div className="text-2xl font-press-start-2p text-grifter-green">{challengeScore}%</div>
+            </div>
+            <div className="bg-black/80 border border-grifter-blue rounded-lg px-4 py-2 backdrop-blur-sm">
+              <div className="text-xs font-mono text-grifter-blue/60 mb-1">TIME</div>
+              <div className="text-lg font-mono text-grifter-blue">{Math.ceil(timeRemaining / 1000)}s</div>
+            </div>
+            <button
+              onClick={stopChallenge}
+              className="px-3 py-1 text-xs font-mono bg-black border border-grifter-pink text-grifter-pink rounded hover:bg-grifter-pink hover:text-black transition-colors"
+            >
+              STOP
+            </button>
+          </div>
+        )}
+
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
         {isClient && isDesktop && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0 ui-caps">
+          {/* Challenge Button */}
+          {!isChallengeActive && (
+            <button
+              onClick={startChallenge}
+              className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-green"
+              style={{
+                boxShadow: '0 0 16px rgba(0, 252, 166, 0.75)',
+              }}
+              aria-label="Start Challenge"
+              title="Start Rhythm Challenge"
+            >
+              <span className="text-grifter-green text-2xl">⚔</span>
+            </button>
+          )}
+          
           {/* HIDE Button */}
           <button
             onClick={() => setIsUIVisible(!isUIVisible)}
