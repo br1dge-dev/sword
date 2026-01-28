@@ -3,67 +3,90 @@
 /**
  * GlitchProgressBar Component
  * 
- * Zeigt das GLITCH-Level an. Bei verbundenem Wallet wird das Level aus dem Contract gelesen,
- * ansonsten aus dem lokalen Store (Demo-Modus).
+ * Zeigt einen Fortschrittsbalken für den Glitch-Prozess an, mit Glitch- und Upgrade-Buttons.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
-import { useWalletStatus, useUserState, useGlobalState } from '@/hooks/useContract';
 
 interface GlitchProgressBarProps {
   className?: string;
 }
 
 export default function GlitchProgressBar({ className = '' }: GlitchProgressBarProps) {
-  // Local store (fallback/demo mode)
-  const { glitchLevel: localLevel } = usePowerUpStore();
+  const { 
+    glitchProgress, 
+    isGlitchComplete, 
+    increaseGlitchProgress, 
+    increaseGlitchLevel, 
+    glitchLevel,
+    maxGlitchLevel
+  } = usePowerUpStore();
   
-  // Contract state
-  const { isConnected } = useWalletStatus();
-  const { levelGlitch: contractLevel, isLoading } = useUserState();
-  const { activeAspect } = useGlobalState();
+  const [glitchButtonCooldown, setGlitchButtonCooldown] = useState(false);
+  const [upgradeButtonPressed, setUpgradeButtonPressed] = useState(false);
   
-  // Use contract level if connected, otherwise local
-  const displayLevel = isConnected ? contractLevel : localLevel;
-  const isActiveAspect = isConnected && activeAspect === 'GLITCH';
+  const isMaxLevel = glitchLevel >= maxGlitchLevel;
   
-  // Convert level (1.0-3.0) to progress (0-100%)
-  const levelProgress = ((displayLevel - 1) / 2) * 100;
-  const isMaxLevel = displayLevel >= 3.0;
+  // Glitch-Button-Handler
+  const handleGlitchClick = () => {
+    if (glitchButtonCooldown || isGlitchComplete || isMaxLevel) return;
+    
+    increaseGlitchProgress();
+    setGlitchButtonCooldown(true);
+    
+    // Cooldown für den Glitch-Button
+    setTimeout(() => {
+      setGlitchButtonCooldown(false);
+    }, 500);
+  };
   
-  // Berechne Farben für die Progress-Bar-Tiles
+  // Upgrade-Button-Handler
+  const handleUpgradeClick = () => {
+    if (!isGlitchComplete || upgradeButtonPressed) return;
+    
+    setUpgradeButtonPressed(true);
+    
+    // Visueller Effekt beim Klicken
+    setTimeout(() => {
+      increaseGlitchLevel();
+      setUpgradeButtonPressed(false);
+    }, 300);
+  };
+  
+  // Berechne Farben für die Progress-Bar-Tiles basierend auf dem Fortschritt
   const getTileColor = (index: number, totalTiles: number) => {
-    const tileThreshold = (index / totalTiles) * 100;
+    const tileProgress = (index + 1) / totalTiles * 100;
     
     if (isMaxLevel) {
-      return 'bg-pink-500'; // Alle Tiles sind pink im MAX-Level
-    } else if (tileThreshold >= levelProgress) {
+      // Bei MAX-Level einheitliche Farbe mit gelegentlichen Glitch-Effekten
+      return 'bg-pink-500';
+    } else if (tileProgress > glitchProgress) {
       return 'bg-gray-800'; // Leere Tiles
-    } else if (levelProgress < 25) {
-      return 'bg-pink-300'; // Blasses Pink (Level 1.0-1.5)
-    } else if (levelProgress < 75) {
-      return 'bg-pink-400'; // Mittleres Pink (Level 1.5-2.5)
+    } else if (glitchProgress < 50) {
+      return 'bg-pink-300'; // Blasses Pink
+    } else if (glitchProgress < 90) {
+      return 'bg-pink-400'; // Mittleres Pink
     } else {
-      return 'bg-pink-500'; // Tiefes Pink (Level 2.5-3.0)
+      return 'bg-pink-500'; // Tiefes Pink
     }
   };
   
   // Generiere die Progress-Bar-Tiles
   const renderProgressTiles = () => {
-    const totalTiles = 10;
+    const totalTiles = 10; // Genau 10 Tiles
     const tiles = [];
     
     for (let i = 0; i < totalTiles; i++) {
-      const tileThreshold = (i / totalTiles) * 100;
-      const isActive = isMaxLevel || tileThreshold < levelProgress;
+      const tileProgress = (i + 1) / totalTiles * 100;
+      const isActive = isMaxLevel || tileProgress <= glitchProgress;
       
       tiles.push(
         <div 
           key={i}
-          className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0 transition-all duration-300`}
+          className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
           style={{
-            boxShadow: isActive && (isMaxLevel || levelProgress >= 75) ? 'inset 0 0 3px rgba(255,0,255,0.8)' : 
-                      isActive && levelProgress >= 25 ? 'inset 0 0 2px rgba(255,0,255,0.5)' : 
+            boxShadow: isActive && (isMaxLevel || glitchProgress >= 90) ? 'inset 0 0 3px rgba(255,0,255,0.8)' : 
+                      isActive && glitchProgress >= 50 ? 'inset 0 0 2px rgba(255,0,255,0.5)' : 
                       'none'
           }}
         />
@@ -76,36 +99,102 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
   return (
     <div className={`flex flex-col ${className}`}>
       <div className="flex flex-col">
-        {/* Überschrift "GLITCH" mit Level-Anzeige */}
-        <div className="mb-1 text-xs font-bold font-press-start-2p text-left flex items-center gap-2" 
+        {/* Überschrift "GLITCH" im Pixel-Font-Stil, linksbündig */}
+        <div className="mb-1 text-xs font-bold font-press-start-2p text-left text-[#FF3EC8]" 
              style={{ 
-               color: isActiveAspect ? '#00FCA6' : '#FF3EC8',
-               textShadow: isActiveAspect ? '0 0 8px #00FCA6' : '0 0 1px #FF3EC8',
+               textShadow: '0 0 1px #FF3EC8',
                letterSpacing: '0.05em'
              }}>
-          <span>GLITCH</span>
-          {isLoading ? (
-            <span className="text-gray-500">...</span>
-          ) : (
-            <span>LVL {Math.floor(displayLevel)}</span>
-          )}
+          GLITCH - LVL {glitchLevel}
         </div>
         
-        {/* Fortschrittsbalken */}
-        <div className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex
-                       ${isMaxLevel ? 'max-level-shine' : ''}`}
-             style={{ 
-               boxShadow: isActiveAspect ? '0 0 8px rgba(0,252,166,0.4)' : 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
-               imageRendering: 'pixelated'
-             }}>
-          {renderProgressTiles()}
+        <div className="flex items-center gap-2">
+          {/* Fortschrittsbalken mit genau 10 Tiles */}
+          <div className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex
+                         ${isMaxLevel ? 'max-level-shine' : ''}`}
+               style={{ 
+                 boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
+                 imageRendering: 'pixelated'
+               }}>
+            {renderProgressTiles()}
+            
+            {/* MAX-Text bei maximalem Level */}
+            {isMaxLevel && (
+              <div className="max-level-text text-[#00FCA6]">MAX</div>
+            )}
+          </div>
           
-          {/* MAX-Text bei maximalem Level */}
-          {isMaxLevel && (
-            <div className="max-level-text text-[#00FCA6]">MAX</div>
-          )}
+          {/* Glitch-Button */}
+          <button
+            onClick={handleGlitchClick}
+            disabled={glitchButtonCooldown || isGlitchComplete || isMaxLevel}
+            className={`w-6 h-6 flex items-center justify-center 
+                       border border-gray-700 bg-gray-800 
+                       ${glitchButtonCooldown ? 'opacity-50' : 'hover:border-pink-400'} 
+                       ${isGlitchComplete || isMaxLevel ? 'opacity-50 cursor-not-allowed' : ''}`}
+            style={{ 
+              boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(255,0,255,0.3)',
+              imageRendering: 'pixelated',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
+              backgroundSize: '4px 4px'
+            }}
+          >
+            {/* Glitch-Icon (Pixel-Art-Stil) */}
+            <div className="relative w-3 h-3">
+              {/* Glitch-Symbol */}
+              <div className="absolute top-0 left-0 w-1 h-1 bg-pink-400"></div>
+              <div className="absolute top-0 left-2 w-1 h-1 bg-green-400"></div>
+              <div className="absolute top-1 left-1 w-1 h-1 bg-pink-500"></div>
+              <div className="absolute top-2 left-0 w-1 h-1 bg-green-400"></div>
+              <div className="absolute top-2 left-2 w-1 h-1 bg-pink-400"></div>
+              {/* Glüheffekt */}
+              <div className="absolute inset-0 opacity-70"
+                   style={{ 
+                     boxShadow: '0 0 3px rgba(255,0,255,0.8)',
+                     animation: 'pulse 1.5s infinite alternate'
+                   }}>
+              </div>
+            </div>
+          </button>
+          
+          {/* Upgrade-Button */}
+          <button
+            onClick={handleUpgradeClick}
+            disabled={!isGlitchComplete}
+            className={`w-6 h-6 flex items-center justify-center 
+                       border ${isGlitchComplete ? 'border-green-700' : 'border-gray-700'} 
+                       ${upgradeButtonPressed ? 'bg-green-900' : 'bg-gray-800'} 
+                       ${isGlitchComplete ? 'hover:border-green-500' : 'opacity-50 cursor-not-allowed'}`}
+            style={{ 
+              boxShadow: isGlitchComplete ? 
+                'inset 0 0 3px rgba(0,0,0,0.8), 0 0 3px rgba(0,255,170,0.5)' : 
+                'inset 0 0 3px rgba(0,0,0,0.8)',
+              imageRendering: 'pixelated',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
+              backgroundSize: '4px 4px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {/* Upgrade-Icon (Pixel-Art-Stil) */}
+            <div className="relative w-3 h-3">
+              {/* Pfeil nach oben */}
+              <div className="absolute top-0 left-1 w-1 h-1 bg-green-400"></div>
+              <div className="absolute top-1 left-0 w-1 h-1 bg-green-400"></div>
+              <div className="absolute top-1 left-1 w-1 h-1 bg-green-500"></div>
+              <div className="absolute top-1 left-2 w-1 h-1 bg-green-400"></div>
+              <div className="absolute top-2 left-1 w-1 h-1 bg-green-400"></div>
+              {/* Glüheffekt wenn aktiviert */}
+              {isGlitchComplete && (
+                <div className="absolute inset-0 opacity-70"
+                     style={{ 
+                       boxShadow: '0 0 3px rgba(0,255,170,0.8)'
+                     }}>
+                </div>
+              )}
+            </div>
+          </button>
         </div>
       </div>
     </div>
   );
-}
+} 

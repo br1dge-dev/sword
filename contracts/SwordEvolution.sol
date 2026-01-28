@@ -3,12 +3,14 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 /// @title SwordEvolution - On-chain rhythm challenge with $EDGE token rewards
 /// @notice Players complete daily rhythm challenges to earn $EDGE and evolve the global sword
-/// @dev Single contract: ERC-20 token + challenge verification + level progression
+/// @dev ERC-20 token with EIP-712 signature verification for claims
 contract SwordEvolution is ERC20, Ownable {
+
+    using ECDSA for bytes32;
     
     // ============ Constants ============
     
@@ -38,17 +40,27 @@ contract SwordEvolution is ERC20, Ownable {
     
     /// @notice Total evolution days
     uint8 public constant TOTAL_DAYS = 60;
-    
+
     // ============ Enums ============
     
     enum Aspect { FORGE, CHARGE, GLITCH }
-    
+
+    // ============ EIP-712 ============
+
+    /// @notice EIP-712 domain separator
+    bytes32 public immutable DOMAIN_SEPARATOR;
+
+    /// @notice Claim type hash for EIP-712
+    bytes32 public constant CLAIM_TYPEHASH = keccak256("Claim(address user,uint256 score,uint256 startOffsetMs,uint256 deadline)");
+
+    /// @notice Nonce used to prevent signature replay attacks
+    mapping(address => uint256) public nonces;
+
     // ============ Structs ============
     
     struct Track {
         string name;
         uint256 durationMs;
-        bytes32 merkleRoot;
         bool active;
     }
     
@@ -56,6 +68,7 @@ contract SwordEvolution is ERC20, Ownable {
         uint8 levelForge;      // 10-30 (1.0-3.0)
         uint8 levelCharge;     // 10-30
         uint8 levelGlitch;     // 10-30
+        uint256 successfulDays; // Total successful claims
         uint256 totalMinted;   // Total $EDGE minted to user
         uint256 lastClaimDay;  // Prevents double-claim same day
     }
@@ -71,9 +84,6 @@ contract SwordEvolution is ERC20, Ownable {
     /// @notice Timestamp when current day started
     uint256 public dayStartTimestamp;
     
-    /// @notice Whether at least one successful claim happened today
-    bool public hasClaimToday;
-    
     /// @notice Array of tracks in the pool
     Track[] public tracks;
     
@@ -87,22 +97,21 @@ contract SwordEvolution is ERC20, Ownable {
     
     event ChallengeClaimed(
         address indexed user,
-        uint256 indexed trackId,
         uint256 startOffsetMs,
         uint8 score,
         uint256 edgeMinted
     );
     
-    event LevelUp(
-        address indexed user,
-        Aspect indexed aspect,
-        uint8 newLevel
-    );
-    
     event DayAdvanced(
         uint256 indexed newDay,
         uint8 claimsYesterday,
-        bool levelUpTriggered
+        Aspect activeAspect,
+        uint8 newLevel
+    );
+    
+    event LevelUp(
+        Aspect indexed aspect,
+        uint8 newLevel
     );
     
     event TrackAdded(
@@ -112,11 +121,13 @@ contract SwordEvolution is ERC20, Ownable {
     );
     
     // ============ Errors ============
-    
+
     error MaxClaimsReached();
     error AlreadyClaimedToday();
     error ScoreTooLow(uint8 score, uint8 required);
-    error InvalidProof();
+    error InvalidSignature();
+    error SignatureExpired();
+    error NonceUsed();
     error EvolutionComplete();
     error NoActiveTracks();
     error InvalidTrack();
@@ -126,16 +137,35 @@ contract SwordEvolution is ERC20, Ownable {
     constructor() ERC20("EDGE", "EDGE") Ownable(msg.sender) {
         currentDay = 1;
         dayStartTimestamp = block.timestamp;
+
+        // Initialize EIP-712 domain separator
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("GR1FTSWORD")),
+                keccak256("1"),
+                block.chainid,
+                address(this)
+            )
+        );
     }
     
     // ============ Core Functions ============
     
-    /// @notice Claim a challenge completion
-    /// @param merkleProof Proof of valid hits within the 45s window
+    /// @notice Claim a challenge completion with EIP-712 signature
     /// @param score Percentage score (0-100)
-    function claimChallenge(
-        bytes32[] calldata merkleProof,
-        uint8 score
+    /// @param startOffsetMs Challenge window start time
+    /// @param deadline Signature expiration time
+    /// @param v v component of ECDSA signature
+    /// @param r r component of ECDSA signature
+    /// @param s s component of ECDSA signature
+    function claimWithSignature(
+        uint8 score,
+        uint256 startOffsetMs,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
     ) external {
         // Check evolution not complete
         if (currentDay > TOTAL_DAYS) revert EvolutionComplete();
@@ -147,23 +177,40 @@ contract SwordEvolution is ERC20, Ownable {
         UserState storage user = users[msg.sender];
         if (user.lastClaimDay == currentDay) revert AlreadyClaimedToday();
         
+        // Check signature not expired
+        if (block.timestamp > deadline) revert SignatureExpired();
+        
         // Check minimum score
         if (score < MIN_SCORE) revert ScoreTooLow(score, MIN_SCORE);
         
-        // Get active challenge
-        (uint256 trackId, , uint256 startOffsetMs, ) = getActiveChallenge();
-        Track storage track = tracks[trackId];
+        // Build EIP-712 hash
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                DOMAIN_SEPARATOR,
+                keccak256(
+                    abi.encode(
+                        CLAIM_TYPEHASH,
+                        msg.sender,
+                        score,
+                        startOffsetMs,
+                        deadline
+                    )
+                )
+            )
+        );
         
-        // Verify merkle proof
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, score, startOffsetMs));
-        if (!MerkleProof.verify(merkleProof, track.merkleRoot, leaf)) {
-            revert InvalidProof();
-        }
+        // Recover signer address
+        address signer = ecrecover(digest, v, r, s);
+        
+        // Verify signature from authorized server (owner can set signer)
+        if (signer != owner()) revert InvalidSignature();
         
         // Update state
         user.lastClaimDay = currentDay;
+        user.successfulDays++;
         claimsToday++;
-        hasClaimToday = true;
+        nonces[msg.sender]++; // Increment nonce to prevent replay
         
         // Initialize levels if first claim
         if (user.levelForge == 0) {
@@ -183,7 +230,7 @@ contract SwordEvolution is ERC20, Ownable {
             user.totalMinted += mintAmount;
         }
         
-        emit ChallengeClaimed(msg.sender, trackId, startOffsetMs, score, mintAmount);
+        emit ChallengeClaimed(msg.sender, startOffsetMs, score, mintAmount);
     }
     
     /// @notice Advance to next evolution day
@@ -198,28 +245,26 @@ contract SwordEvolution is ERC20, Ownable {
         }
         
         uint8 yesterdayClaims = claimsToday;
-        bool levelUp = hasClaimToday;
+        Aspect activeAspect = getActiveAspect();
+        uint8 newLevel = 0;
         
         // If at least one claim today, trigger level-up on active aspect
-        if (levelUp) {
-            Aspect activeAspect = getActiveAspect();
-            _triggerLevelUp(activeAspect);
+        if (yesterdayClaims > 0) {
+            newLevel = _triggerLevelUp(activeAspect);
         }
         
         // Advance day
         currentDay++;
         claimsToday = 0;
-        hasClaimToday = false;
         dayStartTimestamp = block.timestamp;
         
-        emit DayAdvanced(currentDay, yesterdayClaims, levelUp);
+        emit DayAdvanced(currentDay, yesterdayClaims, activeAspect, newLevel);
     }
     
     // ============ View Functions ============
     
     /// @notice Get current active challenge info
     function getActiveChallenge() public view returns (
-        uint256 trackId,
         string memory trackName,
         uint256 startOffsetMs,
         uint256 endOffsetMs
@@ -239,17 +284,18 @@ contract SwordEvolution is ERC20, Ownable {
         // Select track
         uint256 selectedIndex = seed % activeCount;
         uint256 activeIdx = 0;
+        uint256 selectedTrackId = 0;
         for (uint256 i = 0; i < trackCount; i++) {
             if (tracks[i].active) {
                 if (activeIdx == selectedIndex) {
-                    trackId = i;
+                    selectedTrackId = i;
                     break;
                 }
                 activeIdx++;
             }
         }
         
-        Track storage track = tracks[trackId];
+        Track storage track = tracks[selectedTrackId];
         trackName = track.name;
         
         // Calculate 45s window start
@@ -259,17 +305,7 @@ contract SwordEvolution is ERC20, Ownable {
         startOffsetMs = maxStart > 0 ? (seed >> 128) % maxStart : 0;
         endOffsetMs = startOffsetMs + CHALLENGE_WINDOW_MS;
         
-        return (trackId, trackName, startOffsetMs, endOffsetMs);
-    }
-    
-    /// @notice Get currently active aspect for level-ups
-    function getActiveAspect() public view returns (Aspect) {
-        // Days 1-10: Forge, 11-20: Charge, 21-30: Glitch
-        // Days 31-40: Forge (L2), 41-50: Charge (L2), 51-60: Glitch (L2)
-        uint256 cycleDay = ((currentDay - 1) % 30);
-        if (cycleDay < 10) return Aspect.FORGE;
-        if (cycleDay < 20) return Aspect.CHARGE;
-        return Aspect.GLITCH;
+        return (trackName, startOffsetMs, endOffsetMs);
     }
     
     /// @notice Get user's current state
@@ -321,12 +357,40 @@ contract SwordEvolution is ERC20, Ownable {
     function getTrack(uint256 trackId) external view returns (
         string memory name,
         uint256 durationMs,
-        bytes32 merkleRoot,
         bool active
     ) {
         if (trackId >= trackCount) revert InvalidTrack();
         Track storage track = tracks[trackId];
-        return (track.name, track.durationMs, track.merkleRoot, track.active);
+        return (track.name, track.durationMs, track.active);
+    }
+    
+    /// @notice Get currently active aspect for level-ups
+    function getActiveAspect() public view returns (Aspect) {
+        // Days 1-20: Forge, 21-40: Charge, 41-60: Glitch
+        uint256 cycleDay = currentDay - 1;
+        if (cycleDay < 20) return Aspect.FORGE;
+        if (cycleDay < 40) return Aspect.CHARGE;
+        return Aspect.GLITCH;
+    }
+    
+    // ============ Internal Functions ============
+    
+    /// @notice Trigger level-up on specified aspect
+    function _triggerLevelUp(Aspect aspect) internal returns (uint8 newLevel) {
+        // This is called when a day advances with at least one claim
+        // The level-up is global - all users get the same level based on total successful days
+        // 10 successful days = +1 level (10 → 20 → 30)
+        uint8 baseLevel = START_LEVEL;
+        uint8 levelIncrement = uint8(claimsToday / STEPS_PER_LEVEL);
+        newLevel = baseLevel + levelIncrement;
+        
+        // Cap at MAX_LEVEL
+        if (newLevel > MAX_LEVEL) {
+            newLevel = MAX_LEVEL;
+        }
+        
+        emit LevelUp(aspect, newLevel);
+        return newLevel;
     }
     
     // ============ Admin Functions ============
@@ -334,14 +398,12 @@ contract SwordEvolution is ERC20, Ownable {
     /// @notice Add a new track to the pool
     function addTrack(
         string calldata name,
-        uint256 durationMs,
-        bytes32 merkleRoot
+        uint256 durationMs
     ) external onlyOwner returns (uint256 trackId) {
         trackId = trackCount;
         tracks.push(Track({
             name: name,
             durationMs: durationMs,
-            merkleRoot: merkleRoot,
             active: true
         }));
         trackCount++;
@@ -355,20 +417,5 @@ contract SwordEvolution is ERC20, Ownable {
         tracks[trackId].active = active;
     }
     
-    /// @notice Update track merkle root (for fixes only)
-    function updateTrackMerkleRoot(uint256 trackId, bytes32 newRoot) external onlyOwner {
-        if (trackId >= trackCount) revert InvalidTrack();
-        tracks[trackId].merkleRoot = newRoot;
-    }
-    
-    // ============ Internal Functions ============
-    
-    /// @notice Trigger level-up on specified aspect
-    function _triggerLevelUp(Aspect aspect) internal {
-        // Level-up is global (affects all future users' starting state conceptually)
-        // For individual users, they get levels based on when they started
-        // This is a simplified version - the level-up is tracked via events
-        
-        emit LevelUp(address(0), aspect, 0); // Global level-up event
-    }
+
 }
