@@ -16,7 +16,6 @@ import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import BuildBadge from '@/components/ui/BuildBadge';
-import WalletIndicator from '@/components/ui/WalletIndicator';
 import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle } from 'react-icons/io';
 import { useShallow } from 'zustand/react/shallow';
 import WtfIsThisModal from '@/components/ui/WtfIsThisModal';
@@ -165,15 +164,6 @@ export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
       <BuildBadge />
-      
-      {/* Wallet Indicator - top right corner */}
-      {isClient && (
-        <div className={`fixed top-4 right-4 z-30 transition-opacity duration-300 ${
-          isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}>
-          <WalletIndicator />
-        </div>
-      )}
       <div className={`relative w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${
         isModalOpen || isLeaderboardOpen ? 'backdrop-blur-modal' : ''
       }`}>

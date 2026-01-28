@@ -3,67 +3,89 @@
 /**
  * ChargeProgressBar Component
  * 
- * Zeigt das CHARGE-Level an. Bei verbundenem Wallet wird das Level aus dem Contract gelesen,
- * ansonsten aus dem lokalen Store (Demo-Modus).
+ * Zeigt einen Fortschrittsbalken für den Charge-Prozess an, mit Blitz- und Nuklear-Buttons.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
-import { useWalletStatus, useUserState, useGlobalState } from '@/hooks/useContract';
 
 interface ChargeProgressBarProps {
   className?: string;
 }
 
 export default function ChargeProgressBar({ className = '' }: ChargeProgressBarProps) {
-  // Local store (fallback/demo mode)
-  const { chargeLevel: localLevel } = usePowerUpStore();
+  const { 
+    chargeProgress, 
+    isChargeComplete, 
+    increaseChargeProgress, 
+    increaseChargeLevel, 
+    chargeLevel,
+    maxChargeLevel
+  } = usePowerUpStore();
   
-  // Contract state
-  const { isConnected } = useWalletStatus();
-  const { levelCharge: contractLevel, isLoading } = useUserState();
-  const { activeAspect } = useGlobalState();
+  const [lightningButtonCooldown, setLightningButtonCooldown] = useState(false);
+  const [nuclearButtonPressed, setNuclearButtonPressed] = useState(false);
   
-  // Use contract level if connected, otherwise local
-  const displayLevel = isConnected ? contractLevel : localLevel;
-  const isActiveAspect = isConnected && activeAspect === 'CHARGE';
+  const isMaxLevel = chargeLevel >= maxChargeLevel;
   
-  // Convert level (1.0-3.0) to progress (0-100%)
-  const levelProgress = ((displayLevel - 1) / 2) * 100;
-  const isMaxLevel = displayLevel >= 3.0;
+  // Blitz-Button-Handler
+  const handleLightningClick = () => {
+    if (lightningButtonCooldown || isChargeComplete || isMaxLevel) return;
+    
+    increaseChargeProgress();
+    setLightningButtonCooldown(true);
+    
+    // Cooldown für den Blitz-Button
+    setTimeout(() => {
+      setLightningButtonCooldown(false);
+    }, 500);
+  };
   
-  // Berechne Farben für die Progress-Bar-Tiles
+  // Nuklear-Button-Handler
+  const handleNuclearClick = () => {
+    if (!isChargeComplete || nuclearButtonPressed) return;
+    
+    setNuclearButtonPressed(true);
+    
+    // Visueller Effekt beim Klicken
+    setTimeout(() => {
+      increaseChargeLevel();
+      setNuclearButtonPressed(false);
+    }, 300);
+  };
+  
+  // Berechne Farben für die Progress-Bar-Tiles basierend auf dem Fortschritt
   const getTileColor = (index: number, totalTiles: number) => {
-    const tileThreshold = (index / totalTiles) * 100;
+    const tileProgress = (index + 1) / totalTiles * 100;
     
     if (isMaxLevel) {
       return 'bg-yellow-500'; // Alle Tiles sind gelb im MAX-Level
-    } else if (tileThreshold >= levelProgress) {
+    } else if (tileProgress > chargeProgress) {
       return 'bg-gray-800'; // Leere Tiles
-    } else if (levelProgress < 25) {
-      return 'bg-yellow-300'; // Blasses Gelb (Level 1.0-1.5)
-    } else if (levelProgress < 75) {
-      return 'bg-yellow-400'; // Mittleres Gelb (Level 1.5-2.5)
+    } else if (chargeProgress < 50) {
+      return 'bg-yellow-300'; // Blasses Gelb
+    } else if (chargeProgress < 90) {
+      return 'bg-yellow-400'; // Mittleres Gelb
     } else {
-      return 'bg-yellow-500'; // Tiefes Gelb (Level 2.5-3.0)
+      return 'bg-yellow-500'; // Tiefes Gelb
     }
   };
   
   // Generiere die Progress-Bar-Tiles
   const renderProgressTiles = () => {
-    const totalTiles = 10;
+    const totalTiles = 10; // Genau 10 Tiles
     const tiles = [];
     
     for (let i = 0; i < totalTiles; i++) {
-      const tileThreshold = (i / totalTiles) * 100;
-      const isActive = isMaxLevel || tileThreshold < levelProgress;
+      const tileProgress = (i + 1) / totalTiles * 100;
+      const isActive = isMaxLevel || tileProgress <= chargeProgress;
       
       tiles.push(
         <div 
           key={i}
-          className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0 transition-all duration-300`}
+          className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
           style={{
-            boxShadow: isActive && (isMaxLevel || levelProgress >= 75) ? 'inset 0 0 3px rgba(255,255,0,0.8)' : 
-                      isActive && levelProgress >= 25 ? 'inset 0 0 2px rgba(255,255,0,0.5)' : 
+            boxShadow: isActive && (isMaxLevel || chargeProgress >= 90) ? 'inset 0 0 3px rgba(255,255,0,0.8)' : 
+                      isActive && chargeProgress >= 50 ? 'inset 0 0 2px rgba(255,255,0,0.5)' : 
                       'none'
           }}
         />
@@ -76,36 +98,100 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
   return (
     <div className={`flex flex-col ${className}`}>
       <div className="flex flex-col">
-        {/* Überschrift "CHARGE" mit Level-Anzeige */}
-        <div className="mb-1 text-xs font-bold font-press-start-2p text-left flex items-center gap-2" 
+        {/* Überschrift "CHARGE" im Pixel-Font-Stil, linksbündig */}
+        <div className="mb-1 text-xs font-bold font-press-start-2p text-left text-[#F8E16C]" 
              style={{ 
-               color: isActiveAspect ? '#00FCA6' : '#3EE6FF',
-               textShadow: isActiveAspect ? '0 0 8px #00FCA6' : '0 0 1px #3EE6FF',
+               textShadow: '0 0 1px #F8E16C',
                letterSpacing: '0.05em'
              }}>
-          <span>CHARGE</span>
-          {isLoading ? (
-            <span className="text-gray-500">...</span>
-          ) : (
-            <span>LVL {Math.floor(displayLevel)}</span>
-          )}
+          CHARGE - LVL {chargeLevel}
         </div>
         
-        {/* Fortschrittsbalken */}
-        <div className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex
-                       ${isMaxLevel ? 'max-level-shine' : ''}`}
-             style={{ 
-               boxShadow: isActiveAspect ? '0 0 8px rgba(0,252,166,0.4)' : 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
-               imageRendering: 'pixelated'
-             }}>
-          {renderProgressTiles()}
+        <div className="flex items-center gap-2">
+          {/* Fortschrittsbalken mit genau 10 Tiles */}
+          <div className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex
+                         ${isMaxLevel ? 'max-level-shine' : ''}`}
+               style={{ 
+                 boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
+                 imageRendering: 'pixelated'
+               }}>
+            {renderProgressTiles()}
+            
+            {/* MAX-Text bei maximalem Level */}
+            {isMaxLevel && (
+              <div className="max-level-text text-[#00FCA6]">MAX</div>
+            )}
+          </div>
           
-          {/* MAX-Text bei maximalem Level */}
-          {isMaxLevel && (
-            <div className="max-level-text text-[#00FCA6]">MAX</div>
-          )}
+          {/* Blitz-Button */}
+          <button
+            onClick={handleLightningClick}
+            disabled={lightningButtonCooldown || isChargeComplete || isMaxLevel}
+            className={`w-6 h-6 flex items-center justify-center 
+                       border border-gray-700 bg-gray-800 
+                       ${lightningButtonCooldown ? 'opacity-50' : 'hover:border-yellow-400'} 
+                       ${isChargeComplete || isMaxLevel ? 'opacity-50 cursor-not-allowed' : ''}`}
+            style={{ 
+              boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8), 0 0 2px rgba(255,255,0,0.3)',
+              imageRendering: 'pixelated',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
+              backgroundSize: '4px 4px'
+            }}
+          >
+            {/* Blitz-Icon (Pixel-Art-Stil) */}
+            <div className="relative w-3 h-3">
+              {/* Blitz */}
+              <div className="absolute top-0 left-1 w-1 h-1 bg-yellow-300"></div>
+              <div className="absolute top-1 left-1 w-1 h-1 bg-yellow-400"></div>
+              <div className="absolute top-2 left-0 w-1 h-1 bg-yellow-400"></div>
+              <div className="absolute top-2 left-1 w-1 h-1 bg-yellow-300"></div>
+              {/* Glüheffekt */}
+              <div className="absolute inset-0 opacity-70"
+                   style={{ 
+                     boxShadow: '0 0 3px rgba(255,255,0,0.8)'
+                   }}>
+              </div>
+            </div>
+          </button>
+          
+          {/* Nuklear-Button */}
+          <button
+            onClick={handleNuclearClick}
+            disabled={!isChargeComplete}
+            className={`w-6 h-6 flex items-center justify-center 
+                       border ${isChargeComplete ? 'border-yellow-600' : 'border-gray-700'} 
+                       ${nuclearButtonPressed ? 'bg-yellow-900' : 'bg-gray-800'} 
+                       ${isChargeComplete ? 'hover:border-yellow-500' : 'opacity-50 cursor-not-allowed'}`}
+            style={{ 
+              boxShadow: isChargeComplete ? 
+                'inset 0 0 3px rgba(0,0,0,0.8), 0 0 3px rgba(255,255,0,0.5)' : 
+                'inset 0 0 3px rgba(0,0,0,0.8)',
+              imageRendering: 'pixelated',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h2v2H0z'/%3E%3Cpath d='M2 2h2v2H2z'/%3E%3C/g%3E%3C/svg%3E")`,
+              backgroundSize: '4px 4px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {/* Nuklear-Icon (Pixel-Art-Stil) */}
+            <div className="relative w-3 h-3">
+              {/* Atom-Symbol */}
+              <div className="absolute top-1 left-1 w-1 h-1 bg-yellow-500"></div>
+              <div className="absolute top-0 left-1 w-1 h-1 bg-yellow-400"></div>
+              <div className="absolute top-1 left-0 w-1 h-1 bg-yellow-400"></div>
+              <div className="absolute top-1 left-2 w-1 h-1 bg-yellow-400"></div>
+              <div className="absolute top-2 left-1 w-1 h-1 bg-yellow-400"></div>
+              {/* Glüheffekt wenn aktiviert */}
+              {isChargeComplete && (
+                <div className="absolute inset-0 opacity-70"
+                     style={{ 
+                       boxShadow: '0 0 3px rgba(255,255,0,0.8)'
+                     }}>
+                </div>
+              )}
+            </div>
+          </button>
         </div>
       </div>
     </div>
   );
-}
+} 
