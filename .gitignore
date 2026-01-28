@@ -35,3 +35,12 @@ next-env.d.ts
 
 # Sensitive project files
 MANIFEST.md
+
+# Foundry build artifacts
+contracts/broadcast/
+contracts/cache/
+contracts/out/
+contracts/lib/
+
+# Deployment logs
+deployment.log
