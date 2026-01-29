@@ -1,12 +1,13 @@
 /**
- * WalletConnectButton - Connect/Disconnect wallet button
+ * WalletConnectButton - Simple Connect/Disconnect wallet button
  *
- * Shows connection status and handles wallet interactions.
+ * Uses wagmi's useAccount and useConnect hooks.
  */
 'use client';
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { useCallback, useState } from 'react';
+import { injected } from 'wagmi/connectors';
 
 interface WalletConnectButtonProps {
   className?: string;
@@ -14,34 +15,13 @@ interface WalletConnectButtonProps {
 
 export function WalletConnectButton({ className = '' }: WalletConnectButtonProps) {
   const { address, isConnected, chainId } = useAccount();
-  const { connectors, connect } = useConnect();
+  const { connect } = useConnect();
   const { disconnect } = useDisconnect();
-  const [isConnecting, setIsConnecting] = useState(false);
-
-  // Get WalletConnect and Injected connectors
-  const walletConnectConnector = connectors.find(c => c.id === 'walletConnect');
-  const injectedConnector = connectors.find(c => c.id === 'injected');
 
   const handleConnect = useCallback(async () => {
-    if (isConnected) {
-      disconnect();
-      return;
-    }
-
-    setIsConnecting(true);
-    try {
-      // Try WalletConnect first, then Injected
-      if (walletConnectConnector) {
-        await connect({ connector: walletConnectConnector });
-      } else if (injectedConnector) {
-        await connect({ connector: injectedConnector });
-      }
-    } catch (error) {
-      console.error('Failed to connect:', error);
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [isConnected, disconnect, connect, walletConnectConnector, injectedConnector]);
+    // Try injected connector first (MetaMask, Coinbase Wallet, etc.)
+    connect({ connector: injected() });
+  }, [connect]);
 
   // Format address for display
   const formatAddress = (addr: string) => {
@@ -54,17 +34,6 @@ export function WalletConnectButton({ className = '' }: WalletConnectButtonProps
     if (id === 8453) return 'Base';
     return `Chain ${id}`;
   };
-
-  if (isConnecting) {
-    return (
-      <button
-        className={`px-4 py-2 text-xs font-press-start-2p bg-gray-800 border border-gray-600 text-gray-400 rounded cursor-wait ${className}`}
-        disabled
-      >
-        CONNECTING...
-      </button>
-    );
-  }
 
   if (isConnected && address) {
     return (
