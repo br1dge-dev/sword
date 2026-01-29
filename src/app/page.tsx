@@ -265,6 +265,13 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* Wallet Connect Button - top right */}
+        {isClient && (
+          <div className="fixed top-4 right-4 z-20">
+            <WalletConnectButton />
+          </div>
+        )}
+
         {/* Challenge Mode Indicator - shows when challenge mode is active */}
         {isClient && challengeMode === 'challenge' && !isChallengeActive && challengePhase !== 'idle' && (
           <div className="fixed top-4 left-4 z-30 bg-black/80 border border-grifter-green rounded-lg px-3 py-2 backdrop-blur-sm">

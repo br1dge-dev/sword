@@ -927,6 +927,12 @@ function ClaimButton({ score, startOffsetMs }: { score: number; startOffsetMs: n
   const { writeContract, isPending, isError, error } = useWriteContract();
   const [claimStatus, setClaimStatus] = useState<'idle' | 'signing' | 'submitting' | 'success' | 'error'>('idle');
 
+  const { getClaimData } = useChallengeStore(
+    useShallow((s) => ({
+      getClaimData: s.getClaimData,
+    })),
+  );
+
   const handleClaim = useCallback(async () => {
     if (!isConnected) {
       alert('Please connect your wallet first!');
@@ -938,6 +944,13 @@ function ClaimButton({ score, startOffsetMs }: { score: number; startOffsetMs: n
     setClaimStatus('signing');
 
     try {
+      // Get claim data from store
+      const claimData = getClaimData();
+
+      if (!claimData) {
+        throw new Error('No challenge data available');
+      }
+
       // 1. Get signature from server
       const response = await fetch('/api/sign-challenge', {
         method: 'POST',
@@ -946,8 +959,8 @@ function ClaimButton({ score, startOffsetMs }: { score: number; startOffsetMs: n
           user: address,
           score,
           startOffsetMs,
-          hitmap: [], // TODO: Pass actual hitmap
-          userClicks: [], // TODO: Pass actual user clicks
+          hitmap: claimData.hitmap,
+          userClicks: claimData.userClicks,
         }),
       });
 
@@ -979,7 +992,7 @@ function ClaimButton({ score, startOffsetMs }: { score: number; startOffsetMs: n
       console.error('[Claim] Error:', err);
       setClaimStatus('error');
     }
-  }, [isConnected, address, score, startOffsetMs, writeContract]);
+  }, [isConnected, address, score, startOffsetMs, writeContract, getClaimData]);
 
   if (claimStatus === 'success') {
     return (

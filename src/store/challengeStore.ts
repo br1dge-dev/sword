@@ -35,6 +35,7 @@ export interface ChallengeState {
 
   // Stats
   hits: ChallengeHit[];
+  userClicks: number[]; // Timestamps of user clicks in seconds
   combo: number;
   accuracy: number;
   timeLeft: number;
@@ -45,11 +46,13 @@ export interface ChallengeState {
   setAudioTime: (time: number) => void;
   setHitMap: (hitMap: HitMapData) => void;
   addHit: (hit: ChallengeHit) => void;
+  addUserClick: (timestamp: number) => void;
   resetChallenge: () => void;
   setTimeLeft: (time: number) => void;
 
   // Computed
   getUpcomingBeats: (lookaheadMs: number) => number[];
+  getClaimData: () => { hitmap: number[]; userClicks: number[] } | null;
 }
 
 export const useChallengeStore = create<ChallengeState>((set, get) => ({
@@ -59,6 +62,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   audioTime: 0,
   hitMap: null,
   hits: [],
+  userClicks: [],
   combo: 0,
   accuracy: 100,
   timeLeft: 45,
@@ -86,8 +90,13 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     };
   }),
 
+  addUserClick: (timestamp) => set((state) => ({
+    userClicks: [...state.userClicks, timestamp]
+  })),
+
   resetChallenge: () => set({
     hits: [],
+    userClicks: [],
     combo: 0,
     accuracy: 100,
     timeLeft: 45,
@@ -118,5 +127,29 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         return timeUntil;
       })
       .filter(t => t >= 0);
+  },
+
+  // Get data for claim API call
+  getClaimData: () => {
+    const { hitMap, userClicks, audioTime } = get();
+    if (!hitMap) return null;
+
+    const startTime = hitMap.challengeConfig.startOffset;
+    const endTime = startTime + hitMap.challengeConfig.duration;
+
+    // Filter beats within challenge window
+    const beatsInWindow = hitMap.fullHitMap
+      .filter(t => t >= startTime && t <= endTime)
+      .map(t => t - startTime); // Convert to relative time
+
+    // Filter user clicks within challenge window
+    const clicksInWindow = userClicks
+      .filter(t => t >= startTime && t <= endTime)
+      .map(t => t - startTime); // Convert to relative time
+
+    return {
+      hitmap: beatsInWindow,
+      userClicks: clicksInWindow,
+    };
   }
 }));
