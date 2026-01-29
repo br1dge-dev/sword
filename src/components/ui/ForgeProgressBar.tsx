@@ -3,10 +3,11 @@
 /**
  * ForgeProgressBar Component - Progress bar only, no buttons
  *
- * Displays forge progress with level indicator.
+ * Displays forge progress with level indicator from contract data.
  */
 import React from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
+import { useSwordEvolution } from '@/hooks/useSwordEvolution';
 
 interface ForgeProgressBarProps {
   className?: string;
@@ -14,13 +15,18 @@ interface ForgeProgressBarProps {
 
 export default function ForgeProgressBar({ className = '' }: ForgeProgressBarProps) {
   const {
-    forgeProgress,
+    forgeProgress: localProgress,
     isForgeComplete,
-    currentLevel,
+    currentLevel: localLevel,
     maxLevel
   } = usePowerUpStore();
 
-  const isMaxLevel = currentLevel >= maxLevel;
+  const { calculatedLevels, isLoading } = useSwordEvolution();
+
+  // Use contract data if available, fallback to local
+  const level = calculatedLevels?.forge.level ?? localLevel;
+  const progress = calculatedLevels?.forge.progress ?? localProgress;
+  const isMaxLevel = level >= maxLevel;
 
   // Calculate tile colors based on progress
   const getTileColor = (index: number, totalTiles: number) => {
@@ -28,11 +34,11 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
 
     if (isMaxLevel) {
       return 'bg-orange-500';
-    } else if (tileProgress > forgeProgress) {
+    } else if (tileProgress > progress) {
       return 'bg-gray-800';
-    } else if (forgeProgress < 50) {
+    } else if (progress < 50) {
       return 'bg-gray-400';
-    } else if (forgeProgress < 90) {
+    } else if (progress < 90) {
       return 'bg-yellow-600';
     } else {
       return 'bg-orange-500';
@@ -46,15 +52,15 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
 
     for (let i = 0; i < totalTiles; i++) {
       const tileProgress = (i + 1) / totalTiles * 100;
-      const isActive = isMaxLevel || tileProgress <= forgeProgress;
+      const isActive = isMaxLevel || tileProgress <= progress;
 
       tiles.push(
         <div
           key={i}
           className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
           style={{
-            boxShadow: isActive && (isMaxLevel || forgeProgress >= 90) ? 'inset 0 0 3px rgba(255,165,0,0.8)' :
-                      isActive && forgeProgress >= 50 ? 'inset 0 0 2px rgba(255,255,0,0.5)' :
+            boxShadow: isActive && (isMaxLevel || progress >= 90) ? 'inset 0 0 3px rgba(255,165,0,0.8)' :
+                      isActive && progress >= 50 ? 'inset 0 0 2px rgba(255,255,0,0.5)' :
                       'none'
           }}
         />
@@ -75,7 +81,7 @@ export default function ForgeProgressBar({ className = '' }: ForgeProgressBarPro
             letterSpacing: '0.05em'
           }}
         >
-          FORGE - LVL {currentLevel}
+          FORGE - LVL {level}{isLoading && '...'}
         </div>
 
         <div className="flex items-center gap-2">

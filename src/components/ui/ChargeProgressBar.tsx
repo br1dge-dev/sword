@@ -3,10 +3,11 @@
 /**
  * ChargeProgressBar Component - Progress bar only, no buttons
  *
- * Displays charge progress with level indicator.
+ * Displays charge progress with level indicator from contract data.
  */
 import React from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
+import { useSwordEvolution } from '@/hooks/useSwordEvolution';
 
 interface ChargeProgressBarProps {
   className?: string;
@@ -14,13 +15,18 @@ interface ChargeProgressBarProps {
 
 export default function ChargeProgressBar({ className = '' }: ChargeProgressBarProps) {
   const {
-    chargeProgress,
+    chargeProgress: localProgress,
     isChargeComplete,
-    chargeLevel,
-    maxChargeLevel
+    chargeLevel: localLevel,
+    maxChargeLevel: maxLevel
   } = usePowerUpStore();
 
-  const isMaxLevel = chargeLevel >= maxChargeLevel;
+  const { calculatedLevels, isLoading } = useSwordEvolution();
+
+  // Use contract data if available, fallback to local
+  const level = calculatedLevels?.charge.level ?? localLevel;
+  const progress = calculatedLevels?.charge.progress ?? localProgress;
+  const isMaxLevel = level >= maxLevel;
 
   // Calculate tile colors based on progress
   const getTileColor = (index: number, totalTiles: number) => {
@@ -28,11 +34,11 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
 
     if (isMaxLevel) {
       return 'bg-yellow-500';
-    } else if (tileProgress > chargeProgress) {
+    } else if (tileProgress > progress) {
       return 'bg-gray-800';
-    } else if (chargeProgress < 50) {
+    } else if (progress < 50) {
       return 'bg-yellow-300';
-    } else if (chargeProgress < 90) {
+    } else if (progress < 90) {
       return 'bg-yellow-400';
     } else {
       return 'bg-yellow-500';
@@ -46,15 +52,15 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
 
     for (let i = 0; i < totalTiles; i++) {
       const tileProgress = (i + 1) / totalTiles * 100;
-      const isActive = isMaxLevel || tileProgress <= chargeProgress;
+      const isActive = isMaxLevel || tileProgress <= progress;
 
       tiles.push(
         <div
           key={i}
           className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
           style={{
-            boxShadow: isActive && (isMaxLevel || chargeProgress >= 90) ? 'inset 0 0 3px rgba(255,255,0,0.8)' :
-                      isActive && chargeProgress >= 50 ? 'inset 0 0 2px rgba(255,255,0,0.5)' :
+            boxShadow: isActive && (isMaxLevel || progress >= 90) ? 'inset 0 0 3px rgba(255,255,0,0.8)' :
+                      isActive && progress >= 50 ? 'inset 0 0 2px rgba(255,255,0,0.5)' :
                       'none'
           }}
         />
@@ -75,7 +81,7 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
             letterSpacing: '0.05em'
           }}
         >
-          CHARGE - LVL {chargeLevel}
+          CHARGE - LVL {level}{isLoading && '...'}
         </div>
 
         <div className="flex items-center gap-2">
