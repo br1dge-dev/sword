@@ -11,7 +11,7 @@ import { useAccount, useReadContract } from 'wagmi';
 import { baseSepolia } from 'wagmi/chains';
 
 // Contract address - should be in environment variables
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_SWORD_EVOLUTION_ADDRESS as `0x${string}` || '0x';
+const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_BASE_SEPOLIA || process.env.CONTRACT_ADDRESS_BASE_SEPOLIA) as `0x${string}` || '0x';
 
 // Minimal ABI for getGlobalState
 const SWORD_EVOLUTION_ABI = [
