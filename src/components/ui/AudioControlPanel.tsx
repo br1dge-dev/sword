@@ -928,7 +928,7 @@ function ClaimButton({ score, startOffsetMs }: { score: number; startOffsetMs: n
 
   const handleClaim = useCallback(async () => {
     if (!isConnected) {
-      alert('Please connect your wallet first!');
+      alert('Please connect your wallet first!\n\nClick "CONNECT WALLET" in the top-left corner.');
       return;
     }
 
