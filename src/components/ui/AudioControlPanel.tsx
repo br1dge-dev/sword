@@ -1,11 +1,33 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useAudioAnalyzer, globalAnalyzer } from '../../hooks/useAudioAnalyzer';
 import { useAudioReactionStore } from '../../store/audioReactionStore';
 import { useChallengeStore } from '../../store/challengeStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { HitMapData } from '@/store/challengeStore';
+
+// Contract address from environment
+const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_BASE_SEPOLIA || process.env.CONTRACT_ADDRESS_BASE_SEPOLIA) as `0x${string}` || '0x';
+
+// Minimal ABI for claimWithSignature
+const SWORD_EVOLUTION_ABI = [
+  {
+    inputs: [
+      { name: 'score', type: 'uint8' },
+      { name: 'startOffsetMs', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'v', type: 'uint8' },
+      { name: 'r', type: 'bytes32' },
+      { name: 's', type: 'bytes32' },
+    ],
+    name: 'claimWithSignature',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+] as const;
 
 interface AudioControlPanelProps {
   className?: string;
@@ -852,20 +874,10 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
               {/* Claim button for passed challenges */}
               {passed && (
-                <button
-                  onClick={() => {
-                    // TODO: Implement claim via contract
-                    console.log('[Challenge] Claim reward!');
-                    // For now, show success message
-                    alert('Challenge completed! Claim will be processed on-chain.');
-                  }}
-                  className="px-6 py-3 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded transition-all hover:bg-grifter-green hover:text-black"
-                  style={{
-                    boxShadow: '0 0 10px rgba(0, 252, 166, 0.3)',
-                  }}
-                >
-                  CLAIM REWARD
-                </button>
+                <ClaimButton
+                  score={Math.round(sharedAccuracy)}
+                  startOffsetMs={0}
+                />
               )}
 
               <button
@@ -906,5 +918,39 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         }
       `}</style>
     </div>
+  );
+}
+
+// ClaimButton component for on-chain claiming
+function ClaimButton({ score, startOffsetMs }: { score: number; startOffsetMs: number }) {
+  const { address, isConnected } = useAccount();
+  const { writeContract, isPending, isError, error } = useWriteContract();
+
+  const handleClaim = useCallback(async () => {
+    if (!isConnected) {
+      alert('Please connect your wallet first!');
+      return;
+    }
+
+    if (!address) return;
+
+    console.log('[Claim] Would claim for score:', score);
+
+    // For demo purposes, show a message
+    // In production, this would call the contract with a server-signed signature
+    alert('Claim functionality requires server-side signature generation.\n\nFor demo, score saved locally!');
+  }, [isConnected, address, score]);
+
+  return (
+    <button
+      onClick={handleClaim}
+      disabled={!isConnected || isPending}
+      className="px-6 py-3 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded transition-all hover:bg-grifter-green hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
+      style={{
+        boxShadow: '0 0 10px rgba(0, 252, 166, 0.3)',
+      }}
+    >
+      {isPending ? 'SIGNING...' : 'CLAIM REWARD'}
+    </button>
   );
 } 

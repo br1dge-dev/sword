@@ -18,6 +18,7 @@ import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import BuildBadge from '@/components/ui/BuildBadge';
+import WalletConnectButton from '@/components/ui/WalletConnectButton';
 import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle } from 'react-icons/io';
 import { useShallow } from 'zustand/react/shallow';
 import WtfIsThisModal from '@/components/ui/WtfIsThisModal';
@@ -260,6 +261,13 @@ export default function HomePage() {
           <div className="fixed top-4 left-4 z-30 bg-black/80 border border-grifter-green rounded-lg px-3 py-2 backdrop-blur-sm">
             <div className="text-xs font-mono text-grifter-green/60">CHALLENGE</div>
             <div className="text-sm font-press-start-2p text-grifter-green">{challengePhase.toUpperCase()}</div>
+          </div>
+        )}
+
+        {/* Wallet Connect Button - top left */}
+        {isClient && (
+          <div className="fixed top-4 left-4 z-30">
+            <WalletConnectButton />
           </div>
         )}
         
