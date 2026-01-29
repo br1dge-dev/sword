@@ -3,6 +3,7 @@
  *
  * Uses direct DOM manipulation via requestAnimationFrame for 60fps performance
  * instead of React state updates which cause excessive re-renders.
+ * Global click handler triggers hit effect regardless of cursor position.
  */
 'use client';
 
@@ -56,11 +57,23 @@ export function HitIndicator({
     }
   }, [lastHitResult]);
 
-  // Handle click/tap
-  const handleClick = useCallback(() => {
-    if (isActive && onHit) {
-      onHit();
-    }
+  // Global click handler - triggers hit effect anywhere on screen
+  useEffect(() => {
+    if (!isActive) return;
+
+    const handleGlobalClick = () => {
+      if (onHit) {
+        onHit();
+      }
+    };
+
+    window.addEventListener('click', handleGlobalClick);
+    window.addEventListener('touchstart', handleGlobalClick);
+
+    return () => {
+      window.removeEventListener('click', handleGlobalClick);
+      window.removeEventListener('touchstart', handleGlobalClick);
+    };
   }, [isActive, onHit]);
 
   // Animation loop - uses direct DOM manipulation for performance
@@ -129,8 +142,7 @@ export function HitIndicator({
   return (
     <div
       ref={containerRef}
-      className="fixed right-8 top-1/2 -translate-y-1/2 z-20 cursor-pointer select-none"
-      onClick={handleClick}
+      className="fixed right-8 top-1/2 -translate-y-1/2 z-20 select-none"
       style={{
         width: 60,
         height: TRACK_HEIGHT,
@@ -167,27 +179,31 @@ export function HitIndicator({
         </div>
       </div>
 
-      {/* Pre-rendered dots (hidden by default) */}
+      {/* Pre-rendered dots (hidden by default) - centered with exact positioning */}
       {dots.map((_, index) => (
         <div
           key={`dot-${index}`}
           ref={(el) => {
             if (el) dotsRef.current[index] = el;
           }}
-          className="absolute left-1/2 -translate-x-1/2 rounded-full"
+          className="absolute rounded-full"
           style={{
             display: 'none',
             width: DOT_SIZE,
             height: DOT_SIZE,
             background: 'radial-gradient(circle, #00FCA6 0%, #00FCA6 100%)',
+            left: '50%',
+            marginLeft: -DOT_SIZE / 2, // Exact centering
           }}
         />
       ))}
 
       {/* Center line guide */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 w-px"
+        className="absolute w-px"
         style={{
+          left: '50%',
+          marginLeft: -0.5,
           top: 0,
           bottom: HIT_ZONE_HEIGHT,
           background: 'linear-gradient(180deg, transparent 0%, rgba(0, 252, 166, 0.3) 100%)',
