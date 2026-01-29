@@ -276,13 +276,13 @@ export default function HomePage() {
         {/* Challenge Score Display - top right when active */}
         {isClient && isChallengeActive && (
           <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
-            <div className="bg-black/80 border border-grifter-blue rounded-lg px-4 py-2 backdrop-blur-sm">
-              <div className="text-xs font-mono text-grifter-blue/60 mb-1">SCORE</div>
+            <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
+              <div className="text-xs font-mono text-grifter-green/60 mb-1">SCORE</div>
               <div className="text-2xl font-press-start-2p text-grifter-green">{challengeScore}%</div>
             </div>
-            <div className="bg-black/80 border border-grifter-blue rounded-lg px-4 py-2 backdrop-blur-sm">
-              <div className="text-xs font-mono text-grifter-blue/60 mb-1">TIME</div>
-              <div className="text-lg font-mono text-grifter-blue">{Math.ceil(timeRemaining / 1000)}s</div>
+            <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
+              <div className="text-xs font-mono text-grifter-green/60 mb-1">TIME</div>
+              <div className="text-lg font-mono text-grifter-green">{timeRemaining}s</div>
             </div>
             <button
               onClick={stopChallenge}

@@ -93,8 +93,8 @@ export function HitIndicator({
       <div
         className="absolute inset-0 rounded-full"
         style={{
-          background: 'linear-gradient(180deg, rgba(62, 230, 255, 0.05) 0%, rgba(62, 230, 255, 0.1) 100%)',
-          border: '1px solid rgba(62, 230, 255, 0.2)',
+          background: 'linear-gradient(180deg, rgba(0, 252, 166, 0.05) 0%, rgba(0, 252, 166, 0.1) 100%)',
+          border: '1px solid rgba(0, 252, 166, 0.2)',
         }}
       />
       
@@ -105,18 +105,18 @@ export function HitIndicator({
           height: HIT_ZONE_HEIGHT,
           background: flashColor 
             ? `radial-gradient(ellipse at center, ${flashColor}40 0%, transparent 70%)`
-            : 'radial-gradient(ellipse at center, rgba(62, 230, 255, 0.2) 0%, transparent 70%)',
-          borderTop: `2px solid ${flashColor || 'rgba(62, 230, 255, 0.5)'}`,
+            : 'radial-gradient(ellipse at center, rgba(0, 252, 166, 0.2) 0%, transparent 70%)',
+          borderTop: `2px solid ${flashColor || 'rgba(0, 252, 166, 0.5)'}`,
           boxShadow: flashColor 
             ? `0 0 20px ${flashColor}80, inset 0 0 15px ${flashColor}40`
-            : '0 0 10px rgba(62, 230, 255, 0.3)',
+            : '0 0 10px rgba(0, 252, 166, 0.3)',
         }}
       >
         {/* Hit zone label */}
         <div 
           className="absolute inset-0 flex items-center justify-center text-xs font-mono"
           style={{ 
-            color: flashColor || 'rgba(62, 230, 255, 0.6)',
+            color: flashColor || 'rgba(0, 252, 166, 0.6)',
             textShadow: flashColor ? `0 0 8px ${flashColor}` : 'none',
           }}
         >
@@ -139,8 +139,8 @@ export function HitIndicator({
               height: DOT_SIZE * scale,
               top: position,
               opacity,
-              background: 'radial-gradient(circle, #3EE6FF 0%, #00FCA6 100%)',
-              boxShadow: `0 0 ${8 * scale}px rgba(62, 230, 255, ${GLOW_INTENSITY * opacity})`,
+              background: 'radial-gradient(circle, #00FCA6 0%, #00FCA6 100%)',
+              boxShadow: `0 0 ${8 * scale}px rgba(0, 252, 166, ${GLOW_INTENSITY * opacity})`,
               transition: 'none', // No transition for smooth animation
             }}
           />
@@ -153,14 +153,14 @@ export function HitIndicator({
         style={{
           top: 0,
           bottom: HIT_ZONE_HEIGHT,
-          background: 'linear-gradient(180deg, transparent 0%, rgba(62, 230, 255, 0.3) 100%)',
+          background: 'linear-gradient(180deg, transparent 0%, rgba(0, 252, 166, 0.3) 100%)',
         }}
       />
       
       {/* Tap hint */}
       <div 
         className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs font-mono whitespace-nowrap"
-        style={{ color: 'rgba(62, 230, 255, 0.4)' }}
+        style={{ color: 'rgba(0, 252, 166, 0.4)' }}
       >
         TAP
       </div>
