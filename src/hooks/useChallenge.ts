@@ -192,10 +192,12 @@ export function useChallenge() {
   
   // Stop challenge
   const stopChallenge = useCallback(() => {
-    setIsActive(false);
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
     }
+    setIsActive(false);
+    setCurrentTimeMs(0);
   }, []);
   
   // Register a hit attempt
@@ -227,18 +229,18 @@ export function useChallenge() {
       hit: isHit,
     };
     
-    setHits(prev => [...prev, hit]);
-    
-    // Update score
-    if (isHit) {
-      const hitCount = hits.filter(h => h.hit).length + 1;
+    // Update hits and score together
+    setHits(prev => {
+      const newHits = [...prev, hit];
+      const hitCount = newHits.filter(h => h.hit).length;
       const totalBeats = hitMap.length;
       const newScore = totalBeats > 0 ? Math.round((hitCount / totalBeats) * 100) : 0;
       setScore(newScore);
-    }
+      return newHits;
+    });
     
     return hit;
-  }, [isActive, hitMap, hits]);
+  }, [isActive, hitMap]);
   
   // Get upcoming beats (for visual indicator)
   const getUpcomingBeats = useCallback((lookaheadMs: number = 2000): number[] => {
@@ -281,6 +283,6 @@ export function useChallenge() {
     
     // Computed
     progress: isActive ? (currentTimeMs / CHALLENGE_WINDOW_MS) * 100 : 0,
-    timeRemaining: isActive ? Math.max(0, CHALLENGE_WINDOW_MS - currentTimeMs) : 0,
+    timeRemaining: isActive ? Math.max(0, Math.ceil((CHALLENGE_WINDOW_MS - currentTimeMs) / 1000)) : 0,
   };
 }
