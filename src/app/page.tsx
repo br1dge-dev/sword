@@ -1,9 +1,9 @@
 /**
  * HomePage - Hauptseite der SWORD-App
- * 
+ *
  * Diese Komponente enthält das ASCII-Schwert und alle UI-Elemente.
  * OPTIMIERT: Reduzierte Logs, bessere Performance
- * NEU: AudioControlPanel immer sichtbar, Modal nur für SideButtons
+ * NEU: AudioControlPanel mit Challenge Mode
  * NEU: HIDE Button zum Ausblenden des kompletten UI
  */
 "use client";
@@ -14,7 +14,6 @@ import { usePowerUpStore } from '@/store/powerUpStore';
 import { useChallengeStore } from '@/store/challengeStore';
 import AsciiSword from '@/components/ascii/AsciiSword';
 import AudioControlPanel from '@/components/ui/AudioControlPanel';
-import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import BuildBadge from '@/components/ui/BuildBadge';
 import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle } from 'react-icons/io';
@@ -275,18 +274,7 @@ export default function HomePage() {
             </div>
           </div>
         )}
-        
-        {/* SideButtons - Desktop: links, Mobile: im Modal */}
-        {isClient && isDesktop && (
-          <div className={`absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10 transition-opacity duration-300 ${
-            isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}>
-            <div className="scale-125 origin-center ui-caps">
-          <SideButtons />
-        </div>
-          </div>
-        )}
-        
+
         {/* Mobile Steuerelemente - Gear overlay for all controls */}
         {isClient && !isDesktop && (
           <div className={`absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-300 ${
@@ -310,7 +298,7 @@ export default function HomePage() {
           <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
             <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
               <div className="text-xs font-mono text-grifter-green/60 mb-1">SCORE</div>
-              <div className="text-2xl font-press-start-2p text-grifter-green">{challengeScore}%</div>
+              <div className="text-2xl font-press-start-2p text-grifter-green">{challengeScore.toFixed(0)}%</div>
             </div>
             <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
               <div className="text-xs font-mono text-grifter-green/60 mb-1">TIME</div>
@@ -354,21 +342,6 @@ export default function HomePage() {
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
         {isClient && isDesktop && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0 ui-caps">
-          {/* Challenge Button */}
-          {!isChallengeActive && (
-            <button
-              onClick={() => setMode('challenge')}
-              className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-green"
-              style={{
-                boxShadow: '0 0 16px rgba(0, 252, 166, 0.75)',
-              }}
-              aria-label="Start Challenge"
-              title="Start Rhythm Challenge"
-            >
-              <span className="text-grifter-green text-2xl">⚔</span>
-            </button>
-          )}
-          
           {/* HIDE Button */}
           <button
             onClick={() => setIsUIVisible(!isUIVisible)}

@@ -832,9 +832,9 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
           {/* Results */}
           {phase === 'results' && (
             <div className="w-full flex flex-col items-center">
-              <div 
+              <div
                 className="text-lg font-press-start-2p mb-2"
-                style={{ 
+                style={{
                   color: passed ? '#00FCA6' : '#FF3EC8',
                   textShadow: '0 0 12px currentColor',
                 }}
@@ -849,6 +849,22 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
                 {missClicks > 0 && <span className="text-grifter-pink">{missClicks} miss</span>}
                 {missedBeats > 0 && <span className="text-grifter-blue/60">{missedBeats} skipped</span>}
               </div>
+
+              {/* Claim button for passed challenges */}
+              {passed && (
+                <button
+                  onClick={() => {
+                    // TODO: Implement claim logic via contract
+                    console.log('[Challenge] Claim reward!');
+                    alert('Claim functionality coming soon!');
+                  }}
+                  className="px-6 py-3 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded hover:bg-grifter-green hover:text-black transition-colors"
+                  style={{ boxShadow: '0 0 10px rgba(0, 252, 166, 0.3)' }}
+                >
+                  CLAIM REWARD
+                </button>
+              )}
+
               <button
                 onClick={() => {
                   setPhase('idle');
