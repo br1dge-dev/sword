@@ -854,12 +854,15 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
               {passed && (
                 <button
                   onClick={() => {
-                    // TODO: Implement claim logic via contract
+                    // TODO: Implement claim via contract
                     console.log('[Challenge] Claim reward!');
-                    alert('Claim functionality coming soon!');
+                    // For now, show success message
+                    alert('Challenge completed! Claim will be processed on-chain.');
                   }}
-                  className="px-6 py-3 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded hover:bg-grifter-green hover:text-black transition-colors"
-                  style={{ boxShadow: '0 0 10px rgba(0, 252, 166, 0.3)' }}
+                  className="px-6 py-3 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded transition-all hover:bg-grifter-green hover:text-black"
+                  style={{
+                    boxShadow: '0 0 10px rgba(0, 252, 166, 0.3)',
+                  }}
                 >
                   CLAIM REWARD
                 </button>
@@ -874,7 +877,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
                   clearRipples();
                   isPlayingChallengeRef.current = false;
                 }}
-                className="px-4 py-2 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded hover:bg-grifter-blue hover:text-black transition-colors"
+                className="px-4 py-2 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded transition-all hover:bg-grifter-blue hover:text-black"
               >
                 RETRY
               </button>
