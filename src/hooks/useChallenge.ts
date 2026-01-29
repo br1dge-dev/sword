@@ -120,8 +120,8 @@ export function useChallenge() {
     },
   });
   
-  // Parse contract data
-  const trackName = challengeData?.[0] ?? '';
+  // Parse contract data - default to gr1ftsword when no contract
+  const trackName = challengeData?.[0] ?? 'gr1ftsword';
   const startOffsetMs = Number(challengeData?.[1] ?? 0);
   const endOffsetMs = Number(challengeData?.[2] ?? 0);
   const evolutionDay = Number(globalState?.[0] ?? 1);
@@ -141,17 +141,23 @@ export function useChallenge() {
   
   // Load hitmap for track
   const loadHitMap = useCallback(async (track: string) => {
+    console.log('[useChallenge] Loading hitmap for track:', track);
     try {
       // Try to load hitmap from public folder
       const response = await fetch(`/hitmaps/${track}.json`);
       if (response.ok) {
         const data: HitMapData = await response.json();
+        console.log('[useChallenge] Loaded hitmap:', data.displayName, 'beats:', data.fullHitMap.length);
         // Convert seconds to milliseconds and filter to challenge window
-        const startSec = startOffsetMs / 1000;
-        const endSec = endOffsetMs / 1000;
+        // Use contract offsets if available, otherwise use default challenge window
+        const effectiveStartMs = startOffsetMs > 0 ? startOffsetMs : 0;
+        const effectiveEndMs = endOffsetMs > 0 ? endOffsetMs : CHALLENGE_WINDOW_MS;
+        const startSec = effectiveStartMs / 1000;
+        const endSec = effectiveEndMs / 1000;
         const windowHits = data.fullHitMap
           .filter(t => t >= startSec && t <= endSec)
           .map(t => (t - startSec) * 1000); // Relative to challenge start
+        console.log('[useChallenge] Filtered to', windowHits.length, 'beats in window');
         setHitMap(windowHits);
         return windowHits;
       }
@@ -159,6 +165,7 @@ export function useChallenge() {
       console.warn('[useChallenge] Failed to load hitmap:', e);
     }
     // Fallback to demo hitmap
+    console.log('[useChallenge] Using demo hitmap');
     const demoHits = generateDemoHitMap();
     setHitMap(demoHits);
     return demoHits;
@@ -166,24 +173,28 @@ export function useChallenge() {
   
   // Start challenge (works with or without contract)
   const startChallenge = useCallback(async () => {
+    console.log('[useChallenge] Starting challenge for track:', trackName);
     // Load hitmap (will use demo if no real one available)
-    const loadedHitMap = await loadHitMap(trackName || 'demo');
-    
+    const loadedHitMap = await loadHitMap(trackName);
+    console.log('[useChallenge] Loaded hitmap with', loadedHitMap.length, 'beats');
+    console.log('[useChallenge] First 10 beats (ms):', loadedHitMap.slice(0, 10));
+
     setIsActive(true);
     setHits([]);
     setScore(0);
     setCurrentTimeMs(0);
     startTimeRef.current = performance.now();
-    
+
     // Start time tracking
     const updateTime = () => {
       const elapsed = performance.now() - startTimeRef.current;
       setCurrentTimeMs(elapsed);
-      
+
       if (elapsed < CHALLENGE_WINDOW_MS) {
         rafRef.current = requestAnimationFrame(updateTime);
       } else {
         // Challenge ended
+        console.log('[useChallenge] Challenge ended');
         setIsActive(false);
       }
     };
@@ -245,11 +256,12 @@ export function useChallenge() {
   // Get upcoming beats (for visual indicator)
   const getUpcomingBeats = useCallback((lookaheadMs: number = 2000): number[] => {
     if (!isActive) return [];
-    
+
     const now = currentTimeMs;
-    return hitMap
+    const upcoming = hitMap
       .filter(t => t > now && t <= now + lookaheadMs)
       .map(t => t - now); // Return time until beat
+    return upcoming;
   }, [isActive, currentTimeMs, hitMap]);
   
   // Cleanup on unmount
