@@ -5,7 +5,7 @@ import { useAudioAnalyzer, globalAnalyzer } from '../../hooks/useAudioAnalyzer';
 import { useAudioReactionStore } from '../../store/audioReactionStore';
 import { useChallengeStore } from '../../store/challengeStore';
 import { useShallow } from 'zustand/react/shallow';
-import type { HitMapDataData } from '@/store/challengeStore';
+import type { HitMapData } from '@/store/challengeStore';
 
 interface AudioControlPanelProps {
   className?: string;
@@ -70,7 +70,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
   // Local state for things that don't need to be shared
   const [countdown, setCountdown] = useState(3);
-  const [hitMap, setHitMapData] = useState<HitMapData | null>(null);
+  const [hitMap, setHitMap] = useState<HitMapData | null>(null);
   const [maxPossibleHits, setMaxPossibleHits] = useState(0);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const challengeRafRef = useRef<number | undefined>(undefined);
@@ -172,9 +172,9 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   }, [isInitialized, isAnalyzing, start, stop, isPlaying]);
 
   // Load hitmap when challenge mode is enabled
-  const { setHitMapData: setSharedHitMapData, setAudioTime } = useChallengeStore(
+  const { setHitMap: setSharedHitMap, setAudioTime } = useChallengeStore(
     useShallow((s) => ({
-      setHitMapData: s.setHitMapData,
+      setHitMap: s.setHitMap,
       setAudioTime: s.setAudioTime,
     })),
   );
@@ -184,12 +184,12 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       fetch('/hitmaps/gr1ftsword.json')
         .then(res => res.json())
         .then((data: HitMapData) => {
-          setHitMapData(data);
-          setSharedHitMapData(data); // Also store in shared state
+          setHitMap(data);
+          setSharedHitMap(data); // Also store in shared state
           // Calculate max possible hits in the challenge window
           const startTime = data.challengeConfig.startOffset;
           const endTime = startTime + data.challengeConfig.duration;
-          const hitsInWindow = data.fullHitMapData.filter(t => t >= startTime && t <= endTime).length;
+          const hitsInWindow = data.fullHitMap.filter(t => t >= startTime && t <= endTime).length;
           setMaxPossibleHits(hitsInWindow);
         })
         .catch(err => console.error('Failed to load hitmap:', err));
@@ -309,7 +309,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       const hitTimesArray = sharedHits.filter(h => h.hit).map(h => h.timestamp);
 
       let newMissed = 0;
-      for (const beatTime of hitMap.fullHitMapData) {
+      for (const beatTime of hitMap.fullHitMap) {
         if (beatTime < startTime) continue;
         if (beatTime > currentTime - tolerance) break; // Haven't passed yet
         if (beatTime <= lastCheckedBeatRef.current) continue; // Already counted
@@ -360,8 +360,8 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
       let closestDelta = Infinity;
       let closestIndex = -1;
-      for (let i = 0; i < hitMap.fullHitMapData.length; i++) {
-        const delta = Math.abs(currentTime - hitMap.fullHitMapData[i]);
+      for (let i = 0; i < hitMap.fullHitMap.length; i++) {
+        const delta = Math.abs(currentTime - hitMap.fullHitMap[i]);
         if (delta < closestDelta) {
           closestDelta = delta;
           closestIndex = i;
