@@ -1,12 +1,14 @@
 "use client";
 
 /**
- * SideButtons Component - Simplified for Challenge Mode
+ * SideButtons Component - Progress bars only, no manual buttons
  *
- * All progress bars and cleanse have been removed.
- * This component is now minimal and ready for future features.
+ * Displays Forge/Charge/Glitch progress bars without upgrade buttons.
  */
 import React from 'react';
+import ForgeProgressBar from './ForgeProgressBar';
+import ChargeProgressBar from './ChargeProgressBar';
+import GlitchProgressBar from './GlitchProgressBar';
 
 interface SideButtonsProps {
   className?: string;
@@ -15,7 +17,11 @@ interface SideButtonsProps {
 export default function SideButtons({ className = '' }: SideButtonsProps) {
   return (
     <div className={`flex flex-col ${className}`} style={{ width: '100%', maxWidth: '200px' }}>
-      {/* Side buttons area - ready for future features */}
+      <div className="flex flex-col gap-4">
+        <ForgeProgressBar />
+        <ChargeProgressBar />
+        <GlitchProgressBar />
+      </div>
     </div>
   );
 } 

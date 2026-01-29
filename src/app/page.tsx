@@ -5,6 +5,7 @@
  * OPTIMIERT: Reduzierte Logs, bessere Performance
  * NEU: AudioControlPanel mit Challenge Mode
  * NEU: HIDE Button zum Ausblenden des kompletten UI
+ * NEU: SideButtons mit Progress-Bars (ohne manuelle Buttons)
  */
 "use client";
 
@@ -14,6 +15,7 @@ import { usePowerUpStore } from '@/store/powerUpStore';
 import { useChallengeStore } from '@/store/challengeStore';
 import AsciiSword from '@/components/ascii/AsciiSword';
 import AudioControlPanel from '@/components/ui/AudioControlPanel';
+import SideButtons from '@/components/ui/SideButtons';
 import MobileControlsOverlay from '@/components/ui/MobileControlsOverlay';
 import BuildBadge from '@/components/ui/BuildBadge';
 import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle } from 'react-icons/io';
@@ -271,6 +273,17 @@ export default function HomePage() {
             onBeat={handleBeat} 
             onEnergyChange={handleEnergyChange} 
               />
+            </div>
+          </div>
+        )}
+
+        {/* SideButtons - Desktop: left side */}
+        {isClient && isDesktop && (
+          <div className={`absolute top-1/2 left-[25vw] transform -translate-x-1/2 -translate-y-1/2 z-10 transition-opacity duration-300 ${
+            isUIVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}>
+            <div className="scale-125 origin-center ui-caps">
+              <SideButtons />
             </div>
           </div>
         )}
