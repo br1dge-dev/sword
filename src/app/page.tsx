@@ -11,6 +11,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAudioReactionStore } from '@/store/audioReactionStore';
 import { usePowerUpStore } from '@/store/powerUpStore';
+import { useChallengeStore } from '@/store/challengeStore';
 import AsciiSword from '@/components/ascii/AsciiSword';
 import AudioControlPanel from '@/components/ui/AudioControlPanel';
 import SideButtons from '@/components/ui/SideButtons';
@@ -20,7 +21,6 @@ import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle } from 'react-icons/io'
 import { useShallow } from 'zustand/react/shallow';
 import WtfIsThisModal from '@/components/ui/WtfIsThisModal';
 import { HitIndicator } from '@/components/ui/HitIndicator';
-import { useChallenge } from '@/hooks/useChallenge';
 
 const HIGHLIGHT_COLORS = ['#F8E16C', '#FF3EC8', '#3EE6FF'] as const;
 
@@ -45,48 +45,73 @@ export default function HomePage() {
   // keep store import to preserve future usage patterns; currently no X-RAY / POWER modes
   usePowerUpStore(useShallow(() => ({})));
   const swordColorSafe = swordColor ?? '#00FCA6';
-  
-  // Challenge state
+
+  // Challenge state from shared store
   const {
-    isActive: isChallengeActive,
-    registerHit,
+    mode: challengeMode,
+    phase: challengePhase,
+    accuracy: challengeScore,
+    timeLeft,
+    hits: challengeHits,
     getUpcomingBeats,
-    score: challengeScore,
-    startChallenge,
-    stopChallenge,
-    progress: challengeProgress,
-    timeRemaining,
-  } = useChallenge();
-  
+    setMode,
+    setPhase,
+    resetChallenge,
+  } = useChallengeStore(
+    useShallow((s) => ({
+      mode: s.mode,
+      phase: s.phase,
+      accuracy: s.accuracy,
+      timeLeft: s.timeLeft,
+      hits: s.hits,
+      getUpcomingBeats: s.getUpcomingBeats,
+      setMode: s.setMode,
+      setPhase: s.setPhase,
+      resetChallenge: s.resetChallenge,
+    })),
+  );
+
+  const isChallengeActive = challengeMode === 'challenge' && challengePhase === 'active';
+  const challengeEnded = challengePhase === 'results';
+
   const [lastHitResult, setLastHitResult] = useState<{ hit: boolean; delta: number } | null>(null);
-  const [upcomingBeats, setUpcomingBeats] = useState<number[]>([]);
-  
+
+  // Auto-show UI when challenge starts
+  useEffect(() => {
+    if (isChallengeActive) {
+      setIsUIVisible(true);
+    }
+  }, [isChallengeActive]);
+
   // Update upcoming beats at 60fps when challenge is active
+  // Uses global variable instead of React state to avoid re-renders
   useEffect(() => {
     if (!isChallengeActive) {
-      setUpcomingBeats([]);
+      (window as any).upcomingBeats = [];
       return;
     }
-    
+
     let rafId: number;
     const updateBeats = () => {
-      setUpcomingBeats(getUpcomingBeats(2000));
+      const beats = getUpcomingBeats(2000);
+      (window as any).upcomingBeats = beats;
       rafId = requestAnimationFrame(updateBeats);
     };
     rafId = requestAnimationFrame(updateBeats);
-    
-    return () => cancelAnimationFrame(rafId);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      (window as any).upcomingBeats = [];
+    };
   }, [isChallengeActive, getUpcomingBeats]);
-  
-  // Handle hit from indicator
+
+  // Handle hit from indicator - sync with shared store
   const handleChallengeHit = useCallback(() => {
-    const result = registerHit();
-    if (result) {
-      setLastHitResult({ hit: result.hit, delta: result.delta });
-      // Clear after animation
-      setTimeout(() => setLastHitResult(null), 200);
-    }
-  }, [registerHit]);
+    // The actual hit handling is done by AudioControlPanel's global click handler
+    // This is just for visual feedback
+    setLastHitResult({ hit: true, delta: 0 });
+    setTimeout(() => setLastHitResult(null), 200);
+  }, []);
   
   // Für den Titel: Random Highlight
   const leaderboardTitle = 'L3ADERBOARD';
@@ -223,11 +248,18 @@ export default function HomePage() {
         {/* Hit Indicator - nur wenn Challenge aktiv */}
         {isClient && isChallengeActive && (
           <HitIndicator
-            upcomingBeats={upcomingBeats}
             isActive={isChallengeActive}
             onHit={handleChallengeHit}
             lastHitResult={lastHitResult}
           />
+        )}
+
+        {/* Challenge Mode Indicator - shows when challenge mode is active */}
+        {isClient && challengeMode === 'challenge' && !isChallengeActive && challengePhase !== 'idle' && (
+          <div className="fixed top-4 left-4 z-30 bg-black/80 border border-grifter-green rounded-lg px-3 py-2 backdrop-blur-sm">
+            <div className="text-xs font-mono text-grifter-green/60">CHALLENGE</div>
+            <div className="text-sm font-press-start-2p text-grifter-green">{challengePhase.toUpperCase()}</div>
+          </div>
         )}
         
         {/* AudioControlPanel: Desktop only. Mobile lives behind the gear overlay so the sword stays the hero. */}
@@ -282,13 +314,39 @@ export default function HomePage() {
             </div>
             <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
               <div className="text-xs font-mono text-grifter-green/60 mb-1">TIME</div>
-              <div className="text-lg font-mono text-grifter-green">{timeRemaining}s</div>
+              <div className="text-lg font-mono text-grifter-green">{timeLeft.toFixed(0)}s</div>
             </div>
+
             <button
-              onClick={stopChallenge}
+              onClick={() => {
+                setMode('music');
+                resetChallenge();
+              }}
               className="px-3 py-1 text-xs font-mono bg-black border border-grifter-pink text-grifter-pink rounded hover:bg-grifter-pink hover:text-black transition-colors"
             >
               STOP
+            </button>
+          </div>
+        )}
+
+        {/* Challenge Result - shown when challenge ended */}
+        {isClient && challengeEnded && (
+          <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
+            <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
+              <div className="text-xs font-mono text-grifter-green/60 mb-1">FINAL SCORE</div>
+              <div className="text-2xl font-press-start-2p text-grifter-green">{challengeScore.toFixed(0)}%</div>
+            </div>
+            <div className="bg-black/80 border border-grifter-green/50 rounded-lg px-4 py-1 backdrop-blur-sm">
+              <div className="text-[10px] font-mono text-grifter-green/40">HITS: {challengeHits.filter(h => h.hit).length}/{challengeHits.length}</div>
+            </div>
+            <button
+              onClick={() => {
+                setMode('challenge');
+                setPhase('idle');
+              }}
+              className="px-3 py-1 text-xs font-mono bg-black border border-grifter-green text-grifter-green rounded hover:bg-grifter-green hover:text-black transition-colors"
+            >
+              RETRY
             </button>
           </div>
         )}
@@ -299,7 +357,7 @@ export default function HomePage() {
           {/* Challenge Button */}
           {!isChallengeActive && (
             <button
-              onClick={startChallenge}
+              onClick={() => setMode('challenge')}
               className="w-[3.75rem] h-[3.75rem] flex items-center justify-center rounded-full bg-black border border-grifter-green"
               style={{
                 boxShadow: '0 0 16px rgba(0, 252, 166, 0.75)',

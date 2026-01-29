@@ -1,16 +1,14 @@
 /**
- * HitIndicator - Visual indicator for upcoming beats during challenge
- * 
- * Displays a vertical track on the right side with dots falling down
- * representing upcoming beats. Dots accelerate as they approach the hit zone.
+ * HitIndicator - Optimized visual indicator for upcoming beats
+ *
+ * Uses direct DOM manipulation via requestAnimationFrame for 60fps performance
+ * instead of React state updates which cause excessive re-renders.
  */
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 interface HitIndicatorProps {
-  /** Array of times until upcoming beats (in ms) */
-  upcomingBeats: number[];
   /** Lookahead window in ms */
   lookaheadMs?: number;
   /** Whether challenge is active */
@@ -28,57 +26,106 @@ const DOT_SIZE = 12;
 const GLOW_INTENSITY = 0.8;
 
 export function HitIndicator({
-  upcomingBeats,
   lookaheadMs = 2000,
   isActive,
   onHit,
   lastHitResult,
 }: HitIndicatorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [flashColor, setFlashColor] = useState<string | null>(null);
-  
+  const dotsRef = useRef<HTMLDivElement[]>([]);
+  const flashRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number>(0);
+  const lastTimeRef = useRef<number>(0);
+
   // Flash feedback on hit/miss
   useEffect(() => {
-    if (lastHitResult) {
+    if (lastHitResult && flashRef.current) {
       const color = lastHitResult.hit ? '#00FCA6' : '#FF3EC8';
-      setFlashColor(color);
-      const timer = setTimeout(() => setFlashColor(null), 150);
+      flashRef.current.style.background = `radial-gradient(ellipse at center, ${color}40 0%, transparent 70%)`;
+      flashRef.current.style.borderTop = `2px solid ${color}`;
+      flashRef.current.style.boxShadow = `0 0 20px ${color}80, inset 0 0 15px ${color}40`;
+
+      const timer = setTimeout(() => {
+        if (flashRef.current) {
+          flashRef.current.style.background = 'radial-gradient(ellipse at center, rgba(0, 252, 166, 0.2) 0%, transparent 70%)';
+          flashRef.current.style.borderTop = '2px solid rgba(0, 252, 166, 0.5)';
+          flashRef.current.style.boxShadow = '0 0 10px rgba(0, 252, 166, 0.3)';
+        }
+      }, 150);
       return () => clearTimeout(timer);
     }
   }, [lastHitResult]);
-  
+
   // Handle click/tap
   const handleClick = useCallback(() => {
     if (isActive && onHit) {
       onHit();
     }
   }, [isActive, onHit]);
-  
-  // Calculate dot position based on time until beat
-  const getDotPosition = (timeUntil: number): number => {
-    // Easing: dots accelerate as they approach
-    const progress = 1 - (timeUntil / lookaheadMs);
-    // Quadratic easing for acceleration effect
-    const easedProgress = progress * progress;
-    return easedProgress * (TRACK_HEIGHT - HIT_ZONE_HEIGHT);
-  };
-  
-  // Get dot opacity based on position
-  const getDotOpacity = (timeUntil: number): number => {
-    const progress = 1 - (timeUntil / lookaheadMs);
-    // Fade in as dots approach
-    return 0.3 + (progress * 0.7);
-  };
-  
-  // Get dot scale based on position
-  const getDotScale = (timeUntil: number): number => {
-    const progress = 1 - (timeUntil / lookaheadMs);
-    // Grow slightly as dots approach
-    return 0.7 + (progress * 0.3);
-  };
-  
+
+  // Animation loop - uses direct DOM manipulation for performance
+  useEffect(() => {
+    if (!isActive || !containerRef.current) {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
+      return;
+    }
+
+    const animate = (timestamp: number) => {
+      // Throttle to ~60fps
+      if (timestamp - lastTimeRef.current < 16) {
+        rafRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      lastTimeRef.current = timestamp;
+
+      // Get upcoming beats from global store via custom event
+      const event = new CustomEvent('getUpcomingBeats');
+      const result = window.dispatchEvent(event);
+      // The result is set via a global variable for performance
+      const upcomingBeats = (window as any).upcomingBeats || [];
+
+      // Update dot positions directly
+      dotsRef.current.forEach((dot, index) => {
+        if (index < upcomingBeats.length) {
+          const timeUntil = upcomingBeats[index];
+          const progress = 1 - (timeUntil / lookaheadMs);
+          const easedProgress = progress * progress;
+          const position = easedProgress * (TRACK_HEIGHT - HIT_ZONE_HEIGHT);
+          const opacity = 0.3 + (progress * 0.7);
+          const scale = 0.7 + (progress * 0.3);
+
+          dot.style.display = 'block';
+          dot.style.transform = `translateX(-50%) scale(${scale})`;
+          dot.style.top = `${position}px`;
+          dot.style.opacity = String(opacity);
+          dot.style.boxShadow = `0 0 ${8 * scale}px rgba(0, 252, 166, ${GLOW_INTENSITY * opacity})`;
+        } else {
+          dot.style.display = 'none';
+        }
+      });
+
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
+    };
+  }, [isActive, lookaheadMs]);
+
+  // Pre-create dots (max 10 for performance)
+  const maxDots = 10;
+  const dots = Array.from({ length: maxDots }, (_, i) => i);
+
   if (!isActive) return null;
-  
+
   return (
     <div
       ref={containerRef}
@@ -97,56 +144,46 @@ export function HitIndicator({
           border: '1px solid rgba(0, 252, 166, 0.2)',
         }}
       />
-      
+
       {/* Hit zone at bottom */}
       <div
+        ref={flashRef}
         className="absolute bottom-0 left-0 right-0 rounded-b-full transition-all duration-100"
         style={{
           height: HIT_ZONE_HEIGHT,
-          background: flashColor 
-            ? `radial-gradient(ellipse at center, ${flashColor}40 0%, transparent 70%)`
-            : 'radial-gradient(ellipse at center, rgba(0, 252, 166, 0.2) 0%, transparent 70%)',
-          borderTop: `2px solid ${flashColor || 'rgba(0, 252, 166, 0.5)'}`,
-          boxShadow: flashColor 
-            ? `0 0 20px ${flashColor}80, inset 0 0 15px ${flashColor}40`
-            : '0 0 10px rgba(0, 252, 166, 0.3)',
+          background: 'radial-gradient(ellipse at center, rgba(0, 252, 166, 0.2) 0%, transparent 70%)',
+          borderTop: '2px solid rgba(0, 252, 166, 0.5)',
+          boxShadow: '0 0 10px rgba(0, 252, 166, 0.3)',
         }}
       >
         {/* Hit zone label */}
-        <div 
+        <div
           className="absolute inset-0 flex items-center justify-center text-xs font-mono"
-          style={{ 
-            color: flashColor || 'rgba(0, 252, 166, 0.6)',
-            textShadow: flashColor ? `0 0 8px ${flashColor}` : 'none',
+          style={{
+            color: 'rgba(0, 252, 166, 0.6)',
           }}
         >
           HIT
         </div>
       </div>
-      
-      {/* Falling dots */}
-      {upcomingBeats.map((timeUntil, index) => {
-        const position = getDotPosition(timeUntil);
-        const opacity = getDotOpacity(timeUntil);
-        const scale = getDotScale(timeUntil);
-        
-        return (
-          <div
-            key={`beat-${index}-${timeUntil}`}
-            className="absolute left-1/2 -translate-x-1/2 rounded-full"
-            style={{
-              width: DOT_SIZE * scale,
-              height: DOT_SIZE * scale,
-              top: position,
-              opacity,
-              background: 'radial-gradient(circle, #00FCA6 0%, #00FCA6 100%)',
-              boxShadow: `0 0 ${8 * scale}px rgba(0, 252, 166, ${GLOW_INTENSITY * opacity})`,
-              transition: 'none', // No transition for smooth animation
-            }}
-          />
-        );
-      })}
-      
+
+      {/* Pre-rendered dots (hidden by default) */}
+      {dots.map((_, index) => (
+        <div
+          key={`dot-${index}`}
+          ref={(el) => {
+            if (el) dotsRef.current[index] = el;
+          }}
+          className="absolute left-1/2 -translate-x-1/2 rounded-full"
+          style={{
+            display: 'none',
+            width: DOT_SIZE,
+            height: DOT_SIZE,
+            background: 'radial-gradient(circle, #00FCA6 0%, #00FCA6 100%)',
+          }}
+        />
+      ))}
+
       {/* Center line guide */}
       <div
         className="absolute left-1/2 -translate-x-1/2 w-px"
@@ -156,9 +193,9 @@ export function HitIndicator({
           background: 'linear-gradient(180deg, transparent 0%, rgba(0, 252, 166, 0.3) 100%)',
         }}
       />
-      
+
       {/* Tap hint */}
-      <div 
+      <div
         className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs font-mono whitespace-nowrap"
         style={{ color: 'rgba(0, 252, 166, 0.4)' }}
       >
