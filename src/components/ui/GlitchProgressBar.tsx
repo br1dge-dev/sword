@@ -3,10 +3,11 @@
 /**
  * GlitchProgressBar Component - Progress bar only, no buttons
  *
- * Displays glitch progress with level indicator.
+ * Displays glitch progress with level indicator from contract data.
  */
 import React from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
+import { useSwordEvolution } from '@/hooks/useSwordEvolution';
 
 interface GlitchProgressBarProps {
   className?: string;
@@ -14,13 +15,18 @@ interface GlitchProgressBarProps {
 
 export default function GlitchProgressBar({ className = '' }: GlitchProgressBarProps) {
   const {
-    glitchProgress,
+    glitchProgress: localProgress,
     isGlitchComplete,
-    glitchLevel,
-    maxGlitchLevel
+    glitchLevel: localLevel,
+    maxGlitchLevel: maxLevel
   } = usePowerUpStore();
 
-  const isMaxLevel = glitchLevel >= maxGlitchLevel;
+  const { calculatedLevels, isLoading } = useSwordEvolution();
+
+  // Use contract data if available, fallback to local
+  const level = calculatedLevels?.glitch.level ?? localLevel;
+  const progress = calculatedLevels?.glitch.progress ?? localProgress;
+  const isMaxLevel = level >= maxLevel;
 
   // Calculate tile colors based on progress
   const getTileColor = (index: number, totalTiles: number) => {
@@ -28,11 +34,11 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
 
     if (isMaxLevel) {
       return 'bg-pink-500';
-    } else if (tileProgress > glitchProgress) {
+    } else if (tileProgress > progress) {
       return 'bg-gray-800';
-    } else if (glitchProgress < 50) {
+    } else if (progress < 50) {
       return 'bg-pink-300';
-    } else if (glitchProgress < 90) {
+    } else if (progress < 90) {
       return 'bg-pink-400';
     } else {
       return 'bg-pink-500';
@@ -46,15 +52,15 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
 
     for (let i = 0; i < totalTiles; i++) {
       const tileProgress = (i + 1) / totalTiles * 100;
-      const isActive = isMaxLevel || tileProgress <= glitchProgress;
+      const isActive = isMaxLevel || tileProgress <= progress;
 
       tiles.push(
         <div
           key={i}
           className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
           style={{
-            boxShadow: isActive && (isMaxLevel || glitchProgress >= 90) ? 'inset 0 0 3px rgba(255,0,255,0.8)' :
-                      isActive && glitchProgress >= 50 ? 'inset 0 0 2px rgba(255,0,255,0.5)' :
+            boxShadow: isActive && (isMaxLevel || progress >= 90) ? 'inset 0 0 3px rgba(255,0,255,0.8)' :
+                      isActive && progress >= 50 ? 'inset 0 0 2px rgba(255,0,255,0.5)' :
                       'none'
           }}
         />
@@ -75,7 +81,7 @@ export default function GlitchProgressBar({ className = '' }: GlitchProgressBarP
             letterSpacing: '0.05em'
           }}
         >
-          GLITCH - LVL {glitchLevel}
+          GLITCH - LVL {level}{isLoading && '...'}
         </div>
 
         <div className="flex items-center gap-2">
