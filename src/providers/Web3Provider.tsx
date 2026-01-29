@@ -10,10 +10,7 @@ import { createConfig, http, WagmiProvider } from 'wagmi';
 import { baseSepolia, base } from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
-import { injected, walletConnect } from 'wagmi/connectors';
-
-// Project ID from https://cloud.walletconnect.com
-const WALLET_CONNECT_PROJECT_ID = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || '';
+import { injected } from 'wagmi/connectors';
 
 // Create wagmi config with chains and connectors
 const config = createConfig({
@@ -24,10 +21,6 @@ const config = createConfig({
   },
   connectors: [
     injected(),
-    walletConnect({
-      projectId: WALLET_CONNECT_PROJECT_ID,
-      showQrModal: true,
-    }),
   ],
 });
 
