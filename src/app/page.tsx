@@ -55,6 +55,7 @@ export default function HomePage() {
     accuracy: challengeScore,
     timeLeft,
     hits: challengeHits,
+    hitMap,
     getUpcomingBeats,
     setMode,
     setPhase,
@@ -66,6 +67,7 @@ export default function HomePage() {
       accuracy: s.accuracy,
       timeLeft: s.timeLeft,
       hits: s.hits,
+      hitMap: s.hitMap,
       getUpcomingBeats: s.getUpcomingBeats,
       setMode: s.setMode,
       setPhase: s.setPhase,
@@ -256,6 +258,13 @@ export default function HomePage() {
           />
         )}
 
+        {/* Wallet Connect Button - top right */}
+        {isClient && (
+          <div className="fixed top-4 right-4 z-20">
+            <WalletConnectButton />
+          </div>
+        )}
+
         {/* Challenge Mode Indicator - shows when challenge mode is active */}
         {isClient && challengeMode === 'challenge' && !isChallengeActive && challengePhase !== 'idle' && (
           <div className="fixed top-4 left-4 z-30 bg-black/80 border border-grifter-green rounded-lg px-3 py-2 backdrop-blur-sm">
@@ -325,7 +334,9 @@ export default function HomePage() {
               <div className="text-xs font-mono text-grifter-green/60 mb-1">TIME</div>
               <div className="text-lg font-mono text-grifter-green">{timeLeft.toFixed(0)}s</div>
             </div>
-
+            <div className="bg-black/80 border border-grifter-green/50 rounded-lg px-4 py-1 backdrop-blur-sm">
+              <div className="text-[10px] font-mono text-grifter-green/40">BEATS: {hitMap?.fullHitMap.length || 0}</div>
+            </div>
             <button
               onClick={() => {
                 setMode('music');
@@ -335,6 +346,35 @@ export default function HomePage() {
             >
               STOP
             </button>
+          </div>
+        )}
+
+        {/* Challenge Result - shown when challenge ended */}
+        {isClient && challengeEnded && (
+          <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
+            <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
+              <div className="text-xs font-mono text-grifter-green/60 mb-1">FINAL SCORE</div>
+              <div className="text-2xl font-press-start-2p text-grifter-green">{challengeScore.toFixed(0)}%</div>
+            </div>
+            <div className="bg-black/80 border border-grifter-green/50 rounded-lg px-4 py-1 backdrop-blur-sm">
+              <div className="text-[10px] font-mono text-grifter-green/40">HITS: {challengeHits.filter(h => h.hit).length}/{challengeHits.length}</div>
+            </div>
+            <button
+              onClick={() => {
+                setMode('challenge');
+                setPhase('idle');
+              }}
+              className="px-3 py-1 text-xs font-mono bg-black border border-grifter-green text-grifter-green rounded hover:bg-grifter-green hover:text-black transition-colors"
+            >
+              RETRY
+            </button>
+          </div>
+        )}
+
+        {/* Wallet Connect Button - top right, above challenge UI */}
+        {isClient && (
+          <div className="fixed top-4 right-4 z-20">
+            <WalletConnectButton />
           </div>
         )}
 

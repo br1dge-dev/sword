@@ -1,64 +1,48 @@
 /**
- * WalletConnectButton - Simple Connect/Disconnect wallet button
+ * WalletConnectButton - Minimal wallet button
  *
- * Uses wagmi's useAccount and useConnect hooks.
+ * Shows shortened address, hover to disconnect.
  */
 'use client';
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { injected } from 'wagmi/connectors';
 
-interface WalletConnectButtonProps {
-  className?: string;
-}
-
-export function WalletConnectButton({ className = '' }: WalletConnectButtonProps) {
+export function WalletConnectButton() {
   const { address, isConnected, chainId } = useAccount();
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
 
-  const handleConnect = useCallback(async () => {
-    // Try injected connector first (MetaMask, Coinbase Wallet, etc.)
-    connect({ connector: injected() });
-  }, [connect]);
+  const handleClick = useCallback(async () => {
+    if (isConnected) {
+      disconnect();
+    } else {
+      connect({ connector: injected() });
+    }
+  }, [isConnected, connect, disconnect]);
 
-  // Format address for display
-  const formatAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  };
-
-  // Get chain name
-  const getChainName = (id: number) => {
-    if (id === 84532) return 'Base Sepolia';
-    if (id === 8453) return 'Base';
-    return `Chain ${id}`;
-  };
+  const formatAddress = (addr: string) => `${addr.slice(0, 4)}...${addr.slice(-2)}`;
 
   if (isConnected && address) {
     return (
-      <div className={`flex items-center gap-2 ${className}`}>
-        <div className="px-3 py-2 bg-black/80 border border-grifter-green rounded-lg">
-          <div className="text-xs font-mono text-grifter-green/60">CONNECTED</div>
-          <div className="text-sm font-mono text-grifter-green">{formatAddress(address)}</div>
-          <div className="text-[10px] font-mono text-grifter-green/40">{getChainName(chainId || 0)}</div>
-        </div>
-        <button
-          onClick={() => disconnect()}
-          className="px-3 py-2 text-xs font-press-start-2p bg-black border border-grifter-pink text-grifter-pink rounded hover:bg-grifter-pink hover:text-black transition-colors"
-        >
-          DISCONNECT
-        </button>
-      </div>
+      <button
+        onClick={handleClick}
+        className="group relative px-3 py-1.5 text-xs font-mono bg-black/60 border border-grifter-green/40 rounded hover:border-grifter-pink transition-all"
+      >
+        <span className="text-grifter-green group-hover:text-grifter-pink transition-colors">
+          {formatAddress(address)}
+        </span>
+      </button>
     );
   }
 
   return (
     <button
-      onClick={handleConnect}
-      className={`px-4 py-2 text-xs font-press-start-2p bg-black border border-grifter-blue text-grifter-blue rounded hover:bg-grifter-blue hover:text-black transition-colors ${className}`}
+      onClick={handleClick}
+      className="px-3 py-1.5 text-xs font-mono bg-black/60 border border-grifter-blue/40 rounded hover:border-grifter-blue transition-all"
     >
-      CONNECT WALLET
+      <span className="text-grifter-blue">CONNECT</span>
     </button>
   );
 }

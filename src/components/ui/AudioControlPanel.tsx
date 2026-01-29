@@ -925,32 +925,80 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 function ClaimButton({ score, startOffsetMs }: { score: number; startOffsetMs: number }) {
   const { address, isConnected } = useAccount();
   const { writeContract, isPending, isError, error } = useWriteContract();
+  const [claimStatus, setClaimStatus] = useState<'idle' | 'signing' | 'submitting' | 'success' | 'error'>('idle');
 
   const handleClaim = useCallback(async () => {
     if (!isConnected) {
-      alert('Please connect your wallet first!\n\nClick "CONNECT WALLET" in the top-left corner.');
+      alert('Please connect your wallet first!');
       return;
     }
 
     if (!address) return;
 
-    console.log('[Claim] Would claim for score:', score);
+    setClaimStatus('signing');
 
-    // For demo purposes, show a message
-    // In production, this would call the contract with a server-signed signature
-    alert('Claim functionality requires server-side signature generation.\n\nFor demo, score saved locally!');
-  }, [isConnected, address, score]);
+    try {
+      // 1. Get signature from server
+      const response = await fetch('/api/sign-challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: address,
+          score,
+          startOffsetMs,
+          hitmap: [], // TODO: Pass actual hitmap
+          userClicks: [], // TODO: Pass actual user clicks
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Signature failed');
+      }
+
+      setClaimStatus('submitting');
+
+      // 2. Submit transaction to contract
+      await writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: SWORD_EVOLUTION_ABI,
+        functionName: 'claimWithSignature',
+        args: [
+          BigInt(score),
+          BigInt(startOffsetMs),
+          BigInt(data.deadline),
+          BigInt(data.v),
+          data.r,
+          data.s,
+        ] as any,
+      });
+
+      setClaimStatus('success');
+    } catch (err) {
+      console.error('[Claim] Error:', err);
+      setClaimStatus('error');
+    }
+  }, [isConnected, address, score, startOffsetMs, writeContract]);
+
+  if (claimStatus === 'success') {
+    return (
+      <div className="px-6 py-3 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded bg-grifter-green/20">
+        CLAIMED!
+      </div>
+    );
+  }
 
   return (
     <button
       onClick={handleClaim}
-      disabled={!isConnected || isPending}
+      disabled={!isConnected || isPending || claimStatus === 'signing' || claimStatus === 'submitting'}
       className="px-6 py-3 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded transition-all hover:bg-grifter-green hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
       style={{
         boxShadow: '0 0 10px rgba(0, 252, 166, 0.3)',
       }}
     >
-      {isPending ? 'SIGNING...' : 'CLAIM REWARD'}
+      {claimStatus === 'signing' ? 'VERIFYING...' : claimStatus === 'submitting' ? 'SUBMITTING...' : 'CLAIM REWARD'}
     </button>
   );
 } 
