@@ -5,9 +5,9 @@
  *
  * Displays charge progress with level indicator from contract data.
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
-import { useSwordEvolution } from '@/hooks/useSwordEvolution';
+import { useSwordEvolutionV2 } from '@/hooks/useSwordEvolutionV2';
 
 interface ChargeProgressBarProps {
   className?: string;
@@ -21,12 +21,49 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
     maxChargeLevel: maxLevel
   } = usePowerUpStore();
 
-  const { calculatedLevels, isLoading } = useSwordEvolution();
+  const { aspectLevels, isLoading } = useSwordEvolutionV2();
+  const prevProgressRef = useRef<number>(0);
+  const [animatingTiles, setAnimatingTiles] = React.useState<Set<number>>(new Set());
 
   // Use contract data if available, fallback to local
-  const level = calculatedLevels?.charge.level ?? localLevel;
-  const progress = calculatedLevels?.charge.progress ?? localProgress;
+  const level = aspectLevels?.charge.level ?? localLevel;
+  const progress = aspectLevels?.charge.progress ?? localProgress;
   const isMaxLevel = level >= maxLevel;
+
+  // Detect progress changes and trigger animation
+  useEffect(() => {
+    if (progress > prevProgressRef.current) {
+      const prevValue = prevProgressRef.current;
+      const newValue = progress;
+      
+      // Find which tiles are newly activated
+      const totalTiles = 10;
+      const newlyActiveTiles = new Set<number>();
+      
+      for (let i = 0; i < totalTiles; i++) {
+        const tileProgress = (i + 1) / totalTiles * 100;
+        const wasActive = tileProgress <= prevValue;
+        const isNowActive = tileProgress <= newValue;
+        
+        if (!wasActive && isNowActive) {
+          newlyActiveTiles.add(i);
+        }
+      }
+      
+      if (newlyActiveTiles.size > 0) {
+        setAnimatingTiles(new Set(newlyActiveTiles));
+        
+        // Clear animation after 1.5 seconds
+        const timeout = setTimeout(() => {
+          setAnimatingTiles(new Set());
+        }, 1500);
+        
+        return () => clearTimeout(timeout);
+      }
+    }
+    
+    prevProgressRef.current = progress;
+  }, [progress]);
 
   // Calculate tile colors based on progress
   const getTileColor = (index: number, totalTiles: number) => {
@@ -53,15 +90,17 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
     for (let i = 0; i < totalTiles; i++) {
       const tileProgress = (i + 1) / totalTiles * 100;
       const isActive = isMaxLevel || tileProgress <= progress;
+      const isAnimating = animatingTiles.has(i);
 
       tiles.push(
         <div
           key={i}
-          className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0`}
+          className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0 transition-all duration-300 ${isAnimating ? 'animate-pulse' : ''}`}
           style={{
             boxShadow: isActive && (isMaxLevel || progress >= 90) ? 'inset 0 0 3px rgba(255,255,0,0.8)' :
                       isActive && progress >= 50 ? 'inset 0 0 2px rgba(255,255,0,0.5)' :
-                      'none'
+                      'none',
+            filter: isAnimating ? 'brightness(1.5)' : 'none',
           }}
         />
       );
