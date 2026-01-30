@@ -42,13 +42,9 @@ contract AddTracksScript is Script {
         
         // Check if we should add all tracks or just GR1FTSWORD
         bool addAllTracks = false;
-        try {
-            string memory addAll = vm.envString("ADD_ALL_TRACKS");
-            if (keccak256(bytes(addAll)) == keccak256(bytes("true"))) {
-                addAllTracks = true;
-            }
-        } catch {
-            // Default: false (only GR1FTSWORD)
+        string memory addAll = vm.envOr("ADD_ALL_TRACKS", string("false"));
+        if (keccak256(bytes(addAll)) == keccak256(bytes("true"))) {
+            addAllTracks = true;
         }
         
         console.log("============================================");

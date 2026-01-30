@@ -1,0 +1,8 @@
+Compiling 1 files with Solc 0.8.33
+Solc 0.8.33 finished in 184.18ms
+Error: Compiler run failed:
+Error (6933): Expected primary expression.
+  --> script/AddTracks.s.sol:45:13:
+   |
+45 |         try {
+   |             ^
