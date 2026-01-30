@@ -179,7 +179,7 @@ export function HitIndicator({
         </div>
       </div>
 
-      {/* Pre-rendered dots (hidden by default) - centered with exact positioning */}
+      {/* Pre-rendered dots (hidden by default) - centered with transform */}
       {dots.map((_, index) => (
         <div
           key={`dot-${index}`}
@@ -193,7 +193,7 @@ export function HitIndicator({
             height: DOT_SIZE,
             background: 'radial-gradient(circle, #00FCA6 0%, #00FCA6 100%)',
             left: '50%',
-            marginLeft: -DOT_SIZE / 2, // Exact centering
+            transform: 'translateX(-50%)',
           }}
         />
       ))}

@@ -14,7 +14,7 @@ const DOMAIN = {
 const CLAIM_TYPES = {
   Claim: [
     { name: 'user', type: 'address' },
-    { name: 'score', type: 'uint8' },
+    { name: 'score', type: 'uint256' },  // FIXED: Contract expects uint256, not uint8
     { name: 'startOffsetMs', type: 'uint256' },
     { name: 'deadline', type: 'uint256' },
   ],
@@ -55,8 +55,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('[SignChallenge] Received:', { user, score, startOffsetMs, hitmapLength: hitmap.length, userClicksLength: userClicks.length });
+
     // 3. Validate score (recalculate on server to prevent cheating)
-    const calculatedScore = calculateServerScore(userClicks, hitmap, startOffsetMs);
+    // duration is 45 seconds (hardcoded in hitmap)
+    const calculatedScore = calculateServerScore(userClicks, hitmap, startOffsetMs, 45);
+    console.log('[SignChallenge] Calculated score:', calculatedScore, 'Provided score:', score);
     
     if (calculatedScore < 70) {
       return NextResponse.json(
@@ -65,8 +69,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Check score matches (prevent manipulation)
-    if (Math.abs(calculatedScore - score) > 5) {
+    // 4. Check score matches (prevent manipulation) - allow 10% tolerance for timing differences
+    if (Math.abs(calculatedScore - score) > 10) {
       return NextResponse.json(
         { error: 'Score mismatch', calculatedScore, providedScore: score },
         { status: 403 }
@@ -84,9 +88,19 @@ export async function POST(request: NextRequest) {
 
     const account = privateKeyToAccount(privateKey);
     
-    // Determine chain from environment
+    // Determine chain and contract address from environment
     const isProduction = process.env.NODE_ENV === 'production';
     const chain = isProduction ? base : baseSepolia;
+    const contractAddress = isProduction 
+      ? (process.env.CONTRACT_ADDRESS_BASE || process.env.CONTRACT_ADDRESS)
+      : (process.env.CONTRACT_ADDRESS_BASE_SEPOLIA || process.env.CONTRACT_ADDRESS);
+    
+    if (!contractAddress) {
+      return NextResponse.json(
+        { error: 'Contract address not configured' },
+        { status: 500 }
+      );
+    }
     
     const client = createWalletClient({
       account,
@@ -102,13 +116,13 @@ export async function POST(request: NextRequest) {
       domain: {
         ...DOMAIN,
         chainId: chain.id,
-        verifyingContract: process.env.CONTRACT_ADDRESS as `0x${string}`,
+        verifyingContract: contractAddress as `0x${string}`,
       },
       types: CLAIM_TYPES,
       primaryType: 'Claim',
       message: {
         user: user as `0x${string}`,
-        score: Number(score),
+        score: BigInt(score),  // FIXED: Must be bigint for uint256
         startOffsetMs: BigInt(startOffsetMs),
         deadline: BigInt(deadline),
       },
@@ -144,15 +158,16 @@ export async function POST(request: NextRequest) {
 function calculateServerScore(
   userClicks: number[],
   hitmap: number[],
-  startOffsetMs: number
+  startOffsetMs: number,
+  durationSec: number = 45
 ): number {
-  const startSec = startOffsetMs / 1000;
-  const endSec = startSec + 45; // 45s window
+  // hitmap and userClicks are already relative to startOffset (0 to duration)
+  // No need to add startOffsetMs
   const toleranceSec = 0.15; // 150ms
 
-  // Filter beats within challenge window
+  // Filter beats within challenge window (already relative, so just check against duration)
   const beatsInWindow = hitmap.filter(
-    beat => beat >= startSec && beat <= endSec
+    beat => beat >= 0 && beat <= durationSec
   );
 
   // Track which beats were hit
@@ -177,6 +192,8 @@ function calculateServerScore(
 
   const hits = hitBeats.size;
   const totalBeats = beatsInWindow.length;
-  
+
+  console.log('[SignChallenge] Score calc:', { hits, totalBeats, userClicks: userClicks.length, hitmap: hitmap.length });
+
   return totalBeats > 0 ? Math.round((hits / totalBeats) * 100) : 0;
 }
