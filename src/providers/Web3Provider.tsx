@@ -1,8 +1,5 @@
 /**
- * Web3Provider - wagmi setup for contract interaction
- *
- * Provides wallet connection and contract read/write capabilities.
- * Uses Base Sepolia for testnet, Base for production.
+ * Web3Provider - Client-only wagmi setup
  */
 'use client';
 
@@ -12,29 +9,30 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { injected } from 'wagmi/connectors';
 
-// Create wagmi config with chains and connectors
 const config = createConfig({
-  chains: [base, baseSepolia],
+  chains: [baseSepolia, base],
   transports: {
-    [base.id]: http(),
     [baseSepolia.id]: http(),
+    [base.id]: http(),
   },
   connectors: [
-    injected(),
+    injected({ target: 'metaMask' }),
   ],
+  ssr: false,
 });
 
 interface Web3ProviderProps {
   children: ReactNode;
 }
 
+// Named export for direct import
 export function Web3Provider({ children }: Web3ProviderProps) {
-  // Create query client once per component instance
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 60_000, // 1 minute
+        staleTime: 60_000,
         refetchOnWindowFocus: false,
+        retry: false,
       },
     },
   }));
@@ -47,5 +45,8 @@ export function Web3Provider({ children }: Web3ProviderProps) {
     </WagmiProvider>
   );
 }
+
+// Default export for dynamic import
+export default Web3Provider;
 
 export { config };

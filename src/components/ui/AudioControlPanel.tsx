@@ -1,33 +1,13 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useAudioAnalyzer, globalAnalyzer } from '../../hooks/useAudioAnalyzer';
 import { useAudioReactionStore } from '../../store/audioReactionStore';
 import { useChallengeStore } from '../../store/challengeStore';
+import { useSwordEvolution } from '../../hooks/useSwordEvolution';
 import { useShallow } from 'zustand/react/shallow';
 import type { HitMapData } from '@/store/challengeStore';
-
-// Contract address from environment
-const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_BASE_SEPOLIA || process.env.CONTRACT_ADDRESS_BASE_SEPOLIA) as `0x${string}` || '0x';
-
-// Minimal ABI for claimWithSignature
-const SWORD_EVOLUTION_ABI = [
-  {
-    inputs: [
-      { name: 'score', type: 'uint8' },
-      { name: 'startOffsetMs', type: 'uint256' },
-      { name: 'deadline', type: 'uint256' },
-      { name: 'v', type: 'uint8' },
-      { name: 'r', type: 'bytes32' },
-      { name: 's', type: 'bytes32' },
-    ],
-    name: 'claimWithSignature',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-] as const;
+import { ClaimRewardButton } from './ClaimRewardButton';
 
 interface AudioControlPanelProps {
   className?: string;
@@ -74,7 +54,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const [lastEnergy, setLastEnergy] = useState(0);
   
   // Challenge Mode State - use shared store
-  const { mode, setMode, phase, setPhase, hits: sharedHits, combo: sharedCombo, accuracy: sharedAccuracy, timeLeft: sharedTimeLeft, addHit, resetChallenge, setTimeLeft: setSharedTimeLeft } = useChallengeStore(
+  const { mode, setMode, phase, setPhase, hits: sharedHits, combo: sharedCombo, accuracy: sharedAccuracy, timeLeft: sharedTimeLeft, addHit, addUserClick, resetChallenge, setTimeLeft: setSharedTimeLeft } = useChallengeStore(
     useShallow((s) => ({
       mode: s.mode,
       setMode: s.setMode,
@@ -85,6 +65,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       accuracy: s.accuracy,
       timeLeft: s.timeLeft,
       addHit: s.addHit,
+      addUserClick: s.addUserClick,
       resetChallenge: s.resetChallenge,
       setTimeLeft: s.setTimeLeft,
     })),
@@ -103,6 +84,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const missClicks = sharedHits.filter(h => !h.hit).length;
   
   const initializationAttemptedRef = useRef<boolean>(false);
+
   // ENTFERNT: Logging-Variablen (lastLogTimeRef, logThrottleInterval)
 
   // DEAKTIVIERT: Logging-Funktion
@@ -130,6 +112,10 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   );
 
   
+  // Use SwordEvolution hook for claim status
+  const { userState, globalState } = useSwordEvolution();
+  const [hasClaimedSuccessfully, setHasClaimedSuccessfully] = useState(false);
+
   // Audio-Analyzer Hook
   const {
     initialize,
@@ -217,6 +203,31 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         .catch(err => console.error('Failed to load hitmap:', err));
     }
   }, [mode, hitMap]);
+
+  // Get wallet address from window.ethereum
+  const getWalletAddress = useCallback(async () => {
+    if (window.ethereum) {
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      return accounts.length > 0 ? accounts[0] : null;
+    }
+    return null;
+  }, []);
+
+  // Track wallet changes
+  useEffect(() => {
+    const handleAccountsChanged = () => {
+      setHasClaimedSuccessfully(false);
+    };
+    window.ethereum?.on('accountsChanged', handleAccountsChanged);
+    return () => {
+      window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
+    };
+  }, []);
+
+  // Handle challenge button click
+  const handleChallengeClick = useCallback(async () => {
+    setMode('challenge');
+  }, [setMode]);
 
   // Reset challenge state when switching modes
   useEffect(() => {
@@ -362,9 +373,11 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     }
   }, [phase]);
   
-  // Calculate challenge stats - accuracy based on total attempts (hits + misses)
-  const totalAttempts = successfulHits + missClicks + missedBeats;
-  const accuracy = totalAttempts > 0 ? (successfulHits / totalAttempts) * 100 : 100;
+  // Calculate challenge stats - accuracy based on beats hit (same as server)
+  // Count unique beats that were hit (within tolerance)
+  const hitBeatIndices = new Set(sharedHits.filter(h => h.hit).map(h => h.beatIndex));
+  const uniqueHits = hitBeatIndices.size;
+  const accuracy = maxPossibleHits > 0 ? (uniqueHits / maxPossibleHits) * 100 : 100;
   const passed = accuracy >= 70;
 
   // Expose challenge click handler for fullscreen click area
@@ -392,6 +405,9 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
       const isHit = closestDelta <= tolerance;
 
+      // Add user click to shared store (for claim validation)
+      addUserClick(currentTime);
+
       // Add hit to shared store
       addHit({
         timestamp: currentTime,
@@ -410,7 +426,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
     window.addEventListener('click', handleGlobalClick);
     return () => window.removeEventListener('click', handleGlobalClick);
-  }, [isChallengeActive, hitMap, sharedCombo, addRipple, triggerBeat, updateEnergy]);
+  }, [isChallengeActive, hitMap, sharedCombo, addUserClick, addRipple, triggerBeat, updateEnergy]);
   
   // Nächsten Track (stabil, damit Event-Handler sauber sind)
   const nextTrack = useCallback(async (autoplay = false) => {
@@ -635,7 +651,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
           MUSIC
         </button>
         <button
-          onClick={() => setMode('challenge')}
+          onClick={handleChallengeClick}
           className={`px-3 py-2 text-[10px] font-press-start-2p border-2 border-l-0 rounded-r transition-all whitespace-nowrap ${
             mode === 'challenge' 
               ? 'bg-[#00FCA6] text-black border-[#00FCA6]' 
@@ -784,18 +800,22 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       {/* CHALLENGE MODE */}
       {mode === 'challenge' && (
         <div className="w-full flex flex-col items-center">
-            {/* Idle: Show START button */}
+            {/* Idle: Show START button (disabled if already claimed) */}
           {phase === 'idle' && (
             <button
-              onClick={handleChallengeStart}
-              className="px-6 py-3 font-press-start-2p text-xs rounded hover:opacity-90 transition-opacity"
+              onClick={userState?.canClaimToday === false ? undefined : handleChallengeStart}
+              disabled={userState?.canClaimToday === false}
+              className="px-6 py-3 font-press-start-2p text-xs rounded transition-opacity"
               style={{ 
-                backgroundColor: '#00FCA6',
-                color: '#000000',
-                boxShadow: '0 0 20px rgba(0,252,166,0.5)' 
+                backgroundColor: userState?.canClaimToday === false ? '#1a1a1a' : '#00FCA6',
+                color: userState?.canClaimToday === false ? '#666666' : '#000000',
+                boxShadow: userState?.canClaimToday === false ? 'none' : '0 0 20px rgba(0,252,166,0.5)',
+                cursor: userState?.canClaimToday === false ? 'not-allowed' : 'pointer',
+                opacity: userState?.canClaimToday === false ? 0.6 : 1,
               }}
+              title={userState?.canClaimToday === false ? 'You already claimed today! Come back tomorrow.' : ''}
             >
-              START
+              {userState?.canClaimToday === false ? 'ALREADY CLAIMED' : 'START'}
             </button>
           )}
           
@@ -873,26 +893,33 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
               </div>
 
               {/* Claim button for passed challenges */}
-              {passed && (
-                <ClaimButton
-                  score={Math.round(sharedAccuracy)}
-                  startOffsetMs={0}
-                />
+              {passed && !hasClaimedSuccessfully && (
+                <ClaimRewardButton onSuccess={() => setHasClaimedSuccessfully(true)} />
               )}
 
-              <button
-                onClick={() => {
-                  setPhase('idle');
-                  resetChallenge();
-                  setMissedBeats(0);
-                  lastCheckedBeatRef.current = -1;
-                  clearRipples();
-                  isPlayingChallengeRef.current = false;
-                }}
-                className="px-4 py-2 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded transition-all hover:bg-grifter-blue hover:text-black"
-              >
-                RETRY
-              </button>
+              {/* Show success message if claimed */}
+              {passed && hasClaimedSuccessfully && (
+                <div className="px-4 py-2 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded bg-grifter-green/20">
+                  CLAIMED! ✓
+                </div>
+              )}
+
+              {/* Only show RETRY if not successfully claimed */}
+              {!(passed && hasClaimedSuccessfully) && (
+                <button
+                  onClick={() => {
+                    setPhase('idle');
+                    resetChallenge();
+                    setMissedBeats(0);
+                    lastCheckedBeatRef.current = -1;
+                    clearRipples();
+                    isPlayingChallengeRef.current = false;
+                  }}
+                  className="px-4 py-2 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded transition-all hover:bg-grifter-blue hover:text-black"
+                >
+                  RETRY
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -918,100 +945,5 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         }
       `}</style>
     </div>
-  );
-}
-
-// ClaimButton component for on-chain claiming
-function ClaimButton({ score, startOffsetMs }: { score: number; startOffsetMs: number }) {
-  const { address, isConnected } = useAccount();
-  const { writeContract, isPending, isError, error } = useWriteContract();
-  const [claimStatus, setClaimStatus] = useState<'idle' | 'signing' | 'submitting' | 'success' | 'error'>('idle');
-
-  const { getClaimData } = useChallengeStore(
-    useShallow((s) => ({
-      getClaimData: s.getClaimData,
-    })),
-  );
-
-  const handleClaim = useCallback(async () => {
-    if (!isConnected) {
-      alert('Please connect your wallet first!');
-      return;
-    }
-
-    if (!address) return;
-
-    setClaimStatus('signing');
-
-    try {
-      // Get claim data from store
-      const claimData = getClaimData();
-
-      if (!claimData) {
-        throw new Error('No challenge data available');
-      }
-
-      // 1. Get signature from server
-      const response = await fetch('/api/sign-challenge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user: address,
-          score,
-          startOffsetMs,
-          hitmap: claimData.hitmap,
-          userClicks: claimData.userClicks,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Signature failed');
-      }
-
-      setClaimStatus('submitting');
-
-      // 2. Submit transaction to contract
-      await writeContract({
-        address: CONTRACT_ADDRESS,
-        abi: SWORD_EVOLUTION_ABI,
-        functionName: 'claimWithSignature',
-        args: [
-          BigInt(score),
-          BigInt(startOffsetMs),
-          BigInt(data.deadline),
-          BigInt(data.v),
-          data.r,
-          data.s,
-        ] as any,
-      });
-
-      setClaimStatus('success');
-    } catch (err) {
-      console.error('[Claim] Error:', err);
-      setClaimStatus('error');
-    }
-  }, [isConnected, address, score, startOffsetMs, writeContract, getClaimData]);
-
-  if (claimStatus === 'success') {
-    return (
-      <div className="px-6 py-3 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded bg-grifter-green/20">
-        CLAIMED!
-      </div>
-    );
-  }
-
-  return (
-    <button
-      onClick={handleClaim}
-      disabled={!isConnected || isPending || claimStatus === 'signing' || claimStatus === 'submitting'}
-      className="px-6 py-3 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded transition-all hover:bg-grifter-green hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
-      style={{
-        boxShadow: '0 0 10px rgba(0, 252, 166, 0.3)',
-      }}
-    >
-      {claimStatus === 'signing' ? 'VERIFYING...' : claimStatus === 'submitting' ? 'SUBMITTING...' : 'CLAIM REWARD'}
-    </button>
   );
 } 

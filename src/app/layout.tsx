@@ -12,7 +12,6 @@ import { useAudioReactionStore, useIdleAnimation } from '@/store/audioReactionSt
 import '../styles/globals.css';
 import { useShallow } from 'zustand/react/shallow';
 import VersionBadge from '@/components/ui/VersionBadge';
-import { Web3Provider } from '@/providers/Web3Provider';
 
 // Initialize the Inter font with Latin subset
 const inter = Inter({ subsets: ['latin'] });
@@ -88,14 +87,12 @@ export default function RootLayout({
         backgroundColor: 'var(--color-bg-primary)',
         backgroundImage: 'radial-gradient(circle at 50% 50%, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%)',
       }}>
-        <Web3Provider>
-          <div className="min-h-screen overflow-hidden">
-            {children}
-          </div>
-          <VersionBadge />
-          {/* Global CRT overlay: scanlines + tube glow + subtle noise (affects ALL UI) */}
-          <div className="crt-overlay" aria-hidden="true" />
-        </Web3Provider>
+        <div className="min-h-screen overflow-hidden">
+          {children}
+        </div>
+        <VersionBadge />
+        {/* Global CRT overlay: scanlines + tube glow + subtle noise (affects ALL UI) */}
+        <div className="crt-overlay" aria-hidden="true" />
       </body>
     </html>
   );
