@@ -15,6 +15,41 @@ export const SWORD_EVOLUTION_V2_ABI = [
   // Read functions
   {
     inputs: [],
+    name: 'getActiveAspect',
+    outputs: [{ name: '', type: 'uint8' }],      // 0=FORGE, 1=CHARGE, 2=GLITCH
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'getCurrentRound',
+    outputs: [{ name: '', type: 'uint8' }],      // 0-19
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'forgeLevel',
+    outputs: [{ name: '', type: 'uint8' }],      // 10-30
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'chargeLevel',
+    outputs: [{ name: '', type: 'uint8' }],      // 10-30
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'glitchLevel',
+    outputs: [{ name: '', type: 'uint8' }],      // 10-30
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
     name: 'getAspectLevels',
     outputs: [
       { name: 'forgeLevel', type: 'uint8' },      // 10-30
@@ -23,6 +58,8 @@ export const SWORD_EVOLUTION_V2_ABI = [
       { name: 'forgeProgress', type: 'uint8' },   // 0-9
       { name: 'chargeProgress', type: 'uint8' },  // 0-9
       { name: 'glitchProgress', type: 'uint8' },  // 0-9
+      { name: 'activeAspect', type: 'uint8' },    // 0=FORGE, 1=CHARGE, 2=GLITCH
+      { name: 'daysRemainingInAspect', type: 'uint8' }, // 0-20
     ],
     stateMutability: 'view',
     type: 'function',
@@ -38,6 +75,7 @@ export const SWORD_EVOLUTION_V2_ABI = [
       { name: 'progressMax', type: 'uint8' },     // 60
       { name: 'evolutionComplete', type: 'bool' },
       { name: 'canAdvanceDay', type: 'bool' },
+      { name: 'currentRound', type: 'uint8' },    // 0-19
     ],
     stateMutability: 'view',
     type: 'function',
