@@ -56,12 +56,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[SignChallenge] Received:', { user, score, startOffsetMs, hitmapLength: hitmap.length, userClicksLength: userClicks.length });
-
     // 3. Validate score (recalculate on server to prevent cheating)
     // duration is 45 seconds (hardcoded in hitmap)
     const calculatedScore = calculateServerScore(userClicks, hitmap, startOffsetMs, 45);
-    console.log('[SignChallenge] Calculated score:', calculatedScore, 'Provided score:', score);
     
     if (calculatedScore < 70) {
       return NextResponse.json(
@@ -195,8 +192,6 @@ function calculateServerScore(
 
   const hits = hitBeats.size;
   const totalBeats = beatsInWindow.length;
-
-  console.log('[SignChallenge] Score calc:', { hits, totalBeats, userClicks: userClicks.length, hitmap: hitmap.length });
 
   return totalBeats > 0 ? Math.round((hits / totalBeats) * 100) : 0;
 }
