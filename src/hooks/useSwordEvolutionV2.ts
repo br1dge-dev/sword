@@ -8,8 +8,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-// Contract address - V2 (to be deployed)
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x0000000000000000000000000000000000000000';
+// Contract address - V2 (Base Sepolia)
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x3F7d8503ee9A8E781248605822f67A4Eeec30081';
 const RPC_URL = 'https://sepolia.base.org';
 
 // Function selectors for V2 (corrected with sequential aspect progression)
