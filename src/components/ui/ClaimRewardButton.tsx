@@ -263,11 +263,11 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
   const isDisabled = status === 'working' || status === 'done' || canClaimToday === false;
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-center gap-1">
       <button
         onClick={handleClaim}
         disabled={isDisabled}
-        className={`px-3 py-1 text-xs font-mono bg-black border rounded transition-colors ${
+        className={`px-2 py-0.5 text-[10px] font-mono bg-black border rounded transition-colors ${
           canClaimToday === false
             ? 'border-grifter-blue/30 text-grifter-blue/50 cursor-not-allowed'
             : isDisabled 
@@ -279,7 +279,7 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
       </button>
       
       {errorMsg && (
-        <span className="text-[10px] font-mono text-red-500 max-w-[150px] text-right leading-tight">
+        <span className="text-[9px] font-mono text-red-500/70 max-w-[120px] text-center leading-tight">
           {errorMsg}
         </span>
       )}
@@ -289,7 +289,7 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
           href={`${TARGET_CHAIN.blockExplorers?.default.url}/tx/${txHash}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[10px] font-mono text-grifter-blue hover:text-grifter-green"
+          className="text-[9px] font-mono text-grifter-blue/70 hover:text-grifter-green"
         >
           TX
         </a>
