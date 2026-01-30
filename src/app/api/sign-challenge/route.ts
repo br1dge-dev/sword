@@ -3,7 +3,8 @@ import { createWalletClient, http, type Hash } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { baseSepolia, base } from 'viem/chains';
 
-export const runtime = 'edge';
+// Use Node.js runtime for full env access
+export const runtime = 'nodejs';
 
 // EIP-712 Domain - muss exakt zum Contract passen
 const DOMAIN = {
