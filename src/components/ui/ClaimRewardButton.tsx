@@ -9,11 +9,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { encodeFunctionData } from 'viem';
 import { useChallengeStore } from '@/store/challengeStore';
 import { 
-  SWORD_EVOLUTION_ABI, 
+  SWORD_EVOLUTION_V2_ABI as SWORD_EVOLUTION_ABI, 
   getContractAddress, 
-  TARGET_CHAIN,
+  TARGET_CHAIN_ID as TARGET_CHAIN,
   CONTRACT_CONSTANTS,
-} from '@/lib/contracts/swordEvolution';
+} from '@/lib/contracts/swordEvolutionV2';
 
 // Base Sepolia chain ID
 const TARGET_CHAIN_ID = '0x14a34'; // 84532 in hex
@@ -286,7 +286,7 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
       
       {txHash && (
         <a
-          href={`${TARGET_CHAIN.blockExplorers?.default.url}/tx/${txHash}`}
+          href={`https://sepolia.basescan.org/tx/${txHash}`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-[9px] font-mono text-grifter-blue/70 hover:text-grifter-green"
