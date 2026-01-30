@@ -52,10 +52,10 @@ contract DeployScriptV2 is Script {
             console.log("Next steps:");
             console.log("1. Add CONTRACT_ADDRESS_V2 to .env.local");
             console.log("2. Add first track:");
-            console.log("   cast send", address(sword), '"addTrack(string,uint256)" "GR1FTSWORD" 139880 \');
+            console.log("   cast send <ADDRESS> \"addTrack(string,uint256)\" \"GR1FTSWORD\" 139880");
             console.log("   --rpc-url $BASE_SEPOLIA_RPC_URL --private-key $PRIVATE_KEY");
-            console.log("3. Update frontend: NEXT_PUBLIC_CONTRACT_ADDRESS_V2=", address(sword));
-            console.log("4. Update API: CONTRACT_ADDRESS_BASE_SEPOLIA=", address(sword));
+            console.log("3. Update frontend with new address");
+            console.log("4. Update API with new address");
             console.log("============================================");
             
             return sword;
