@@ -113,8 +113,20 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
   
   // Use SwordEvolution hook for claim status
-  const { userState, globalState, aspectLevels } = useSwordEvolutionV2();
+  const { userState, globalState, aspectLevels, refetch } = useSwordEvolutionV2();
   const [hasClaimedSuccessfully, setHasClaimedSuccessfully] = useState(false);
+  const [showProgressUpdate, setShowProgressUpdate] = useState(false);
+  const prevAspectLevelsRef = useRef(aspectLevels);
+
+  // Visual effect when aspect levels update after claim
+  useEffect(() => {
+    if (hasClaimedSuccessfully && aspectLevels !== prevAspectLevelsRef.current) {
+      setShowProgressUpdate(true);
+      prevAspectLevelsRef.current = aspectLevels;
+      const timer = setTimeout(() => setShowProgressUpdate(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [aspectLevels, hasClaimedSuccessfully]);
 
   // Audio-Analyzer Hook
   const {
@@ -891,13 +903,23 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
               {/* Claim button for passed challenges */}
               {passed && !hasClaimedSuccessfully && (
-                <ClaimRewardButton onSuccess={() => setHasClaimedSuccessfully(true)} />
+                <ClaimRewardButton 
+                  onSuccess={() => {
+                    setHasClaimedSuccessfully(true);
+                    refetch(); // Reload aspect levels immediately
+                  }} 
+                />
               )}
 
               {/* Show success message if claimed */}
               {passed && hasClaimedSuccessfully && (
-                <div className="px-3 py-1 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded bg-grifter-green/20">
+                <div 
+                  className={`px-3 py-1 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded bg-grifter-green/20 transition-all duration-300 ${showProgressUpdate ? 'scale-110 shadow-[0_0_15px_#00FCA6]' : ''}`}
+                >
                   CLAIMED! ✓
+                  {showProgressUpdate && (
+                    <span className="ml-2 text-grifter-cyan animate-pulse">↻</span>
+                  )}
                 </div>
               )}
 
