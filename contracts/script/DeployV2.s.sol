@@ -34,7 +34,7 @@ contract DeployScriptV2 is Script {
             console.log("Contract: SwordEvolutionV2");
             console.log("Features:");
             console.log("  - 60 days, 3 rounds");
-            console.log("  - Sequential aspects: FORGE→CHARGE→GLITCH");
+            console.log("  - Sequential aspects: FORGE->CHARGE->GLITCH");
             console.log("  - Max 1 step per day");
             console.log("  - 100 EDGE per claim");
             console.log("");

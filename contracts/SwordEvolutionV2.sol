@@ -181,7 +181,7 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         // Build EIP-712 hash
         bytes32 digest = keccak256(
             abi.encodePacked(
-                "\x19\01",
+                "\x19\x01",
                 DOMAIN_SEPARATOR,
                 keccak256(
                     abi.encode(
