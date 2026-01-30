@@ -1,7 +1,11 @@
 #!/bin/bash
 
 # Add Tracks to SwordEvolutionV2
-# This script adds all music tracks to the deployed contract
+# This script adds tracks to the deployed contract
+# 
+# Usage:
+#   ./scripts/add-tracks.sh              → Add only GR1FTSWORD (default)
+#   ADD_ALL_TRACKS=true ./scripts/add-tracks.sh  → Add all 10 tracks
 
 set -e
 
@@ -41,23 +45,39 @@ if [ -z "$CONTRACT_ADDRESS_BASE_SEPOLIA" ] || [ "$CONTRACT_ADDRESS_BASE_SEPOLIA"
     exit 1
 fi
 
+# Determine mode
+ADD_ALL_TRACKS="${ADD_ALL_TRACKS:-false}"
+
 echo "Contract: $CONTRACT_ADDRESS_BASE_SEPOLIA"
 echo "Network: Base Sepolia"
 echo ""
-echo "Tracks to add:"
-echo "  1. GR1FTSWORD (139880ms)"
-echo "  2. FLASHWORD (120000ms)"
-echo "  3. FUNKSWORD (180000ms)"
-echo "  4. ATARISWORD (150000ms)"
-echo "  5. DR4GONSWORD (200000ms)"
-echo "  6. PUNCHSWORD (160000ms)"
-echo "  7. NIGHTSWORD (175000ms)"
-echo "  8. DANGERSWORD (190000ms)"
-echo "  9. SHONENSWORD (185000ms)"
-echo "  10. WORFSWORD (170000ms)"
-echo ""
 
-read -p "Add all tracks? (yes/no): " CONFIRM
+if [ "$ADD_ALL_TRACKS" = "true" ]; then
+    echo -e "${YELLOW}Mode: ALL TRACKS${NC}"
+    echo ""
+    echo "Tracks to add:"
+    echo "  1. GR1FTSWORD (139880ms)"
+    echo "  2. FLASHWORD (120000ms)"
+    echo "  3. FUNKSWORD (180000ms)"
+    echo "  4. ATARISWORD (150000ms)"
+    echo "  5. DR4GONSWORD (200000ms)"
+    echo "  6. PUNCHSWORD (160000ms)"
+    echo "  7. NIGHTSWORD (175000ms)"
+    echo "  8. DANGERSWORD (190000ms)"
+    echo "  9. SHONENSWORD (185000ms)"
+    echo "  10. WORFSWORD (170000ms)"
+else
+    echo -e "${YELLOW}Mode: GR1FTSWORD ONLY${NC}"
+    echo ""
+    echo "Track to add:"
+    echo "  1. GR1FTSWORD (139880ms)"
+    echo ""
+    echo "To add all tracks later, run:"
+    echo "  ADD_ALL_TRACKS=true ./scripts/add-tracks.sh"
+fi
+
+echo ""
+read -p "Continue? (yes/no): " CONFIRM
 
 if [ "$CONFIRM" != "yes" ]; then
     echo "Cancelled."
@@ -69,6 +89,7 @@ echo "Adding tracks..."
 echo ""
 
 cd contracts
+ADD_ALL_TRACKS="$ADD_ALL_TRACKS" \
 PRIVATE_KEY="$PRIVATE_KEY" \
 CONTRACT_ADDRESS_BASE_SEPOLIA="$CONTRACT_ADDRESS_BASE_SEPOLIA" \
 forge script script/AddTracks.s.sol \
