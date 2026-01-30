@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAudioAnalyzer, globalAnalyzer } from '../../hooks/useAudioAnalyzer';
 import { useAudioReactionStore } from '../../store/audioReactionStore';
 import { useChallengeStore } from '../../store/challengeStore';
-import { useSwordEvolution } from '../../hooks/useSwordEvolution';
+import { useSwordEvolutionV2 } from '../../hooks/useSwordEvolutionV2';
 import { useShallow } from 'zustand/react/shallow';
 import type { HitMapData } from '@/store/challengeStore';
 import { ClaimRewardButton } from './ClaimRewardButton';
@@ -113,7 +113,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
   
   // Use SwordEvolution hook for claim status
-  const { userState, globalState } = useSwordEvolution();
+  const { userState, globalState, aspectLevels } = useSwordEvolutionV2();
   const [hasClaimedSuccessfully, setHasClaimedSuccessfully] = useState(false);
 
   // Audio-Analyzer Hook
