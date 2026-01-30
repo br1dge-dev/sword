@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     const chain = baseSepolia;
     const contractAddress = process.env.CONTRACT_ADDRESS_BASE_SEPOLIA 
       || process.env.CONTRACT_ADDRESS
-      || '0x573b1236601083f0389d6826f35dcc7762e40ee5'; // Hardcoded fallback for Base Sepolia
+      || '0x3F7d8503ee9A8E781248605822f67A4Eeec30081'; // V2 Contract on Base Sepolia
     
     if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
       console.error('[SignChallenge] Contract address not configured');
