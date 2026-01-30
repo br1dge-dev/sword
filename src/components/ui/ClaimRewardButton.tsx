@@ -196,6 +196,9 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (err.error?.includes('Server configuration error')) {
+          throw new Error('Server not configured. Please contact support.');
+        }
         throw new Error(err.error || 'Server error');
       }
 
