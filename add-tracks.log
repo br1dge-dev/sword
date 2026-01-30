@@ -1,8 +1,48 @@
 Compiling 1 files with Solc 0.8.33
-Solc 0.8.33 finished in 184.18ms
-Error: Compiler run failed:
-Error (6933): Expected primary expression.
-  --> script/AddTracks.s.sol:45:13:
-   |
-45 |         try {
-   |             ^
+Solc 0.8.33 finished in 462.03ms
+Compiler run successful!
+Script ran successfully.
+
+== Logs ==
+  ============================================
+    Adding Tracks to SwordEvolutionV2
+  ============================================
+  Contract: 0x3F7d8503ee9A8E781248605822f67A4Eeec30081
+  Mode: GR1FTSWORD ONLY
+  
+  Adding GR1FTSWORD only...
+    + GR1FTSWORD (139880ms)
+  
+  To add all tracks later, run with:
+    ADD_ALL_TRACKS=true ./scripts/add-tracks.sh
+  
+  ============================================
+    SUCCESS! GR1FTSWORD added
+  ============================================
+  
+  Tracks are active by default.
+  Users can now start challenges!
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 84532
+
+Estimated gas price: 0.0014 gwei
+
+Estimated total gas used for script: 188995
+
+Estimated amount required: 0.000000264593 ETH
+
+==========================
+
+
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
+
+Transactions saved to: /Users/christian/+CODING/Hobby/sword/contracts/broadcast/AddTracks.s.sol/84532/run-latest.json
+
+Sensitive values saved to: /Users/christian/+CODING/Hobby/sword/contracts/cache/AddTracks.s.sol/84532/run-latest.json
+
