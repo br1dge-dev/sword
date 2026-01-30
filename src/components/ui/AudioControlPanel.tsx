@@ -803,7 +803,6 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
             {/* Idle: Show START button (disabled if already claimed) */}
           {phase === 'idle' && (
             <>
-              {console.log('[DEBUG] userState:', userState, 'canClaimToday:', userState?.canClaimToday)}
               <button
                 onClick={userState !== null && userState.canClaimToday === false ? undefined : handleChallengeStart}
                 disabled={userState !== null && userState.canClaimToday === false}

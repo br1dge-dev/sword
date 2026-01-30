@@ -96,7 +96,6 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
       const canClaim = data && data !== '0x' && parseInt(data, 16) === 1;
       setCanClaimToday(canClaim);
     } catch (err) {
-      console.log('Could not check claim status:', err);
       setCanClaimToday(null);
     }
     setIsCheckingClaimStatus(false);
