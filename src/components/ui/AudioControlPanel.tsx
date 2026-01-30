@@ -802,21 +802,24 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         <div className="w-full flex flex-col items-center">
             {/* Idle: Show START button (disabled if already claimed) */}
           {phase === 'idle' && (
-            <button
-              onClick={userState?.canClaimToday === false ? undefined : handleChallengeStart}
-              disabled={userState?.canClaimToday === false}
-              className="px-6 py-3 font-press-start-2p text-xs rounded transition-opacity"
-              style={{ 
-                backgroundColor: userState?.canClaimToday === false ? '#1a1a1a' : '#00FCA6',
-                color: userState?.canClaimToday === false ? '#666666' : '#000000',
-                boxShadow: userState?.canClaimToday === false ? 'none' : '0 0 20px rgba(0,252,166,0.5)',
-                cursor: userState?.canClaimToday === false ? 'not-allowed' : 'pointer',
-                opacity: userState?.canClaimToday === false ? 0.6 : 1,
-              }}
-              title={userState?.canClaimToday === false ? 'You already claimed today! Come back tomorrow.' : ''}
-            >
-              {userState?.canClaimToday === false ? 'ALREADY CLAIMED' : 'START'}
-            </button>
+            <>
+              {console.log('[DEBUG] userState:', userState, 'canClaimToday:', userState?.canClaimToday)}
+              <button
+                onClick={userState !== null && userState.canClaimToday === false ? undefined : handleChallengeStart}
+                disabled={userState !== null && userState.canClaimToday === false}
+                className="px-6 py-3 font-press-start-2p text-xs rounded transition-opacity"
+                style={{
+                  backgroundColor: userState !== null && userState.canClaimToday === false ? '#1a1a1a' : '#00FCA6',
+                  color: userState !== null && userState.canClaimToday === false ? '#666666' : '#000000',
+                  boxShadow: userState !== null && userState.canClaimToday === false ? 'none' : '0 0 20px rgba(0,252,166,0.5)',
+                  cursor: userState !== null && userState.canClaimToday === false ? 'not-allowed' : 'pointer',
+                  opacity: userState !== null && userState.canClaimToday === false ? 0.6 : 1,
+                }}
+                title={userState !== null && userState.canClaimToday === false ? 'You already claimed today! Come back tomorrow.' : ''}
+              >
+                {userState !== null && userState.canClaimToday === false ? 'ALREADY CLAIMED' : 'START'}
+              </button>
+            </>
           )}
           
           {/* Countdown */}
