@@ -90,16 +90,17 @@ export async function POST(request: NextRequest) {
 
     const account = privateKeyToAccount(privateKey);
     
-    // Determine chain and contract address from environment
-    const isProduction = process.env.NODE_ENV === 'production';
-    const chain = isProduction ? base : baseSepolia;
-    const contractAddress = isProduction 
-      ? (process.env.CONTRACT_ADDRESS_BASE || process.env.CONTRACT_ADDRESS)
-      : (process.env.CONTRACT_ADDRESS_BASE_SEPOLIA || process.env.CONTRACT_ADDRESS);
+    // Determine chain and contract address
+    // For now, always use Base Sepolia (testnet)
+    const chain = baseSepolia;
+    const contractAddress = process.env.CONTRACT_ADDRESS_BASE_SEPOLIA 
+      || process.env.CONTRACT_ADDRESS
+      || '0x573b1236601083f0389d6826f35dcc7762e40ee5'; // Hardcoded fallback for Base Sepolia
     
-    if (!contractAddress) {
+    if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
+      console.error('[SignChallenge] Contract address not configured');
       return NextResponse.json(
-        { error: 'Contract address not configured' },
+        { error: 'Contract address not configured. Please set CONTRACT_ADDRESS_BASE_SEPOLIA in Vercel.' },
         { status: 500 }
       );
     }
