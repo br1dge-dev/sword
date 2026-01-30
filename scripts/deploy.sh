@@ -18,7 +18,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Check if we're in the right directory
-if [ ! -f "contracts/SwordEvolution.sol" ]; then
+if [ ! -f "contracts/SwordEvolutionV2.sol" ]; then
     echo -e "${RED}ERROR: Please run this script from the project root${NC}"
     exit 1
 fi
@@ -94,9 +94,13 @@ echo -e "${GREEN}✓ Sufficient balance${NC}"
 echo ""
 
 # Confirm deployment
-echo -e "${YELLOW}Ready to deploy!${NC}"
+echo -e "${YELLOW}Ready to deploy V2!${NC}"
 echo ""
 echo "Network: Base Sepolia (Testnet)"
+echo "Contract: SwordEvolutionV2"
+echo "Features:"
+echo "  - 60 days, sequential aspects"
+echo "  - FORGE (10d) → CHARGE (10d) → GLITCH (10d)"
 echo "Deployer: $DEPLOYER"
 echo "Balance: $BALANCE_ETH ETH"
 echo ""
@@ -108,14 +112,14 @@ if [ "$CONFIRM" != "yes" ]; then
 fi
 
 echo ""
-echo "Deploying contract..."
+echo "Deploying SwordEvolutionV2..."
 echo ""
 
 # Run deployment with environment variables
 cd contracts
 PRIVATE_KEY="$PRIVATE_KEY" \
 BASE_SEPOLIA_RPC_URL="$BASE_SEPOLIA_RPC_URL" \
-forge script script/Deploy.s.sol \
+forge script script/DeployV2.s.sol \
     --rpc-url "$BASE_SEPOLIA_RPC_URL" \
     --broadcast \
     --verify \
@@ -128,5 +132,8 @@ echo "Check deployment.log for details."
 echo ""
 echo "Next steps:"
 echo "1. Copy the contract address from the log"
-echo "2. Add it to .env.local: CONTRACT_ADDRESS_BASE_SEPOLIA=0x..."
+echo "2. Add to .env.local:"
+echo "   CONTRACT_ADDRESS_BASE_SEPOLIA=0x..."
+echo "   NEXT_PUBLIC_CONTRACT_ADDRESS_V2=0x..."
 echo "3. Add your first track using cast or the admin UI"
+echo "4. Update API signer to use new contract address"
