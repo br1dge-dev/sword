@@ -80,8 +80,9 @@ export async function POST(request: NextRequest) {
     // 5. Create signature
     const privateKey = process.env.SIGNER_PRIVATE_KEY as `0x${string}`;
     if (!privateKey) {
+      console.error('[SignChallenge] Missing SIGNER_PRIVATE_KEY environment variable');
       return NextResponse.json(
-        { error: 'Server configuration error' },
+        { error: 'Server configuration error: Missing SIGNER_PRIVATE_KEY' },
         { status: 500 }
       );
     }
