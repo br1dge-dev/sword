@@ -336,37 +336,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Challenge Result - shown when challenge ended */}
-        {isClient && challengeEnded && (
-          <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
-            <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
-              <div className="text-xs font-mono text-grifter-green/60 mb-1">FINAL SCORE</div>
-              <div className="text-2xl font-press-start-2p text-grifter-green">{challengeScore.toFixed(0)}%</div>
-            </div>
-            <div className="bg-black/80 border border-grifter-green/50 rounded-lg px-4 py-1 backdrop-blur-sm">
-              <div className="text-[10px] font-mono text-grifter-green/40">HITS: {challengeHits.filter(h => h.hit).length}/{challengeHits.length}</div>
-            </div>
-            {/* Claim Reward Button - only show if score >= 70% */}
-            {challengeScore >= 70 && (
-              <ClaimRewardButton />
-            )}
-            {challengeScore < 70 && (
-              <div className="text-[10px] font-mono text-red-500/80">
-                NEED 70% TO CLAIM
-              </div>
-            )}
-            <button
-              onClick={() => {
-                setMode('challenge');
-                setPhase('idle');
-              }}
-              className="px-3 py-1 text-xs font-mono bg-black border border-grifter-green text-grifter-green rounded hover:bg-grifter-green hover:text-black transition-colors"
-            >
-              RETRY
-            </button>
-          </div>
-        )}
-
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
         {isClient && isDesktop && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-4 sm:gap-4 w-auto sm:w-auto px-2 sm:px-0 ui-caps">

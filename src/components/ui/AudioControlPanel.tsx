@@ -875,23 +875,18 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
           
           {/* Results */}
           {phase === 'results' && (
-            <div className="w-full flex flex-col items-center">
+            <div className="w-full flex flex-col items-center gap-2">
               <div
-                className="text-lg font-press-start-2p mb-2"
+                className="text-base font-press-start-2p"
                 style={{
                   color: passed ? '#00FCA6' : '#FF3EC8',
-                  textShadow: '0 0 12px currentColor',
+                  textShadow: '0 0 8px currentColor',
                 }}
               >
                 {passed ? 'PASSED!' : 'TRY AGAIN'}
               </div>
-              <div className="text-4xl font-press-start-2p text-white mb-3">
+              <div className="text-3xl font-press-start-2p text-white mb-1">
                 {sharedAccuracy.toFixed(0)}%
-              </div>
-              <div className="flex items-center gap-4 text-xs font-press-start-2p mb-4">
-                <span className="text-grifter-green">{successfulHits} hits</span>
-                {missClicks > 0 && <span className="text-grifter-pink">{missClicks} miss</span>}
-                {missedBeats > 0 && <span className="text-grifter-blue/60">{missedBeats} skipped</span>}
               </div>
 
               {/* Claim button for passed challenges */}
@@ -901,7 +896,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
               {/* Show success message if claimed */}
               {passed && hasClaimedSuccessfully && (
-                <div className="px-4 py-2 mb-3 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded bg-grifter-green/20">
+                <div className="px-3 py-1 border border-grifter-green text-grifter-green font-press-start-2p text-xs rounded bg-grifter-green/20">
                   CLAIMED! ✓
                 </div>
               )}
@@ -917,7 +912,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
                     clearRipples();
                     isPlayingChallengeRef.current = false;
                   }}
-                  className="px-4 py-2 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded transition-all hover:bg-grifter-blue hover:text-black"
+                  className="px-3 py-1.5 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded transition-all hover:bg-grifter-blue hover:text-black"
                 >
                   RETRY
                 </button>
