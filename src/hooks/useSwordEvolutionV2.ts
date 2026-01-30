@@ -12,15 +12,20 @@ import { useState, useEffect, useCallback } from 'react';
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x0000000000000000000000000000000000000000';
 const RPC_URL = 'https://sepolia.base.org';
 
-// Function selectors for V2
+// Function selectors for V2 (corrected with sequential aspect progression)
 const SELECTORS = {
   getAspectLevels: '0x9e23c6f1',
   getGlobalState: '0x4e0e8f4e',
   getUserState: '0x416ae768',
+  getActiveAspect: '0x9b2c5a5e',  // New: get active aspect (0=FORGE, 1=CHARGE, 2=GLITCH)
+  getCurrentRound: '0xbe8de82b',  // New: get current round (0-19)
+  forgeLevel: '0x5d3b1d30',
+  chargeLevel: '0xe7c37ef0',
+  glitchLevel: '0x97cf3e2a',
   globalProgress: '0x6b5cc770',
   currentDay: '0x5c9302c9',
   claimsToday: '0xeb3d4346',
-  stepClaimedToday: '0x7d2ec202', // New in V2
+  stepClaimedToday: '0x7d2ec202',
 };
 
 function hexToNumber(hex: string): number {
@@ -31,6 +36,8 @@ export interface AspectLevels {
   forge: { level: number; progress: number };
   charge: { level: number; progress: number };
   glitch: { level: number; progress: number };
+  activeAspect: number;  // 0=FORGE, 1=CHARGE, 2=GLITCH
+  daysRemainingInAspect: number; // 0-20
 }
 
 export interface GlobalState {
@@ -41,6 +48,7 @@ export interface GlobalState {
   progressMax: number;
   evolutionComplete: boolean;
   canAdvanceDay: boolean;
+  currentRound: number;  // 0-19
 }
 
 export interface UserState {
@@ -84,18 +92,25 @@ export function useSwordEvolutionV2() {
       if (!data) { setAspectLevels(null); return; }
 
       const hex = data.slice(2);
-      const forgeLevel = hexToNumber('0x' + hex.slice(0, 64));
-      const chargeLevel = hexToNumber('0x' + hex.slice(64, 128));
-      const glitchLevel = hexToNumber('0x' + hex.slice(128, 192));
+      // First 3 values: forgeLevel, chargeLevel, glitchLevel (10-30)
+      const forgeLevelRaw = hexToNumber('0x' + hex.slice(0, 64));
+      const chargeLevelRaw = hexToNumber('0x' + hex.slice(64, 128));
+      const glitchLevelRaw = hexToNumber('0x' + hex.slice(128, 192));
+      // Next 3 values: forgeProgress, chargeProgress, glitchProgress (0-9)
       const forgeProgress = hexToNumber('0x' + hex.slice(192, 256));
       const chargeProgress = hexToNumber('0x' + hex.slice(256, 320));
       const glitchProgress = hexToNumber('0x' + hex.slice(320, 384));
+      // New values: activeAspect, daysRemainingInAspect
+      const activeAspect = hexToNumber('0x' + hex.slice(384, 448));
+      const daysRemainingInAspect = hexToNumber('0x' + hex.slice(448, 512));
 
       // Convert internal level (10-30) to display level (1.0-3.0)
       setAspectLevels({
-        forge: { level: forgeLevel / 10, progress: forgeProgress },
-        charge: { level: chargeLevel / 10, progress: chargeProgress },
-        glitch: { level: glitchLevel / 10, progress: glitchProgress },
+        forge: { level: forgeLevelRaw / 10, progress: forgeProgress },
+        charge: { level: chargeLevelRaw / 10, progress: chargeProgress },
+        glitch: { level: glitchLevelRaw / 10, progress: glitchProgress },
+        activeAspect,
+        daysRemainingInAspect,
       });
     } catch (err) {
       console.error('Error fetching aspect levels:', err);
@@ -115,8 +130,9 @@ export function useSwordEvolutionV2() {
       const progressMax = hexToNumber('0x' + hex.slice(256, 320));
       const evolutionComplete = hexToNumber('0x' + hex.slice(320, 384)) === 1;
       const canAdvanceDay = hexToNumber('0x' + hex.slice(384, 448)) === 1;
+      const currentRound = hexToNumber('0x' + hex.slice(448, 512));
 
-      setGlobalState({ day, claimsToday, claimsRemaining, progress, progressMax, evolutionComplete, canAdvanceDay });
+      setGlobalState({ day, claimsToday, claimsRemaining, progress, progressMax, evolutionComplete, canAdvanceDay, currentRound });
     } catch (err) {
       console.error('Error fetching global state:', err);
     }
@@ -159,7 +175,16 @@ export function useSwordEvolutionV2() {
     setIsLoading(false);
   }, [fetchAspectLevels, fetchGlobalState, fetchUserState]);
 
-  return { aspectLevels, globalState, userState, isLoading, refetch };
+  return { 
+    aspectLevels, 
+    globalState, 
+    userState, 
+    isLoading, 
+    refetch,
+    // Convenience accessors for new V2 fields
+    activeAspect: aspectLevels?.activeAspect ?? null,
+    currentRound: globalState?.currentRound ?? null,
+  };
 }
 
 export default useSwordEvolutionV2;

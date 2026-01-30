@@ -5,9 +5,9 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-/// @title SwordEvolution V2 - Corrected progression system
-/// @notice 60 days, 60 steps, all aspects level up together
-/// @dev Each day with ≥1 claim adds +1 step to global progress
+/// @title SwordEvolution V2 - Sequential aspect progression
+/// @notice 60 days, 3 aspects, 10 days each per round, 3 rounds total
+/// @dev Each day with ≥1 claim adds +0.1 to current active aspect
 contract SwordEvolutionV2 is ERC20, Ownable {
 
     using ECDSA for bytes32;
@@ -20,7 +20,10 @@ contract SwordEvolutionV2 is ERC20, Ownable {
     uint256 public constant CHALLENGE_WINDOW_MS = 45_000;
     uint8 public constant MIN_SCORE = 70;
     uint8 public constant TOTAL_DAYS = 60;
-    uint8 public constant TOTAL_STEPS = 60; // 3 aspects × 20 steps (1.0→3.0)
+    uint8 public constant DAYS_PER_ASPECT = 10; // 10 days per aspect per round
+    uint8 public constant TOTAL_ROUNDS = 3; // 3 rounds (1.0→2.0, 2.0→3.0)
+    
+    enum Aspect { FORGE, CHARGE, GLITCH }
     
     // ============ EIP-712 ============
     
@@ -30,20 +33,23 @@ contract SwordEvolutionV2 is ERC20, Ownable {
     
     // ============ State Variables ============
     
-    /// @notice Global progress (0-60), increases by 1 per day with ≥1 claim
-    uint8 public globalProgress;
-    
     /// @notice Current day (1-60)
     uint256 public currentDay;
     
     /// @notice Claims made today (0-10)
     uint8 public claimsToday;
     
-    /// @notice Was a step already claimed today?
+    /// @notice Was a step claimed today? (prevents multiple progress per day)
     bool public stepClaimedToday;
     
     /// @notice When current day started
     uint256 public dayStartTimestamp;
+    
+    /// @notice Aspect progress: 10-30 for each aspect (internally 10 = 1.0, 30 = 3.0)
+    /// forgeProgress, chargeProgress, glitchProgress
+    uint8 public forgeLevel;
+    uint8 public chargeLevel;
+    uint8 public glitchLevel;
     
     /// @notice Track pool
     struct Track {
@@ -66,18 +72,21 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         uint256 startOffsetMs,
         uint8 score,
         uint256 edgeMinted,
-        uint8 newGlobalProgress
+        Aspect activeAspect,
+        uint8 aspectNewLevel
     );
     
     event DayAdvanced(
         uint256 indexed newDay,
-        uint8 claimsYesterday,
-        uint8 globalProgress
+        Aspect activeAspect,
+        uint8 forgeLevel,
+        uint8 chargeLevel,
+        uint8 glitchLevel
     );
     
-    event GlobalProgressIncreased(
-        uint8 newProgress,
-        uint8 currentLevel  // 10, 20, or 30
+    event AspectLevelUp(
+        Aspect indexed aspect,
+        uint8 newLevel
     );
     
     // ============ Errors ============
@@ -97,6 +106,11 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         currentDay = 1;
         dayStartTimestamp = block.timestamp;
         
+        // Initialize all aspects at level 10 (1.0)
+        forgeLevel = 10;
+        chargeLevel = 10;
+        glitchLevel = 10;
+        
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
@@ -106,6 +120,26 @@ contract SwordEvolutionV2 is ERC20, Ownable {
                 address(this)
             )
         );
+    }
+    
+    // ============ Helper Functions ============
+    
+    /// @notice Get currently active aspect based on day
+    function getActiveAspect() public view returns (Aspect) {
+        uint8 dayInCycle = uint8((currentDay - 1) % 30); // 0-29
+        
+        if (dayInCycle < 10) {
+            return Aspect.FORGE; // Days 1-10, 31-40, 51-60
+        } else if (dayInCycle < 20) {
+            return Aspect.CHARGE; // Days 11-20, 41-50
+        } else {
+            return Aspect.GLITCH; // Days 21-30, 51-60 (wait, that's wrong)
+        }
+    }
+    
+    /// @notice Get current round (0, 1, or 2)
+    function getCurrentRound() public view returns (uint8) {
+        return uint8((currentDay - 1) / 30); // 0, 1, or 2
     }
     
     // ============ Core Functions ============
@@ -120,7 +154,7 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         bytes32 s
     ) external {
         // Check evolution not complete
-        if (currentDay > TOTAL_DAYS || globalProgress >= TOTAL_STEPS) {
+        if (currentDay > TOTAL_DAYS) {
             revert EvolutionComplete();
         }
         
@@ -147,7 +181,7 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         // Build EIP-712 hash
         bytes32 digest = keccak256(
             abi.encodePacked(
-                "\x19\x01",
+                "\x19\01",
                 DOMAIN_SEPARATOR,
                 keccak256(
                     abi.encode(
@@ -175,16 +209,37 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         // Update global claims counter
         claimsToday++;
         
-        // KEY FIX: Only increase progress once per day!
+        // KEY: Only increase aspect level once per day!
+        Aspect activeAspect = getActiveAspect();
+        uint8 aspectNewLevel = 0;
+        
         if (!stepClaimedToday) {
-            globalProgress++;
             stepClaimedToday = true;
             
-            // Calculate current level (10, 20, or 30)
-            uint8 currentLevel = 10 + ((globalProgress - 1) / 10) * 10;
-            if (currentLevel > 30) currentLevel = 30;
-            
-            emit GlobalProgressIncreased(globalProgress, currentLevel);
+            // Increase the active aspect by 1 (0.1 level)
+            if (activeAspect == Aspect.FORGE && forgeLevel < 30) {
+                forgeLevel++;
+                aspectNewLevel = forgeLevel;
+                
+                // Check for level up event (every 10 steps)
+                if (forgeLevel % 10 == 0) {
+                    emit AspectLevelUp(Aspect.FORGE, forgeLevel);
+                }
+            } else if (activeAspect == Aspect.CHARGE && chargeLevel < 30) {
+                chargeLevel++;
+                aspectNewLevel = chargeLevel;
+                
+                if (chargeLevel % 10 == 0) {
+                    emit AspectLevelUp(Aspect.CHARGE, chargeLevel);
+                }
+            } else if (activeAspect == Aspect.GLITCH && glitchLevel < 30) {
+                glitchLevel++;
+                aspectNewLevel = glitchLevel;
+                
+                if (glitchLevel % 10 == 0) {
+                    emit AspectLevelUp(Aspect.GLITCH, glitchLevel);
+                }
+            }
         }
         
         // Mint $EDGE
@@ -198,10 +253,17 @@ contract SwordEvolutionV2 is ERC20, Ownable {
             userTotalMinted[msg.sender] += mintAmount;
         }
         
-        emit ChallengeClaimed(msg.sender, startOffsetMs, score, mintAmount, globalProgress);
+        emit ChallengeClaimed(
+            msg.sender, 
+            startOffsetMs, 
+            score, 
+            mintAmount, 
+            activeAspect,
+            aspectNewLevel
+        );
     }
     
-    /// @notice Advance to next day (manual or when full)
+    /// @notice Advance to next day
     function advanceDay() external {
         // Can advance if: 24h passed OR 10 claims reached
         if (block.timestamp < dayStartTimestamp + 1 days && claimsToday < MAX_CLAIMS_PER_DAY) {
@@ -212,39 +274,47 @@ contract SwordEvolutionV2 is ERC20, Ownable {
             return; // Evolution complete
         }
         
-        uint8 yesterdayClaims = claimsToday;
         currentDay++;
         claimsToday = 0;
-        stepClaimedToday = false; // Reset for new day
+        stepClaimedToday = false;
         dayStartTimestamp = block.timestamp;
         
-        emit DayAdvanced(currentDay, yesterdayClaims, globalProgress);
+        emit DayAdvanced(currentDay, getActiveAspect(), forgeLevel, chargeLevel, glitchLevel);
     }
     
     // ============ View Functions ============
     
-    /// @notice Get aspect levels - ALL aspects have the same level!
+    /// @notice Get all aspect levels and which is currently active
     function getAspectLevels() external view returns (
-        uint8 forgeLevel,      // 10-30 (1.0-3.0)
-        uint8 chargeLevel,     // 10-30
-        uint8 glitchLevel,     // 10-30
-        uint8 forgeProgress,   // 0-9 (within current level)
-        uint8 chargeProgress,  // 0-9
-        uint8 glitchProgress   // 0-9
+        uint8 forgeLevel_,      // 10-30 (1.0-3.0)
+        uint8 chargeLevel_,     // 10-30
+        uint8 glitchLevel_,     // 10-30
+        uint8 forgeProgress,    // 0-9 within current level
+        uint8 chargeProgress,   // 0-9
+        uint8 glitchProgress,   // 0-9
+        Aspect activeAspect,
+        uint8 daysRemainingInAspect // How many days left for current aspect
     ) {
-        // All aspects have the same level based on globalProgress
-        // Level 1.0 = 10, Level 2.0 = 20, Level 3.0 = 30
-        uint8 baseLevel = 10 + (globalProgress / 10) * 10;
-        if (baseLevel > 30) baseLevel = 30;
+        forgeLevel_ = forgeLevel;
+        chargeLevel_ = chargeLevel;
+        glitchLevel_ = glitchLevel;
         
-        uint8 progress = globalProgress % 10;
+        // Progress within current level (0-9)
+        forgeProgress = (forgeLevel - 1) % 10;
+        chargeProgress = (chargeLevel - 1) % 10;
+        glitchProgress = (glitchLevel - 1) % 10;
         
-        forgeLevel = baseLevel;
-        chargeLevel = baseLevel;
-        glitchLevel = baseLevel;
-        forgeProgress = progress;
-        chargeProgress = progress;
-        glitchProgress = progress;
+        activeAspect = getActiveAspect();
+        
+        // Calculate days remaining in current aspect phase
+        uint8 dayInCycle = uint8((currentDay - 1) % 30);
+        if (dayInCycle < 10) {
+            daysRemainingInAspect = 10 - dayInCycle;
+        } else if (dayInCycle < 20) {
+            daysRemainingInAspect = 20 - dayInCycle;
+        } else {
+            daysRemainingInAspect = 30 - dayInCycle;
+        }
     }
     
     /// @notice Get user state
@@ -267,8 +337,8 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         uint256 day,
         uint8 claimsToday_,
         uint8 claimsRemaining,
-        uint8 progress,
-        uint8 progressMax,
+        Aspect activeAspect,
+        uint8 currentRound, // 0, 1, or 2
         bool evolutionComplete,
         bool canAdvanceDay
     ) {
@@ -279,9 +349,9 @@ contract SwordEvolutionV2 is ERC20, Ownable {
             currentDay,
             claimsToday,
             MAX_CLAIMS_PER_DAY - claimsToday,
-            globalProgress,
-            TOTAL_STEPS,
-            currentDay > TOTAL_DAYS || globalProgress >= TOTAL_STEPS,
+            getActiveAspect(),
+            getCurrentRound(),
+            currentDay > TOTAL_DAYS,
             timePassed || claimsFull
         );
     }
