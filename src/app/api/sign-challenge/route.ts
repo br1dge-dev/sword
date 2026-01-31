@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Check score matches (prevent manipulation) - allow 10% tolerance for timing differences
+    console.log('[SignChallenge] Score validation:', { calculatedScore, providedScore: score, diff: Math.abs(calculatedScore - score) });
     if (Math.abs(calculatedScore - score) > 10) {
       return NextResponse.json(
         { error: 'Score mismatch', calculatedScore, providedScore: score },
