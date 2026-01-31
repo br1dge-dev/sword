@@ -15,7 +15,7 @@ const DOMAIN = {
 const CLAIM_TYPES = {
   Claim: [
     { name: 'user', type: 'address' },
-    { name: 'score', type: 'uint256' },  // FIXED: Contract expects uint256, not uint8
+    { name: 'score', type: 'uint256' },  // Must match TYPEHASH: "Claim(address user,uint256 score,...)"
     { name: 'startOffsetMs', type: 'uint256' },
     { name: 'deadline', type: 'uint256' },
   ],
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       primaryType: 'Claim',
       message: {
         user: user as `0x${string}`,
-        score: BigInt(score),  // FIXED: Must be bigint for uint256
+        score: BigInt(score),  // uint256 to match TYPEHASH
         startOffsetMs: BigInt(startOffsetMs),
         deadline: BigInt(deadline),
       },

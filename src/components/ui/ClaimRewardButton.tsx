@@ -12,6 +12,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { encodeFunctionData } from 'viem';
 import { useChallengeStore } from '@/store/challengeStore';
+import { usePowerUpStore } from '@/store/powerUpStore';
+import { useSwordEvolutionV2 } from '@/hooks/useSwordEvolutionV2';
 import { 
   SWORD_EVOLUTION_V2_ABI as SWORD_EVOLUTION_ABI, 
   getContractAddress, 
@@ -29,6 +31,36 @@ interface ClaimRewardButtonProps {
 
 type ClaimState = 'idle' | 'checking' | 'signing' | 'pending' | 'success' | 'error';
 
+// Poll for transaction receipt with timeout
+async function pollForReceipt(txHash: string, maxAttempts = 30, interval = 2000): Promise<any> {
+  if (!window.ethereum) {
+    throw new Error('No ethereum provider');
+  }
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    console.log(`[Claim] Polling attempt ${attempt}/${maxAttempts}...`);
+    
+    try {
+      const receipt = await window.ethereum.request({
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+      });
+      
+      if (receipt && receipt.blockNumber) {
+        console.log('[Claim] Receipt found:', receipt);
+        return receipt;
+      }
+    } catch (err) {
+      console.warn(`[Claim] Poll attempt ${attempt} failed:`, err);
+    }
+    
+    // Wait before next attempt
+    await new Promise(resolve => setTimeout(resolve, interval));
+  }
+  
+  throw new Error('Transaction confirmation timeout');
+}
+
 export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
@@ -40,6 +72,8 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
   const [showErrorAnimation, setShowErrorAnimation] = useState(false);
 
   const { accuracy, hitMap, getClaimData } = useChallengeStore();
+  const { setClaimPending, clearClaimPending } = usePowerUpStore();
+  const { activeAspect } = useSwordEvolutionV2();
 
   // Check for ethereum provider
   useEffect(() => {
@@ -166,6 +200,17 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
 
       // 6. Send transaction
       setClaimState('pending');
+      
+      // Map pendingAspect index to aspect name (0=FORGE, 1=CHARGE, 2=GLITCH)
+      const aspectMap: { [key: number]: 'forge' | 'charge' | 'glitch' } = {
+        0: 'forge',
+        1: 'charge', 
+        2: 'glitch'
+      };
+      // Use activeAspect from hook or fallback to forge
+      const activeAspectIndex = activeAspect ?? 0;
+      const activeAspectKey = aspectMap[activeAspectIndex] || 'forge';
+      
       const contractAddress = getContractAddress(TARGET_CHAIN_ID_DECIMAL);
       if (!contractAddress) throw new Error('Contract not configured');
 
@@ -189,26 +234,46 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
           from: currentAccount,
           to: contractAddress,
           data,
+          gas: '0x30d40', // 200,000 gas limit - sufficient for claimWithSignature
         }],
       });
 
       setTxHash(tx);
-      setClaimState('success');
-      setShowSuccessAnimation(true);
+      console.log('[Claim] Transaction sent:', tx);
       
-      // Notify parent component
-      onSuccess?.();
+      // Set claim pending in store so progress bars can animate
+      setClaimPending(activeAspectKey, tx);
+      console.log('[Claim] Set pending aspect:', activeAspectKey);
       
-      // Hide success animation after 3 seconds
-      setTimeout(() => {
-        setShowSuccessAnimation(false);
-      }, 3000);
+      // Poll for transaction receipt until confirmed
+      console.log('[Claim] Polling for transaction receipt...');
+      const receipt = await pollForReceipt(tx);
+      
+      if (receipt && receipt.status === '0x1') {
+        console.log('[Claim] Transaction confirmed:', receipt);
+        clearClaimPending();
+        setClaimState('success');
+        setShowSuccessAnimation(true);
+        
+        // Notify parent component
+        onSuccess?.();
+        
+        // Hide success animation after 3 seconds
+        setTimeout(() => {
+          setShowSuccessAnimation(false);
+        }, 3000);
+      } else {
+        console.error('[Claim] Transaction failed or reverted:', receipt);
+        clearClaimPending();
+        throw new Error('Transaction failed or reverted');
+      }
 
     } catch (err: any) {
       const msg = err?.message || err?.toString() || 'Error';
       setErrorMsg(msg);
       setClaimState('error');
       setShowErrorAnimation(true);
+      clearClaimPending(); // Clear pending state on error
       
       // Hide error animation after 3 seconds
       setTimeout(() => {
@@ -216,7 +281,7 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
         setClaimState('idle');
       }, 3000);
     }
-  }, [account, accuracy, hitMap, getClaimData, onSuccess]);
+  }, [account, accuracy, hitMap, getClaimData, onSuccess, activeAspect, clearClaimPending, setClaimPending]);
 
   // No ethereum provider
   if (!hasEthereum) {

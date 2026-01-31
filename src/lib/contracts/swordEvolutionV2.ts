@@ -71,11 +71,10 @@ export const SWORD_EVOLUTION_V2_ABI = [
       { name: 'day', type: 'uint256' },
       { name: 'claimsToday', type: 'uint8' },
       { name: 'claimsRemaining', type: 'uint8' },
-      { name: 'progress', type: 'uint8' },        // 0-60
-      { name: 'progressMax', type: 'uint8' },     // 60
+      { name: 'activeAspect', type: 'uint8' },    // 0=FORGE, 1=CHARGE, 2=GLITCH
+      { name: 'currentRound', type: 'uint8' },    // 0, 1, or 2
       { name: 'evolutionComplete', type: 'bool' },
       { name: 'canAdvanceDay', type: 'bool' },
-      { name: 'currentRound', type: 'uint8' },    // 0-19
     ],
     stateMutability: 'view',
     type: 'function',
@@ -92,13 +91,7 @@ export const SWORD_EVOLUTION_V2_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
-  {
-    inputs: [],
-    name: 'globalProgress',
-    outputs: [{ name: '', type: 'uint8' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
+
   {
     inputs: [],
     name: 'currentDay',
