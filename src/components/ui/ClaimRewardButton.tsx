@@ -1,7 +1,11 @@
 /**
- * ClaimRewardButton - Direct ethereum provider claim
+ * ClaimRewardButton - Direct ethereum provider claim with visual feedback
  * 
- * No wagmi, no hydration issues. Just raw window.ethereum.
+ * Features:
+ * - Pending animation while transaction is processing
+ * - Success animation (green, ASCII-style) on success
+ * - Failure animation (red/purple, ASCII-style) on error
+ * - Auto-refresh data after successful claim
  */
 'use client';
 
@@ -23,17 +27,19 @@ interface ClaimRewardButtonProps {
   onSuccess?: () => void;
 }
 
+type ClaimState = 'idle' | 'checking' | 'signing' | 'pending' | 'success' | 'error';
+
 export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [hasEthereum, setHasEthereum] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'working' | 'done' | 'error'>('idle');
+  const [claimState, setClaimState] = useState<ClaimState>('idle');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [showErrorAnimation, setShowErrorAnimation] = useState(false);
 
   const { accuracy, hitMap, getClaimData } = useChallengeStore();
-  const [canClaimToday, setCanClaimToday] = useState<boolean | null>(null);
-  const [isCheckingClaimStatus, setIsCheckingClaimStatus] = useState(false);
 
   // Check for ethereum provider
   useEffect(() => {
@@ -71,49 +77,14 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
     }
   }, []);
 
-  // Check if user can claim today (pre-flight check)
-  const checkCanClaim = useCallback(async (userAddress: string) => {
-    if (!userAddress) return;
-    
-    setIsCheckingClaimStatus(true);
-    try {
-      const contractAddress = getContractAddress(TARGET_CHAIN_ID_DECIMAL);
-      if (!contractAddress) return;
-
-      // Encode canClaim call
-      const paddedAddr = userAddress.slice(2).padStart(64, '0');
-      const canClaimSelector = '0x7d2ec202'; // keccak256("canClaim(address)")
-      
-      const data = await window.ethereum?.request({
-        method: 'eth_call',
-        params: [{
-          to: contractAddress,
-          data: canClaimSelector + paddedAddr,
-        }, 'latest'],
-      });
-
-      // Parse result: 0x000...000 = false, 0x000...001 = true
-      const canClaim = data && data !== '0x' && parseInt(data, 16) === 1;
-      setCanClaimToday(canClaim);
-    } catch (err) {
-      setCanClaimToday(null);
-    }
-    setIsCheckingClaimStatus(false);
-  }, []);
-
-  // Check claim status when account changes
-  useEffect(() => {
-    if (account) {
-      checkCanClaim(account);
-    }
-  }, [account, checkCanClaim]);
-
   const handleClaim = useCallback(async () => {
     if (!window.ethereum) return;
     
-    setStatus('working');
+    setClaimState('checking');
     setErrorMsg('');
     setTxHash(null);
+    setShowSuccessAnimation(false);
+    setShowErrorAnimation(false);
 
     try {
       // 1. Connect if needed
@@ -158,27 +129,20 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
         }
       }
 
-      // 3. Pre-flight check: Can user claim today?
-      if (currentAccount) {
-        await checkCanClaim(currentAccount);
-        if (canClaimToday === false) {
-          throw new Error('Already claimed today! Come back tomorrow.');
-        }
-      }
-
-      // 4. Check score
+      // 3. Check score
       const score = Math.round(accuracy);
       if (score < CONTRACT_CONSTANTS.MIN_SCORE) {
         throw new Error(`Need ${CONTRACT_CONSTANTS.MIN_SCORE}% score`);
       }
 
-      // 5. Get claim data
+      // 4. Get claim data
       const claimData = getClaimData();
       if (!claimData || !hitMap) {
         throw new Error('No challenge data');
       }
 
-      // 6. Get signature from server
+      // 5. Get signature from server
+      setClaimState('signing');
       const startOffsetMs = Math.round(hitMap.challengeConfig.startOffset * 1000);
       
       const res = await fetch('/api/sign-challenge', {
@@ -195,15 +159,13 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        if (err.error?.includes('Server configuration error')) {
-          throw new Error('Server not configured. Please contact support.');
-        }
         throw new Error(err.error || 'Server error');
       }
 
       const { v, r, s, deadline } = await res.json();
 
-      // 7. Send transaction
+      // 6. Send transaction
+      setClaimState('pending');
       const contractAddress = getContractAddress(TARGET_CHAIN_ID_DECIMAL);
       if (!contractAddress) throw new Error('Contract not configured');
 
@@ -231,16 +193,30 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
       });
 
       setTxHash(tx);
-      setStatus('done');
-      onSuccess?.(); // Notify parent component
+      setClaimState('success');
+      setShowSuccessAnimation(true);
+      
+      // Notify parent component
+      onSuccess?.();
+      
+      // Hide success animation after 3 seconds
+      setTimeout(() => {
+        setShowSuccessAnimation(false);
+      }, 3000);
 
     } catch (err: any) {
       const msg = err?.message || err?.toString() || 'Error';
       setErrorMsg(msg);
-      setStatus('error');
-      setTimeout(() => setStatus('idle'), 3000);
+      setClaimState('error');
+      setShowErrorAnimation(true);
+      
+      // Hide error animation after 3 seconds
+      setTimeout(() => {
+        setShowErrorAnimation(false);
+        setClaimState('idle');
+      }, 3000);
     }
-  }, [account, accuracy, hitMap, getClaimData, canClaimToday, checkCanClaim]);
+  }, [account, accuracy, hitMap, getClaimData, onSuccess]);
 
   // No ethereum provider
   if (!hasEthereum) {
@@ -254,31 +230,108 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
     );
   }
 
-  let text = 'CLAIM';
-  if (canClaimToday === false) text = 'CLAIMED TODAY';
-  else if (status === 'working') text = '...';
-  else if (status === 'done') text = 'DONE';
-  else if (status === 'error') text = 'RETRY';
-
-  const isDisabled = status === 'working' || status === 'done' || canClaimToday === false;
+  // Render button based on state
+  const renderButton = () => {
+    const baseClasses = "relative px-4 py-2 text-xs font-mono font-bold rounded transition-all cursor-pointer z-[100] overflow-hidden";
+    
+    switch (claimState) {
+      case 'pending':
+        return (
+          <button
+            disabled
+            className={`${baseClasses} bg-black border border-yellow-500 text-yellow-500 cursor-wait`}
+          >
+            {/* Pending Animation - ASCII Style */}
+            <span className="relative z-10 flex items-center gap-2">
+              <span className="animate-pulse">[</span>
+              <span className="animate-bounce">.</span>
+              <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>.</span>
+              <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>.</span>
+              <span className="animate-pulse">]</span>
+              <span className="ml-1">PENDING</span>
+            </span>
+            {/* Scanline effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent animate-[scan_2s_linear_infinite]" />
+          </button>
+        );
+        
+      case 'success':
+      case 'signing':
+        return (
+          <button
+            disabled
+            className={`${baseClasses} bg-black border border-grifter-green text-grifter-green cursor-default`}
+          >
+            {showSuccessAnimation ? (
+              <span className="relative z-10 flex items-center gap-2">
+                <span className="animate-pulse text-lg">✓</span>
+                <span className="animate-[glow_1s_ease-in-out_infinite]">CLAIMED!</span>
+              </span>
+            ) : (
+              <span>CLAIMED ✓</span>
+            )}
+            {/* Success glow effect */}
+            {showSuccessAnimation && (
+              <>
+                <div className="absolute inset-0 bg-grifter-green/30 animate-pulse" />
+                <div className="absolute -inset-1 bg-grifter-green/20 blur-sm animate-pulse" />
+              </>
+            )}
+          </button>
+        );
+        
+      case 'error':
+        return (
+          <button
+            onClick={handleClaim}
+            className={`${baseClasses} bg-black border border-red-500 text-red-500 hover:bg-red-500/20`}
+          >
+            {showErrorAnimation ? (
+              <span className="relative z-10 flex items-center gap-2">
+                <span className="animate-pulse text-lg">✗</span>
+                <span className="animate-[shake_0.5s_ease-in-out]">FAILED</span>
+              </span>
+            ) : (
+              <span>RETRY</span>
+            )}
+            {/* Error glitch effect */}
+            {showErrorAnimation && (
+              <>
+                <div className="absolute inset-0 bg-red-500/20 animate-pulse" />
+                <div className="absolute inset-0 bg-purple-500/10 animate-[glitch_0.3s_ease-in-out_infinite]" />
+              </>
+            )}
+          </button>
+        );
+        
+      case 'checking':
+      case 'signing':
+        return (
+          <button
+            disabled
+            className={`${baseClasses} bg-black border border-grifter-blue/60 text-grifter-blue/60 cursor-wait`}
+          >
+            <span className="animate-pulse">...</span>
+          </button>
+        );
+        
+      default: // idle
+        return (
+          <button
+            onClick={handleClaim}
+            className={`${baseClasses} bg-black border border-grifter-green text-grifter-green hover:bg-grifter-green hover:text-black`}
+          >
+            CLAIM
+          </button>
+        );
+    }
+  };
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <button
-        onClick={handleClaim}
-        disabled={isDisabled}
-        className={`px-2 py-0.5 text-[10px] font-mono bg-black border rounded transition-colors ${
-          canClaimToday === false
-            ? 'border-grifter-blue/30 text-grifter-blue/50 cursor-not-allowed'
-            : isDisabled 
-              ? 'border-grifter-green/30 text-grifter-green/50 cursor-not-allowed' 
-              : 'border-grifter-green text-grifter-green hover:bg-grifter-green hover:text-black'
-        }`}
-      >
-        {text}
-      </button>
+    <div className="flex flex-col items-end gap-1">
+      {renderButton()}
       
-      {errorMsg && (
+      {errorMsg && !showErrorAnimation && (
         <span className="text-[9px] font-mono text-red-500/70 max-w-[120px] text-center leading-tight">
           {errorMsg}
         </span>
@@ -294,6 +347,31 @@ export function ClaimRewardButton({ onSuccess }: ClaimRewardButtonProps) {
           TX
         </a>
       )}
+      
+      {/* Custom styles for animations */}
+      <style jsx>{`
+        @keyframes scan {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes glow {
+          0%, 100% { text-shadow: 0 0 5px #00FCA6, 0 0 10px #00FCA6; }
+          50% { text-shadow: 0 0 20px #00FCA6, 0 0 30px #00FCA6; }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-3px); }
+          75% { transform: translateX(3px); }
+        }
+        @keyframes glitch {
+          0% { clip-path: inset(40% 0 61% 0); transform: translate(-2px, 2px); }
+          20% { clip-path: inset(92% 0 1% 0); transform: translate(2px, -2px); }
+          40% { clip-path: inset(43% 0 1% 0); transform: translate(-2px, 2px); }
+          60% { clip-path: inset(25% 0 58% 0); transform: translate(2px, -2px); }
+          80% { clip-path: inset(54% 0 7% 0); transform: translate(-2px, 2px); }
+          100% { clip-path: inset(58% 0 43% 0); transform: translate(2px, -2px); }
+        }
+      `}</style>
     </div>
   );
 }
