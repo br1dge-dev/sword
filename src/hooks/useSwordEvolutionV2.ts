@@ -86,8 +86,14 @@ export function useSwordEvolutionV2() {
 
   const fetchAspectLevels = useCallback(async () => {
     try {
+      console.log('[V2 Hook] Fetching aspect levels from:', CONTRACT_ADDRESS);
       const data = await callRpc('eth_call', [{ to: CONTRACT_ADDRESS, data: SELECTORS.getAspectLevels }, 'latest']);
-      if (!data) { setAspectLevels(null); return; }
+      console.log('[V2 Hook] Raw response:', data);
+      if (!data) { 
+        console.error('[V2 Hook] No data returned from getAspectLevels');
+        setAspectLevels(null); 
+        return; 
+      }
 
       const hex = data.slice(2);
       // First 3 values: forgeLevel, chargeLevel, glitchLevel (10-30)
@@ -103,15 +109,17 @@ export function useSwordEvolutionV2() {
       const daysRemainingInAspect = hexToNumber('0x' + hex.slice(448, 512));
 
       // Convert internal level (10-30) to display level (1.0-3.0)
-      setAspectLevels({
+      const parsed = {
         forge: { level: forgeLevelRaw / 10, progress: forgeProgress },
         charge: { level: chargeLevelRaw / 10, progress: chargeProgress },
         glitch: { level: glitchLevelRaw / 10, progress: glitchProgress },
         activeAspect,
         daysRemainingInAspect,
-      });
+      };
+      console.log('[V2 Hook] Parsed aspect levels:', parsed);
+      setAspectLevels(parsed);
     } catch (err) {
-      console.error('Error fetching aspect levels:', err);
+      console.error('[V2 Hook] Error fetching aspect levels:', err);
     }
   }, []);
 
