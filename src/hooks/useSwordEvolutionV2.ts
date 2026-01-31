@@ -12,16 +12,16 @@ import { useState, useEffect, useCallback } from 'react';
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x3F7d8503ee9A8E781248605822f67A4Eeec30081';
 const RPC_URL = 'https://sepolia.base.org';
 
-// Function selectors for V2 (corrected with sequential aspect progression)
+// Function selectors for V2 - calculated from keccak256(functionSignature)
 const SELECTORS = {
-  getAspectLevels: '0x9e23c6f1',
-  getGlobalState: '0x4e0e8f4e',
-  getUserState: '0x416ae768',
-  getActiveAspect: '0x9b2c5a5e',  // New: get active aspect (0=FORGE, 1=CHARGE, 2=GLITCH)
-  getCurrentRound: '0xbe8de82b',  // New: get current round (0-19)
-  forgeLevel: '0x5d3b1d30',
-  chargeLevel: '0xe7c37ef0',
-  glitchLevel: '0x97cf3e2a',
+  getAspectLevels: '0x109f54c6',   // getAspectLevels()
+  getGlobalState: '0xc7e7dd13',    // getGlobalState()
+  getUserState: '0x69416454',      // getUserState(address)
+  getActiveAspect: '0x9b2c5a5e',   // getActiveAspect()
+  getCurrentRound: '0xbe8de82b',   // getCurrentRound()
+  forgeLevel: '0x5d3b1d30',        // forgeLevel()
+  chargeLevel: '0xe7c37ef0',       // chargeLevel()
+  glitchLevel: '0x97cf3e2a',       // glitchLevel()
   globalProgress: '0x6b5cc770',
   currentDay: '0x5c9302c9',
   claimsToday: '0xeb3d4346',
@@ -44,11 +44,9 @@ export interface GlobalState {
   day: number;
   claimsToday: number;
   claimsRemaining: number;
-  progress: number;
-  progressMax: number;
   evolutionComplete: boolean;
   canAdvanceDay: boolean;
-  currentRound: number;  // 0-19
+  currentRound: number;  // 0, 1, or 2
 }
 
 export interface UserState {
@@ -123,16 +121,16 @@ export function useSwordEvolutionV2() {
       if (!data) { setGlobalState(null); return; }
 
       const hex = data.slice(2);
+      // getGlobalState() returns: (day, claimsToday_, claimsRemaining, activeAspect, currentRound, evolutionComplete, canAdvanceDay)
       const day = hexToNumber('0x' + hex.slice(0, 64));
       const claimsToday = hexToNumber('0x' + hex.slice(64, 128));
       const claimsRemaining = hexToNumber('0x' + hex.slice(128, 192));
-      const progress = hexToNumber('0x' + hex.slice(192, 256));
-      const progressMax = hexToNumber('0x' + hex.slice(256, 320));
+      // Skip activeAspect at position 192-256 (we get this from getAspectLevels)
+      const currentRound = hexToNumber('0x' + hex.slice(256, 320));
       const evolutionComplete = hexToNumber('0x' + hex.slice(320, 384)) === 1;
       const canAdvanceDay = hexToNumber('0x' + hex.slice(384, 448)) === 1;
-      const currentRound = hexToNumber('0x' + hex.slice(448, 512));
 
-      setGlobalState({ day, claimsToday, claimsRemaining, progress, progressMax, evolutionComplete, canAdvanceDay, currentRound });
+      setGlobalState({ day, claimsToday, claimsRemaining, evolutionComplete, canAdvanceDay, currentRound });
     } catch (err) {
       console.error('Error fetching global state:', err);
     }
