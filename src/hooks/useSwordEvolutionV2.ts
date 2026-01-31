@@ -7,25 +7,25 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { usePowerUpStore } from '@/store/powerUpStore';
 
 // Contract address - V2 (Base Sepolia)
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x3F7d8503ee9A8E781248605822f67A4Eeec30081';
 const RPC_URL = 'https://sepolia.base.org';
 
-// Function selectors for V2 - calculated from keccak256(functionSignature)
+// Function selectors for V2 - calculated from keccak256(functionSignature)[:4]
 const SELECTORS = {
-  getAspectLevels: '0x109f54c6',   // getAspectLevels()
-  getGlobalState: '0xc7e7dd13',    // getGlobalState()
-  getUserState: '0x69416454',      // getUserState(address)
-  getActiveAspect: '0x9b2c5a5e',   // getActiveAspect()
-  getCurrentRound: '0xbe8de82b',   // getCurrentRound()
-  forgeLevel: '0x5d3b1d30',        // forgeLevel()
-  chargeLevel: '0xe7c37ef0',       // chargeLevel()
-  glitchLevel: '0x97cf3e2a',       // glitchLevel()
-  globalProgress: '0x6b5cc770',
-  currentDay: '0x5c9302c9',
-  claimsToday: '0xeb3d4346',
-  stepClaimedToday: '0x7d2ec202',
+  getAspectLevels: '0x7e0211e7',   // getAspectLevels()
+  getGlobalState: '0x743faee2',    // getGlobalState()
+  getUserState: '0x416ae768',      // getUserState(address)
+  getActiveAspect: '0x4c2e0246',   // getActiveAspect()
+  getCurrentRound: '0xa32bf597',   // getCurrentRound()
+  forgeLevel: '0xf2096da8',        // forgeLevel()
+  chargeLevel: '0xd0d7e306',       // chargeLevel()
+  glitchLevel: '0xfd80bca4',       // glitchLevel()
+  currentDay: '0x5c9302c9',        // currentDay()
+  claimsToday: '0x061d8a73',       // claimsToday()
+  stepClaimedToday: '0x7d2ec202',  // stepClaimedToday()
 };
 
 function hexToNumber(hex: string): number {
@@ -57,13 +57,20 @@ export interface UserState {
 }
 
 async function callRpc(method: string, params: any[] = []): Promise<any> {
+  const body = JSON.stringify({ jsonrpc: '2.0', id: Math.random(), method, params });
+  
   const res = await fetch(RPC_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: Math.random(), method, params }),
+    body,
   });
   const data = await res.json();
-  if (data.error) return null;
+  
+  if (data.error) {
+    console.error('[V2 RPC] Error:', data.error.code, data.error.message);
+    throw new Error(`RPC Error ${data.error.code}: ${data.error.message}`);
+  }
+  
   return data.result;
 }
 
@@ -82,20 +89,38 @@ export function useSwordEvolutionV2() {
       }
     };
     getAccount();
+
+    // Listen for wallet changes
+    if (window.ethereum) {
+      const handleAccountsChanged = (accounts: string[]) => {
+        setAddress(accounts.length > 0 ? accounts[0] : null);
+      };
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      return () => {
+        window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
+      };
+    }
   }, []);
 
   const fetchAspectLevels = useCallback(async () => {
     try {
-      console.log('[V2 Hook] Fetching aspect levels from:', CONTRACT_ADDRESS);
       const data = await callRpc('eth_call', [{ to: CONTRACT_ADDRESS, data: SELECTORS.getAspectLevels }, 'latest']);
-      console.log('[V2 Hook] Raw response:', data);
-      if (!data) { 
-        console.error('[V2 Hook] No data returned from getAspectLevels');
+      
+      if (!data || data === '0x') { 
+        console.error('[V2] getAspectLevels: no data');
         setAspectLevels(null); 
         return; 
       }
 
       const hex = data.slice(2);
+      
+      // Expected 8 uint256 values = 256 bytes
+      if (hex.length < 512) {
+        console.error('[V2] getAspectLevels: bad response length', hex.length);
+        setAspectLevels(null);
+        return;
+      }
+      
       // First 3 values: forgeLevel, chargeLevel, glitchLevel (10-30)
       const forgeLevelRaw = hexToNumber('0x' + hex.slice(0, 64));
       const chargeLevelRaw = hexToNumber('0x' + hex.slice(64, 128));
@@ -109,17 +134,32 @@ export function useSwordEvolutionV2() {
       const daysRemainingInAspect = hexToNumber('0x' + hex.slice(448, 512));
 
       // Convert internal level (10-30) to display level (1.0-3.0)
+      // NOTE: Contract progress is inverted, calculate correct progress from level
+      const forgeLevel = forgeLevelRaw / 10;
+      const chargeLevel = chargeLevelRaw / 10;
+      const glitchLevel = glitchLevelRaw / 10;
+      
+      // Correct progress: Level 1.0 = 0%, Level 1.1 = 10%, Level 1.9 = 90%
+      const correctForgeProgress = Math.round((forgeLevel % 1) * 10);
+      const correctChargeProgress = Math.round((chargeLevel % 1) * 10);
+      const correctGlitchProgress = Math.round((glitchLevel % 1) * 10);
+      
       const parsed = {
-        forge: { level: forgeLevelRaw / 10, progress: forgeProgress },
-        charge: { level: chargeLevelRaw / 10, progress: chargeProgress },
-        glitch: { level: glitchLevelRaw / 10, progress: glitchProgress },
+        forge: { level: forgeLevel, progress: correctForgeProgress },
+        charge: { level: chargeLevel, progress: correctChargeProgress },
+        glitch: { level: glitchLevel, progress: correctGlitchProgress },
         activeAspect,
         daysRemainingInAspect,
       };
-      console.log('[V2 Hook] Parsed aspect levels:', parsed);
+      console.log('[V2 Hook] Parsed:', { 
+        day: parsed.activeAspect === 0 ? 'FORGE' : parsed.activeAspect === 1 ? 'CHARGE' : 'GLITCH',
+        levels: { forge: parsed.forge.level, charge: parsed.charge.level, glitch: parsed.glitch.level },
+        progress: { forge: parsed.forge.progress, charge: parsed.charge.progress, glitch: parsed.glitch.progress }
+      });
       setAspectLevels(parsed);
-    } catch (err) {
-      console.error('[V2 Hook] Error fetching aspect levels:', err);
+    } catch (err: any) {
+      console.error('[V2] getAspectLevels error:', err.message);
+      setAspectLevels(null);
     }
   }, []);
 
@@ -129,18 +169,18 @@ export function useSwordEvolutionV2() {
       if (!data) { setGlobalState(null); return; }
 
       const hex = data.slice(2);
-      // getGlobalState() returns: (day, claimsToday_, claimsRemaining, activeAspect, currentRound, evolutionComplete, canAdvanceDay)
+      // getGlobalState() returns 7 values: (day, claimsToday_, claimsRemaining, activeAspect, currentRound, evolutionComplete, canAdvanceDay)
       const day = hexToNumber('0x' + hex.slice(0, 64));
       const claimsToday = hexToNumber('0x' + hex.slice(64, 128));
       const claimsRemaining = hexToNumber('0x' + hex.slice(128, 192));
-      // Skip activeAspect at position 192-256 (we get this from getAspectLevels)
+      const activeAspect = hexToNumber('0x' + hex.slice(192, 256));
       const currentRound = hexToNumber('0x' + hex.slice(256, 320));
       const evolutionComplete = hexToNumber('0x' + hex.slice(320, 384)) === 1;
       const canAdvanceDay = hexToNumber('0x' + hex.slice(384, 448)) === 1;
 
       setGlobalState({ day, claimsToday, claimsRemaining, evolutionComplete, canAdvanceDay, currentRound });
     } catch (err) {
-      console.error('Error fetching global state:', err);
+      console.error('[V2] getGlobalState error:', err);
     }
   }, []);
 
@@ -160,7 +200,7 @@ export function useSwordEvolutionV2() {
 
       setUserState({ totalClaims, totalMinted, canClaimToday, lastClaimDay });
     } catch (err) {
-      console.error('Error fetching user state:', err);
+      console.error('[V2] getUserState error:', err);
     }
   }, [address]);
 
@@ -174,6 +214,31 @@ export function useSwordEvolutionV2() {
     const interval = setInterval(fetchAll, 10000);
     return () => clearInterval(interval);
   }, [fetchAspectLevels, fetchGlobalState, fetchUserState]);
+
+  // Sync contract data to powerUpStore
+  useEffect(() => {
+    if (aspectLevels) {
+      const state = usePowerUpStore.getState();
+      const forgeLvl = Math.floor(aspectLevels.forge.level);
+      const chargeLvl = Math.floor(aspectLevels.charge.level);
+      const glitchLvl = Math.floor(aspectLevels.glitch.level);
+      
+      // Only update if changed
+      if (state.currentLevel !== forgeLvl || 
+          state.chargeLevel !== chargeLvl || 
+          state.glitchLevel !== glitchLvl) {
+        usePowerUpStore.setState({
+          currentLevel: forgeLvl,
+          chargeLevel: chargeLvl,
+          glitchLevel: glitchLvl,
+          forgeProgress: aspectLevels.forge.progress * 10,
+          chargeProgress: aspectLevels.charge.progress * 10,
+          glitchProgress: aspectLevels.glitch.progress * 10,
+        });
+        console.log('[V2] Store sync:', { forge: forgeLvl, charge: chargeLvl, glitch: glitchLvl });
+      }
+    }
+  }, [aspectLevels]);
 
   const refetch = useCallback(async () => {
     setIsLoading(true);

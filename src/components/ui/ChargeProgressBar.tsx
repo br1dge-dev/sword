@@ -18,21 +18,32 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
     chargeProgress: localProgress,
     isChargeComplete,
     chargeLevel: localLevel,
-    maxChargeLevel: maxLevel
+    maxChargeLevel: maxLevel,
+    isClaimPending,
+    pendingAspect
   } = usePowerUpStore();
 
   const { aspectLevels, isLoading } = useSwordEvolutionV2();
+  
+  // Check if this aspect is pending a claim
+  const isThisAspectPending = isClaimPending && pendingAspect === 'charge';
   const prevProgressRef = useRef<number>(0);
   const [animatingTiles, setAnimatingTiles] = React.useState<Set<number>>(new Set());
 
   // Use contract data if available, fallback to local
   const level = aspectLevels?.charge.level ?? localLevel;
-  const progress = aspectLevels?.charge.progress ?? localProgress;
+  // Use local store progress (synced from contract and scaled 0-100)
+  const progress = localProgress;
   const isMaxLevel = level >= maxLevel;
 
-  // Detect progress changes and trigger animation
+  // Detect progress changes and trigger level-up animation
+  const [showLevelUp, setShowLevelUp] = React.useState(false);
+  
   useEffect(() => {
-    if (progress > prevProgressRef.current) {
+    if (progress > prevProgressRef.current && prevProgressRef.current > 0) {
+      // Level up detected!
+      setShowLevelUp(true);
+      
       const prevValue = prevProgressRef.current;
       const newValue = progress;
       
@@ -52,33 +63,36 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
       
       if (newlyActiveTiles.size > 0) {
         setAnimatingTiles(new Set(newlyActiveTiles));
-        
-        // Clear animation after 1.5 seconds
-        const timeout = setTimeout(() => {
-          setAnimatingTiles(new Set());
-        }, 1500);
-        
-        return () => clearTimeout(timeout);
       }
+      
+      // Clear animations after 3 seconds
+      const timeout = setTimeout(() => {
+        setAnimatingTiles(new Set());
+        setShowLevelUp(false);
+      }, 3000);
+      
+      return () => clearTimeout(timeout);
     }
     
     prevProgressRef.current = progress;
   }, [progress]);
 
-  // Calculate tile colors based on progress
-  const getTileColor = (index: number, totalTiles: number) => {
+  // Calculate tile colors based on progress - returns background color string
+  const getTileColor = (index: number, totalTiles: number): string => {
     const tileProgress = (index + 1) / totalTiles * 100;
 
     if (isMaxLevel) {
-      return 'bg-yellow-500';
+      return '#facc15'; // yellow-400
     } else if (tileProgress > progress) {
-      return 'bg-gray-800';
-    } else if (progress < 50) {
-      return 'bg-yellow-300';
+      return '#1f2937'; // gray-800
+    } else if (progress < 30) {
+      return '#fef08a'; // yellow-200
+    } else if (progress < 60) {
+      return '#facc15'; // yellow-400
     } else if (progress < 90) {
-      return 'bg-yellow-400';
+      return '#fb923c'; // orange-400
     } else {
-      return 'bg-yellow-500';
+      return '#f472b6'; // pink-400
     }
   };
 
@@ -95,8 +109,9 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
       tiles.push(
         <div
           key={i}
-          className={`h-full w-[10%] ${getTileColor(i, totalTiles)} border-r border-gray-900 last:border-r-0 transition-all duration-300 ${isAnimating ? 'animate-pulse' : ''}`}
+          className={`h-full w-[10%] border-r border-gray-900 last:border-r-0 transition-all duration-300 ${isAnimating ? 'animate-pulse' : ''}`}
           style={{
+            backgroundColor: getTileColor(i, totalTiles),
             boxShadow: isActive && (isMaxLevel || progress >= 90) ? 'inset 0 0 3px rgba(255,255,0,0.8)' :
                       isActive && progress >= 50 ? 'inset 0 0 2px rgba(255,255,0,0.5)' :
                       'none',
@@ -114,9 +129,9 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
       <div className="flex flex-col">
         {/* Header "CHARGE" with level */}
         <div
-          className="mb-1 text-xs font-bold font-press-start-2p text-left text-[#F8E16C]"
+          className="mb-1 text-xs font-bold font-press-start-2p text-left text-yellow-400"
           style={{
-            textShadow: '0 0 1px #F8E16C',
+            textShadow: '0 0 1px #facc15',
             letterSpacing: '0.05em'
           }}
         >
@@ -126,9 +141,11 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
         <div className="flex items-center gap-2">
           {/* Progress bar with 10 tiles */}
           <div
-            className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex ${isMaxLevel ? 'max-level-shine' : ''}`}
+            className={`relative h-6 w-32 border border-gray-700 bg-gray-900 overflow-hidden flex ${isMaxLevel ? 'max-level-shine' : ''} ${isThisAspectPending ? 'pending-pulse' : ''}`}
             style={{
-              boxShadow: 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
+              boxShadow: isThisAspectPending 
+                ? 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 8px rgba(248,225,108,0.8), 0 0 16px rgba(248,225,108,0.4)'
+                : 'inset 0 0 3px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.2)',
               imageRendering: 'pixelated'
             }}
           >
@@ -136,9 +153,30 @@ export default function ChargeProgressBar({ className = '' }: ChargeProgressBarP
 
             {/* MAX text at max level */}
             {isMaxLevel && (
-              <div className="max-level-text text-[#00FCA6]">MAX</div>
+              <div className="max-level-text text-yellow-400">MAX</div>
+            )}
+            
+            {/* Pending indicator overlay */}
+            {isThisAspectPending && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-400/30 to-transparent animate-[scan_1.5s_linear_infinite]" />
+            )}
+            
+            {/* Level Up animation overlay */}
+            {showLevelUp && (
+              <div className="absolute inset-0 flex items-center justify-center bg-yellow-400/30 animate-pulse">
+                <span className="text-[10px] font-bold text-yellow-400 font-press-start-2p animate-bounce">
+                  +0.1!
+                </span>
+              </div>
             )}
           </div>
+          
+          {/* Pending text indicator */}
+          {isThisAspectPending && (
+            <span className="text-[8px] font-mono text-yellow-400 animate-pulse">
+              pending...
+            </span>
+          )}
         </div>
       </div>
     </div>

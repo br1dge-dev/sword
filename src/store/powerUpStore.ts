@@ -27,6 +27,11 @@ interface PowerUpState {
   glitchProgress: number;
   isGlitchComplete: boolean;
 
+  // Claim pending state for blockchain transactions
+  pendingAspect: 'forge' | 'charge' | 'glitch' | null;
+  isClaimPending: boolean;
+  pendingTxHash: string | null;
+
   // Visual layers (reserved for future, currently none)
   
   // Aktionen
@@ -39,6 +44,10 @@ interface PowerUpState {
   increaseChargeProgress: () => void;
   increaseGlitchProgress: () => void;
   resetForgeProgress: () => void;
+  
+  // Claim pending actions
+  setClaimPending: (aspect: 'forge' | 'charge' | 'glitch' | null, txHash?: string) => void;
+  clearClaimPending: () => void;
   
   // Hilfsfunktion zum Zurücksetzen aller Effekte
   resetAllEffects: () => void;
@@ -60,6 +69,9 @@ export const usePowerUpStore = create<PowerUpState>()(
       maxGlitchLevel: 3,
       glitchProgress: 0,
       isGlitchComplete: false,
+      pendingAspect: null,
+      isClaimPending: false,
+      pendingTxHash: null,
 
       startPowerUp: () => {
         set((state) => {
@@ -161,6 +173,22 @@ export const usePowerUpStore = create<PowerUpState>()(
         set({ 
           forgeProgress: 0,
           isForgeComplete: false 
+        });
+      },
+      
+      setClaimPending: (aspect, txHash) => {
+        set({
+          pendingAspect: aspect,
+          isClaimPending: aspect !== null,
+          pendingTxHash: txHash || null,
+        });
+      },
+      
+      clearClaimPending: () => {
+        set({
+          pendingAspect: null,
+          isClaimPending: false,
+          pendingTxHash: null,
         });
       },
       

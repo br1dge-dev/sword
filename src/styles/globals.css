@@ -165,6 +165,12 @@
     100% { opacity: 0.85; transform: translateY(0px); }
   }
 
+  /* Scan animation for pending state */
+  @keyframes scan {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
   /* CRT glow + tube feel */
   .crt-glow {
     position: relative;
