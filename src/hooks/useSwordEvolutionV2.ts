@@ -16,7 +16,6 @@ const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x755f4
 const RPC_URLS = [
   'https://sepolia.base.org',
   'https://base-sepolia-rpc.publicnode.com',
-  'https://base-sepolia.blockpi.network/v1/rpc/public',
 ];
 
 // Function selectors for V2 - calculated from keccak256(functionSignature)[:4]
