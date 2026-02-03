@@ -8,7 +8,13 @@
 import { useState, useEffect, useCallback } from 'react';
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x755f48d8130bab70dd7Fd69bba037Ea9400b6365';
-const RPC_URL = 'https://sepolia.base.org';
+
+// Multiple RPC endpoints for fallback
+const RPC_URLS = [
+  'https://sepolia.base.org',
+  'https://base-sepolia-rpc.publicnode.com',
+  'https://base-sepolia.blockpi.network/v1/rpc/public',
+];
 
 // ERC20 Transfer event topic
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
@@ -22,17 +28,33 @@ export interface LeaderboardEntry {
 }
 
 async function callRpc(method: string, params: unknown[] = []): Promise<unknown> {
-  const res = await fetch(RPC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: Math.random(), method, params }),
-  });
-  const data = await res.json();
-  if (data.error) {
-    console.error('[Leaderboard RPC] Error:', data.error);
-    throw new Error(data.error.message);
+  let lastError: Error | null = null;
+  
+  for (const rpcUrl of RPC_URLS) {
+    try {
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: Math.random(), method, params }),
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
+      const data = await res.json();
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+      return data.result;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      // Try next RPC
+    }
   }
-  return data.result;
+  
+  console.error('[Leaderboard RPC] All RPCs failed:', lastError);
+  throw lastError;
 }
 
 export function useEdgeLeaderboard() {
