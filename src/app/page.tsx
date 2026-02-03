@@ -24,6 +24,7 @@ import { IoMdEye, IoMdEyeOff, IoMdTrophy, IoMdHelpCircle } from 'react-icons/io'
 import { useShallow } from 'zustand/react/shallow';
 import WtfIsThisModal from '@/components/ui/WtfIsThisModal';
 import { HitIndicator } from '@/components/ui/HitIndicator';
+import { useEdgeLeaderboard, formatEdgeBalance, formatAddress } from '@/hooks/useEdgeLeaderboard';
 
 const HIGHLIGHT_COLORS = ['#F8E16C', '#FF3EC8', '#3EE6FF'] as const;
 
@@ -208,32 +209,8 @@ export default function HomePage() {
     setAudioActive(true);
   };
 
-  // Pseudo-Leaderboard Daten
-  const leaderboardData = [
-    { address: '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6', points: 2847, rank: 1 },
-    { address: '0x8ba1f109551bD432803012645Hac136c772c3c3', points: 2156, rank: 2 },
-    { address: '0x1234567890abcdef1234567890abcdef12345678', points: 1892, rank: 3 },
-    { address: '0xabcdef1234567890abcdef1234567890abcdef12', points: 1456, rank: 4 },
-    { address: '0x9876543210fedcba9876543210fedcba98765432', points: 1234, rank: 5 },
-    { address: '0xfedcba0987654321fedcba0987654321fedcba09', points: 987, rank: 6 },
-    { address: '0x1111111111111111111111111111111111111111', points: 756, rank: 7 },
-    { address: '0x2222222222222222222222222222222222222222', points: 543, rank: 8 },
-    { address: '0x3333333333333333333333333333333333333333', points: 321, rank: 9 },
-    { address: '0x4444444444444444444444444444444444444444', points: 123, rank: 10 },
-  ];
-
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  const getRankColor = (rank: number) => {
-    switch (rank) {
-      case 1: return 'text-grifter-green';
-      case 2: return 'text-grifter-pink';
-      case 3: return 'text-grifter-blue';
-      default: return 'text-grifter-blue';
-    }
-  };
+  // $EDGE Leaderboard from contract
+  const { leaderboard: edgeLeaderboard, isLoading: isLeaderboardLoading } = useEdgeLeaderboard();
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
@@ -405,56 +382,66 @@ export default function HomePage() {
               </div>
               
               <div className="space-y-3">
-                {leaderboardData.map((entry) => {
-                  let rankClass = '';
-                  let numberColor = '';
-                  let pointsColor = '';
-                  let addressColor = '';
-                  let unitColor = '';
-                  if (entry.rank === 1) {
-                    rankClass = 'leaderboard-rank-1';
-                    numberColor = 'text-[#00FCA6]';
-                    pointsColor = 'text-[#00FCA6]';
-                    addressColor = 'text-[#00FCA6]';
-                    unitColor = '';
-                  } else if (entry.rank === 2) {
-                    rankClass = 'leaderboard-rank-2';
-                    numberColor = 'text-[#F8E16C]';
-                    pointsColor = 'text-[#F8E16C]';
-                    addressColor = 'text-[#F8E16C]';
-                    unitColor = '';
-                  } else if (entry.rank === 3) {
-                    rankClass = 'leaderboard-rank-3';
-                    numberColor = 'text-[#FF3EC8]';
-                    pointsColor = 'text-[#FF3EC8]';
-                    addressColor = 'text-[#FF3EC8]';
-                    unitColor = '';
-                  } else {
-                    numberColor = 'text-[#3EE6FF]';
-                    pointsColor = 'text-[#3EE6FF]';
-                    addressColor = 'text-[#3EE6FF]';
-                    unitColor = 'text-[#3EE6FF]';
-                  }
-                  return (
-                    <div
-                      key={entry.address}
-                      className={`flex items-center justify-between p-3 rounded ${rankClass || 'border border-grifter-blue'}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`text-xs font-press-start-2p flex items-center ${numberColor}`}>
-                          #{entry.rank}
+                {isLeaderboardLoading ? (
+                  <div className="text-center text-grifter-blue font-mono text-sm py-8">
+                    Loading $EDGE holders...
+                  </div>
+                ) : edgeLeaderboard.length === 0 ? (
+                  <div className="text-center text-gray-500 font-mono text-sm py-8">
+                    No $EDGE holders yet.<br />
+                    <span className="text-xs">Be the first to claim!</span>
+                  </div>
+                ) : (
+                  edgeLeaderboard.map((entry) => {
+                    let rankClass = '';
+                    let numberColor = '';
+                    let pointsColor = '';
+                    let addressColor = '';
+                    if (entry.rank === 1) {
+                      rankClass = 'leaderboard-rank-1';
+                      numberColor = 'text-[#00FCA6]';
+                      pointsColor = 'text-[#00FCA6]';
+                      addressColor = 'text-[#00FCA6]';
+                    } else if (entry.rank === 2) {
+                      rankClass = 'leaderboard-rank-2';
+                      numberColor = 'text-[#F8E16C]';
+                      pointsColor = 'text-[#F8E16C]';
+                      addressColor = 'text-[#F8E16C]';
+                    } else if (entry.rank === 3) {
+                      rankClass = 'leaderboard-rank-3';
+                      numberColor = 'text-[#FF3EC8]';
+                      pointsColor = 'text-[#FF3EC8]';
+                      addressColor = 'text-[#FF3EC8]';
+                    } else {
+                      numberColor = 'text-[#3EE6FF]';
+                      pointsColor = 'text-[#3EE6FF]';
+                      addressColor = 'text-[#3EE6FF]';
+                    }
+                    return (
+                      <div
+                        key={entry.address}
+                        className={`flex items-center justify-between p-3 rounded ${rankClass || 'border border-grifter-blue'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`text-xs font-press-start-2p flex items-center ${numberColor}`}>
+                            #{entry.rank}
+                          </div>
+                          <div className={`font-mono text-xs ${addressColor}`}>
+                            {formatAddress(entry.address)}
+                          </div>
                         </div>
-                        <div className={`font-mono text-xs ${addressColor}`}>
-                          {formatAddress(entry.address)}
+                        <div className="flex items-center gap-1">
+                          <span className={`text-xs font-press-start-2p ${pointsColor}`}>
+                            {formatEdgeBalance(entry.balance)}
+                          </span>
+                          <span className={`text-[10px] font-mono ${pointsColor} opacity-70`}>
+                            $EDGE
+                          </span>
                         </div>
                       </div>
-                      <div className="leaderboard-points">
-                        <span className={`text-xs font-press-start-2p ${pointsColor}`}>{entry.points}</span>
-                        <span className={`leaderboard-points-unit ${unitColor}`}>͆</span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
               
               <div className="mt-6 text-center">
