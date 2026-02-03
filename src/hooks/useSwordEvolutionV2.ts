@@ -171,11 +171,6 @@ export function useSwordEvolutionV2() {
         activeAspect,
         daysRemainingInAspect,
       };
-      console.log('[V2 Hook] Parsed:', { 
-        day: parsed.activeAspect === 0 ? 'FORGE' : parsed.activeAspect === 1 ? 'CHARGE' : 'GLITCH',
-        levels: { forge: parsed.forge.level, charge: parsed.charge.level, glitch: parsed.glitch.level },
-        progress: { forge: parsed.forge.progress, charge: parsed.charge.progress, glitch: parsed.glitch.progress }
-      });
       setAspectLevels(parsed);
     } catch (err: any) {
       console.error('[V2] getAspectLevels error:', err.message);
@@ -260,10 +255,6 @@ export function useSwordEvolutionV2() {
           forgeProgress: forgeProgressNew,
           chargeProgress: chargeProgressNew,
           glitchProgress: glitchProgressNew,
-        });
-        console.log('[V2] Store sync:', { 
-          forge: forgeLvl, charge: chargeLvl, glitch: glitchLvl,
-          progress: { forge: forgeProgressNew, charge: chargeProgressNew, glitch: glitchProgressNew }
         });
       }
     }
