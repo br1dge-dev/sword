@@ -13,7 +13,6 @@ const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x755f4
 const RPC_URLS = [
   'https://sepolia.base.org',
   'https://base-sepolia-rpc.publicnode.com',
-  'https://base-sepolia.blockpi.network/v1/rpc/public',
 ];
 
 // ERC20 Transfer event topic
@@ -68,22 +67,25 @@ export function useEdgeLeaderboard() {
       setError(null);
 
       // Get all Transfer events (mints are from zero address)
+      // Start from contract deployment block (37179766 = 0x2375206)
       const logs = await callRpc('eth_getLogs', [{
         address: CONTRACT_ADDRESS,
-        fromBlock: '0x0',
+        fromBlock: '0x2375206',
         toBlock: 'latest',
         topics: [TRANSFER_TOPIC]
-      }]) as Array<{ topics: string[]; data: string }>;
+      }]) as Array<{ topics: string[]; data: string }> | null;
 
       // Extract unique recipient addresses (topic[2] is 'to' address)
       const holders = new Set<string>();
-      for (const log of logs) {
-        const toAddress = log.topics[2];
-        // Skip zero address
-        if (toAddress !== ZERO_ADDRESS) {
-          // Convert padded address to checksum format
-          const address = '0x' + toAddress.slice(26);
-          holders.add(address.toLowerCase());
+      if (logs && Array.isArray(logs)) {
+        for (const log of logs) {
+          const toAddress = log.topics[2];
+          // Skip zero address
+          if (toAddress !== ZERO_ADDRESS) {
+            // Convert padded address to checksum format
+            const address = '0x' + toAddress.slice(26);
+            holders.add(address.toLowerCase());
+          }
         }
       }
 
