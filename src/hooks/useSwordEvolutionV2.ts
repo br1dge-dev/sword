@@ -11,7 +11,13 @@ import { usePowerUpStore } from '@/store/powerUpStore';
 
 // Contract address - V2 (Base Sepolia)
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x755f48d8130bab70dd7Fd69bba037Ea9400b6365';
-const RPC_URL = 'https://sepolia.base.org';
+
+// Multiple RPC endpoints for fallback
+const RPC_URLS = [
+  'https://sepolia.base.org',
+  'https://base-sepolia-rpc.publicnode.com',
+  'https://base-sepolia.blockpi.network/v1/rpc/public',
+];
 
 // Function selectors for V2 - calculated from keccak256(functionSignature)[:4]
 const SELECTORS = {
@@ -56,22 +62,36 @@ export interface UserState {
   lastClaimDay: number;
 }
 
-async function callRpc(method: string, params: any[] = []): Promise<any> {
+async function callRpc(method: string, params: unknown[] = []): Promise<unknown> {
   const body = JSON.stringify({ jsonrpc: '2.0', id: Math.random(), method, params });
+  let lastError: Error | null = null;
   
-  const res = await fetch(RPC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  });
-  const data = await res.json();
-  
-  if (data.error) {
-    console.error('[V2 RPC] Error:', data.error.code, data.error.message);
-    throw new Error(`RPC Error ${data.error.code}: ${data.error.message}`);
+  for (const rpcUrl of RPC_URLS) {
+    try {
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
+      const data = await res.json();
+      if (data.error) {
+        throw new Error(`RPC Error ${data.error.code}: ${data.error.message}`);
+      }
+      
+      return data.result;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      // Try next RPC
+    }
   }
   
-  return data.result;
+  console.error('[V2 RPC] All RPCs failed:', lastError);
+  throw lastError;
 }
 
 export function useSwordEvolutionV2() {
@@ -104,7 +124,7 @@ export function useSwordEvolutionV2() {
 
   const fetchAspectLevels = useCallback(async () => {
     try {
-      const data = await callRpc('eth_call', [{ to: CONTRACT_ADDRESS, data: SELECTORS.getAspectLevels }, 'latest']);
+      const data = await callRpc('eth_call', [{ to: CONTRACT_ADDRESS, data: SELECTORS.getAspectLevels }, 'latest']) as string | null;
       
       if (!data || data === '0x') { 
         console.error('[V2] getAspectLevels: no data');
@@ -165,7 +185,7 @@ export function useSwordEvolutionV2() {
 
   const fetchGlobalState = useCallback(async () => {
     try {
-      const data = await callRpc('eth_call', [{ to: CONTRACT_ADDRESS, data: SELECTORS.getGlobalState }, 'latest']);
+      const data = await callRpc('eth_call', [{ to: CONTRACT_ADDRESS, data: SELECTORS.getGlobalState }, 'latest']) as string | null;
       if (!data) { setGlobalState(null); return; }
 
       const hex = data.slice(2);
@@ -189,7 +209,7 @@ export function useSwordEvolutionV2() {
 
     try {
       const paddedAddr = address.slice(2).padStart(64, '0');
-      const data = await callRpc('eth_call', [{ to: CONTRACT_ADDRESS, data: SELECTORS.getUserState + paddedAddr }, 'latest']);
+      const data = await callRpc('eth_call', [{ to: CONTRACT_ADDRESS, data: SELECTORS.getUserState + paddedAddr }, 'latest']) as string | null;
       if (!data) { setUserState(null); return; }
 
       const hex = data.slice(2);
