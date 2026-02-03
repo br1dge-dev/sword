@@ -5,7 +5,7 @@
  */
 
 export const CONTRACT_ADDRESSES: Record<number, `0x${string}`> = {
-  84532: '0x3F7d8503ee9A8E781248605822f67A4Eeec30081', // Base Sepolia V2
+  84532: '0x755f48d8130bab70dd7Fd69bba037Ea9400b6365', // Base Sepolia V2.1 (auto-advance)
   8453: '0x0000000000000000000000000000000000000000',  // Base Mainnet V2 (future)
 };
 

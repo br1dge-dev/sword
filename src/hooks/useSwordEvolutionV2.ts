@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
 
 // Contract address - V2 (Base Sepolia)
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x3F7d8503ee9A8E781248605822f67A4Eeec30081';
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x755f48d8130bab70dd7Fd69bba037Ea9400b6365';
 const RPC_URL = 'https://sepolia.base.org';
 
 // Function selectors for V2 - calculated from keccak256(functionSignature)[:4]

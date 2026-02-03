@@ -6,8 +6,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 /// @title SwordEvolution V2 - Sequential aspect progression
-/// @notice 60 days, 3 aspects, 10 days each per round, 3 rounds total
-/// @dev Each day with ≥1 claim adds +0.1 to current active aspect
+/// @notice 60 days (24h each), 3 aspects, 10 days each per round, 2 rounds total
+/// @dev Each day = exactly 24h. First claim of day adds +0.1 to active aspect.
+///      Up to 10 users can claim $EDGE per day. Day auto-advances on next claim after 24h.
 contract SwordEvolutionV2 is ERC20, Ownable {
 
     using ECDSA for bytes32;
@@ -97,7 +98,6 @@ contract SwordEvolutionV2 is ERC20, Ownable {
     error ScoreTooLow(uint8 score, uint8 required);
     error InvalidSignature();
     error SignatureExpired();
-    error TooEarly();
     error NoActiveTracks();
     
     // ============ Constructor ============
@@ -158,12 +158,17 @@ contract SwordEvolutionV2 is ERC20, Ownable {
             revert EvolutionComplete();
         }
         
-        // Check global claims limit
+        // AUTO-ADVANCE: If 24h passed, advance to next day
+        if (block.timestamp >= dayStartTimestamp + 1 days) {
+            _advanceDay();
+        }
+        
+        // Check global claims limit (after potential advance)
         if (claimsToday >= MAX_CLAIMS_PER_DAY) {
             revert MaxClaimsReached();
         }
         
-        // Check user hasn't claimed today
+        // Check user hasn't claimed today (after potential advance)
         if (userLastClaimDay[msg.sender] == currentDay) {
             revert AlreadyClaimedToday();
         }
@@ -263,13 +268,8 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         );
     }
     
-    /// @notice Advance to next day
-    function advanceDay() external {
-        // Can advance if: 24h passed OR 10 claims reached
-        if (block.timestamp < dayStartTimestamp + 1 days && claimsToday < MAX_CLAIMS_PER_DAY) {
-            revert TooEarly();
-        }
-        
+    /// @notice Internal day advance logic (called automatically by claimWithSignature)
+    function _advanceDay() internal {
         if (currentDay >= TOTAL_DAYS) {
             return; // Evolution complete
         }
