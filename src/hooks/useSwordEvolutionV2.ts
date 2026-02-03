@@ -222,20 +222,29 @@ export function useSwordEvolutionV2() {
       const forgeLvl = Math.floor(aspectLevels.forge.level);
       const chargeLvl = Math.floor(aspectLevels.charge.level);
       const glitchLvl = Math.floor(aspectLevels.glitch.level);
+      const forgeProgressNew = aspectLevels.forge.progress * 10;
+      const chargeProgressNew = aspectLevels.charge.progress * 10;
+      const glitchProgressNew = aspectLevels.glitch.progress * 10;
       
-      // Only update if changed
+      // Update if level OR progress changed
       if (state.currentLevel !== forgeLvl || 
           state.chargeLevel !== chargeLvl || 
-          state.glitchLevel !== glitchLvl) {
+          state.glitchLevel !== glitchLvl ||
+          state.forgeProgress !== forgeProgressNew ||
+          state.chargeProgress !== chargeProgressNew ||
+          state.glitchProgress !== glitchProgressNew) {
         usePowerUpStore.setState({
           currentLevel: forgeLvl,
           chargeLevel: chargeLvl,
           glitchLevel: glitchLvl,
-          forgeProgress: aspectLevels.forge.progress * 10,
-          chargeProgress: aspectLevels.charge.progress * 10,
-          glitchProgress: aspectLevels.glitch.progress * 10,
+          forgeProgress: forgeProgressNew,
+          chargeProgress: chargeProgressNew,
+          glitchProgress: glitchProgressNew,
         });
-        console.log('[V2] Store sync:', { forge: forgeLvl, charge: chargeLvl, glitch: glitchLvl });
+        console.log('[V2] Store sync:', { 
+          forge: forgeLvl, charge: chargeLvl, glitch: glitchLvl,
+          progress: { forge: forgeProgressNew, charge: chargeProgressNew, glitch: glitchProgressNew }
+        });
       }
     }
   }, [aspectLevels]);
