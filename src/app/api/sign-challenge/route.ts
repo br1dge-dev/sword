@@ -67,9 +67,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Check score matches (prevent manipulation) - allow 10% tolerance for timing differences
+    // 4. Check score matches (prevent manipulation) - allow 15% tolerance for timing differences
     console.log('[SignChallenge] Score validation:', { calculatedScore, providedScore: score, diff: Math.abs(calculatedScore - score) });
-    if (Math.abs(calculatedScore - score) > 10) {
+    if (Math.abs(calculatedScore - score) > 15) {
       return NextResponse.json(
         { error: 'Score mismatch', calculatedScore, providedScore: score },
         { status: 403 }
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     const chain = baseSepolia;
     const contractAddress = process.env.CONTRACT_ADDRESS_BASE_SEPOLIA 
       || process.env.CONTRACT_ADDRESS
-      || '0x755f48d8130bab70dd7Fd69bba037Ea9400b6365'; // V2.1 Contract on Base Sepolia (auto-advance)
+      || '0x5FAE341367647F8Db2448792e793e9f46F67acb4'; // V2.1 Contract on Base Sepolia (auto-advance, score-based rewards)
     
     if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
       console.error('[SignChallenge] Contract address not configured');

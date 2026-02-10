@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePowerUpStore } from '@/store/powerUpStore';
 
 // Contract address - V2 (Base Sepolia)
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x755f48d8130bab70dd7Fd69bba037Ea9400b6365';
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x5FAE341367647F8Db2448792e793e9f46F67acb4';
 
 // Multiple RPC endpoints for fallback
 const RPC_URLS = [

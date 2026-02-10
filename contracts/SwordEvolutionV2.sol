@@ -16,7 +16,8 @@ contract SwordEvolutionV2 is ERC20, Ownable {
     // ============ Constants ============
     
     uint256 public constant MAX_SUPPLY = 60_000 ether;
-    uint256 public constant EDGE_PER_CLAIM = 100 ether;
+    uint256 public constant EDGE_BASE = 100 ether;        // Minimum EDGE for MIN_SCORE
+    uint256 public constant EDGE_MAX = 200 ether;         // Maximum EDGE for perfect score (100)
     uint8 public constant MAX_CLAIMS_PER_DAY = 10;
     uint256 public constant CHALLENGE_WINDOW_MS = 45_000;
     uint8 public constant MIN_SCORE = 70;
@@ -34,17 +35,17 @@ contract SwordEvolutionV2 is ERC20, Ownable {
     
     // ============ State Variables ============
     
-    /// @notice Current day (1-60)
-    uint256 public currentDay;
+    /// @notice Deployment timestamp (used to calculate current day)
+    uint256 public immutable deploymentTimestamp;
     
-    /// @notice Claims made today (0-10)
+    /// @notice Claims made in the current day (0-10)
     uint8 public claimsToday;
     
     /// @notice Was a step claimed today? (prevents multiple progress per day)
     bool public stepClaimedToday;
     
-    /// @notice When current day started
-    uint256 public dayStartTimestamp;
+    /// @notice Which day was last processed (for claimsToday/stepClaimedToday reset)
+    uint256 public lastProcessedDay;
     
     /// @notice Aspect progress: 10-30 for each aspect (internally 10 = 1.0, 30 = 3.0)
     /// forgeProgress, chargeProgress, glitchProgress
@@ -62,7 +63,8 @@ contract SwordEvolutionV2 is ERC20, Ownable {
     uint256 public trackCount;
     
     /// @notice User data
-    mapping(address => uint256) public userLastClaimDay;
+    mapping(address => uint256) public userLastClaimDay;      // Which day user last claimed (for aspect progression)
+    mapping(address => uint256) public userLastClaimTimestamp;  // Exact timestamp of last claim (for 24h cooldown)
     mapping(address => uint256) public userTotalClaims;
     mapping(address => uint256) public userTotalMinted;
     
@@ -103,8 +105,8 @@ contract SwordEvolutionV2 is ERC20, Ownable {
     // ============ Constructor ============
     
     constructor() ERC20("EDGE", "EDGE") Ownable(msg.sender) {
-        currentDay = 1;
-        dayStartTimestamp = block.timestamp;
+        deploymentTimestamp = block.timestamp;
+        lastProcessedDay = 1;
         
         // Initialize all aspects at level 10 (1.0)
         forgeLevel = 10;
@@ -124,8 +126,38 @@ contract SwordEvolutionV2 is ERC20, Ownable {
     
     // ============ Helper Functions ============
     
+    /// @notice Calculate EDGE amount based on score (70-100)
+    /// Score 70 = 100 EDGE, Score 100 = 200 EDGE, linear in between
+    function calculateEdgeReward(uint8 score) public pure returns (uint256) {
+        if (score <= MIN_SCORE) {
+            return EDGE_BASE;
+        }
+        if (score >= 100) {
+            return EDGE_MAX;
+        }
+        
+        // Linear interpolation: BASE + (MAX - BASE) * (score - MIN) / (100 - MIN)
+        uint256 bonus = (EDGE_MAX - EDGE_BASE) * (score - MIN_SCORE) / (100 - MIN_SCORE);
+        return EDGE_BASE + bonus;
+    }
+    
+    /// @notice Calculate current day based on time elapsed since deployment
+    /// This ensures days progress automatically without requiring claims
+    function getCurrentDay() public view returns (uint256) {
+        if (block.timestamp <= deploymentTimestamp) {
+            return 1;
+        }
+        uint256 elapsedDays = (block.timestamp - deploymentTimestamp) / 1 days;
+        uint256 day = elapsedDays + 1;
+        return day > TOTAL_DAYS ? TOTAL_DAYS + 1 : day; // Cap at TOTAL_DAYS + 1 (evolution complete)
+    }
+    
     /// @notice Get currently active aspect based on day
     function getActiveAspect() public view returns (Aspect) {
+        uint256 currentDay = getCurrentDay();
+        if (currentDay > TOTAL_DAYS) {
+            return Aspect.GLITCH; // Default when evolution complete
+        }
         uint8 dayInCycle = uint8((currentDay - 1) % 30); // 0-29
         
         if (dayInCycle < 10) {
@@ -139,7 +171,24 @@ contract SwordEvolutionV2 is ERC20, Ownable {
     
     /// @notice Get current round (0, 1, or 2)
     function getCurrentRound() public view returns (uint8) {
+        uint256 currentDay = getCurrentDay();
+        if (currentDay > TOTAL_DAYS) {
+            return 2; // Last round when evolution complete
+        }
         return uint8((currentDay - 1) / 30); // 0, 1, or 2
+    }
+    
+    /// @notice Internal function to sync state when day changes
+    /// Resets daily counters if we've entered a new day
+    function _syncDay() internal {
+        uint256 actualCurrentDay = getCurrentDay();
+        
+        if (actualCurrentDay != lastProcessedDay) {
+            // We've entered a new day - reset daily counters
+            claimsToday = 0;
+            stepClaimedToday = false;
+            lastProcessedDay = actualCurrentDay;
+        }
     }
     
     // ============ Core Functions ============
@@ -153,23 +202,23 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         bytes32 r,
         bytes32 s
     ) external {
+        // Sync day state (resets counters if we've entered a new day)
+        _syncDay();
+        
+        uint256 currentDay = getCurrentDay();
+        
         // Check evolution not complete
         if (currentDay > TOTAL_DAYS) {
             revert EvolutionComplete();
         }
         
-        // AUTO-ADVANCE: If 24h passed, advance to next day
-        if (block.timestamp >= dayStartTimestamp + 1 days) {
-            _advanceDay();
-        }
-        
-        // Check global claims limit (after potential advance)
+        // Check global claims limit
         if (claimsToday >= MAX_CLAIMS_PER_DAY) {
             revert MaxClaimsReached();
         }
         
-        // Check user hasn't claimed today (after potential advance)
-        if (userLastClaimDay[msg.sender] == currentDay) {
+        // Check user hasn't claimed in the last 24 hours (strict cooldown)
+        if (block.timestamp < userLastClaimTimestamp[msg.sender] + 1 days) {
             revert AlreadyClaimedToday();
         }
         
@@ -208,6 +257,7 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         
         // Update user state
         userLastClaimDay[msg.sender] = currentDay;
+        userLastClaimTimestamp[msg.sender] = block.timestamp;
         userTotalClaims[msg.sender]++;
         nonces[msg.sender]++;
         
@@ -247,8 +297,8 @@ contract SwordEvolutionV2 is ERC20, Ownable {
             }
         }
         
-        // Mint $EDGE
-        uint256 mintAmount = EDGE_PER_CLAIM;
+        // Mint $EDGE based on score
+        uint256 mintAmount = calculateEdgeReward(score);
         if (totalSupply() + mintAmount > MAX_SUPPLY) {
             mintAmount = MAX_SUPPLY - totalSupply();
         }
@@ -266,20 +316,6 @@ contract SwordEvolutionV2 is ERC20, Ownable {
             activeAspect,
             aspectNewLevel
         );
-    }
-    
-    /// @notice Internal day advance logic (called automatically by claimWithSignature)
-    function _advanceDay() internal {
-        if (currentDay >= TOTAL_DAYS) {
-            return; // Evolution complete
-        }
-        
-        currentDay++;
-        claimsToday = 0;
-        stepClaimedToday = false;
-        dayStartTimestamp = block.timestamp;
-        
-        emit DayAdvanced(currentDay, getActiveAspect(), forgeLevel, chargeLevel, glitchLevel);
     }
     
     // ============ View Functions ============
@@ -307,6 +343,7 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         activeAspect = getActiveAspect();
         
         // Calculate days remaining in current aspect phase
+        uint256 currentDay = getCurrentDay();
         uint8 dayInCycle = uint8((currentDay - 1) % 30);
         if (dayInCycle < 10) {
             daysRemainingInAspect = 10 - dayInCycle;
@@ -324,10 +361,13 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         bool canClaimToday,
         uint256 lastClaimDay
     ) {
+        bool cooldownPassed = block.timestamp >= userLastClaimTimestamp[user] + 1 days;
+        bool hasClaimsRemaining = claimsToday < MAX_CLAIMS_PER_DAY;
+        
         return (
             userTotalClaims[user],
             userTotalMinted[user],
-            userLastClaimDay[user] != currentDay && claimsToday < MAX_CLAIMS_PER_DAY,
+            cooldownPassed && hasClaimsRemaining,
             userLastClaimDay[user]
         );
     }
@@ -342,7 +382,7 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         bool evolutionComplete,
         bool canAdvanceDay
     ) {
-        bool timePassed = block.timestamp >= dayStartTimestamp + 1 days;
+        uint256 currentDay = getCurrentDay();
         bool claimsFull = claimsToday >= MAX_CLAIMS_PER_DAY;
         
         return (
@@ -352,7 +392,7 @@ contract SwordEvolutionV2 is ERC20, Ownable {
             getActiveAspect(),
             getCurrentRound(),
             currentDay > TOTAL_DAYS,
-            timePassed || claimsFull
+            claimsFull
         );
     }
     
@@ -370,7 +410,7 @@ contract SwordEvolutionV2 is ERC20, Ownable {
         }
         if (activeCount == 0) revert NoActiveTracks();
         
-        uint256 seed = uint256(keccak256(abi.encodePacked(currentDay, "GR1FTSWORD")));
+        uint256 seed = uint256(keccak256(abi.encodePacked(getCurrentDay(), "GR1FTSWORD")));
         uint256 selectedIndex = seed % activeCount;
         
         uint256 activeIdx = 0;

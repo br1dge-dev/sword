@@ -36,8 +36,9 @@ export interface ChallengeState {
   // Stats
   hits: ChallengeHit[];
   userClicks: number[]; // Timestamps of user clicks in seconds
-  combo: number;
-  accuracy: number;
+  missedBeats: number; // Count of beats that passed without being hit
+  totalBeats: number; // Total beats in challenge window
+  accuracy: number; // Current accuracy percentage
   timeLeft: number;
 
   // Actions
@@ -47,12 +48,18 @@ export interface ChallengeState {
   setHitMap: (hitMap: HitMapData) => void;
   addHit: (hit: ChallengeHit) => void;
   addUserClick: (timestamp: number) => void;
+  addMissedBeat: () => void;
+  setTotalBeats: (count: number) => void;
   resetChallenge: () => void;
+  startChallenge: (totalBeats: number) => void;
+  finalizeAccuracy: () => void; // Call when challenge ends to include missed beats
   setTimeLeft: (time: number) => void;
 
   // Computed
+  getAccuracy: () => number;
   getUpcomingBeats: (lookaheadMs: number) => number[];
   getClaimData: () => { hitmap: number[]; userClicks: number[] } | null;
+  getScore: () => { hits: number; missed: number; wrong: number; total: number; accuracy: number };
 }
 
 export const useChallengeStore = create<ChallengeState>((set, get) => ({
@@ -63,8 +70,9 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   hitMap: null,
   hits: [],
   userClicks: [],
-  combo: 0,
-  accuracy: 100,
+  missedBeats: 0,
+  totalBeats: 0,
+  accuracy: 0,
   timeLeft: 45,
 
   // Actions
@@ -76,16 +84,26 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
 
   setHitMap: (hitMap) => set({ hitMap }),
 
+  // Helper to calculate accuracy during challenge (hits / (hits + wrong))
+  calculateAccuracy: () => {
+    const { hits } = get();
+    const successfulHits = hits.filter(h => h.hit).length;
+    const wrongClicks = hits.filter(h => !h.hit).length;
+    const totalAttempts = successfulHits + wrongClicks;
+    if (totalAttempts === 0) return 0;
+    return Math.round((successfulHits / totalAttempts) * 100);
+  },
+
   addHit: (hit) => set((state) => {
     const newHits = [...state.hits, hit];
+    // Count successful hits and wrong clicks
     const successfulHits = newHits.filter(h => h.hit).length;
-    const totalAttempts = newHits.length;
-    const newAccuracy = totalAttempts > 0 ? (successfulHits / totalAttempts) * 100 : 100;
-    const newCombo = hit.hit ? state.combo + 1 : 0;
-
+    const wrongClicks = newHits.filter(h => !h.hit).length;
+    // Calculate accuracy: hits / (hits + wrong)
+    const totalAttempts = successfulHits + wrongClicks;
+    const newAccuracy = totalAttempts > 0 ? Math.round((successfulHits / totalAttempts) * 100) : 0;
     return {
       hits: newHits,
-      combo: newCombo,
       accuracy: newAccuracy
     };
   }),
@@ -94,17 +112,57 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     userClicks: [...state.userClicks, timestamp]
   })),
 
+  addMissedBeat: () => set((state) => ({
+    missedBeats: state.missedBeats + 1
+  })),
+
+  setTotalBeats: (count) => set({ totalBeats: count }),
+
   resetChallenge: () => set({
     hits: [],
     userClicks: [],
-    combo: 0,
-    accuracy: 100,
+    missedBeats: 0,
+    accuracy: 0,
+    // totalBeats is NOT reset here - it's set when challenge starts
     timeLeft: 45,
     phase: 'idle',
     audioTime: 0
   }),
 
+  // Start challenge with total beats - resets state AND sets totalBeats in one update
+  startChallenge: (totalBeats) => set({
+    hits: [],
+    userClicks: [],
+    missedBeats: 0,
+    totalBeats,
+    accuracy: 0,
+    timeLeft: 45,
+    phase: 'idle',
+    audioTime: 0
+  }),
+
+  // Finalize accuracy at end of challenge (include missed beats)
+  finalizeAccuracy: () => set((state) => {
+    const successfulHits = state.hits.filter(h => h.hit).length;
+    const wrongClicks = state.hits.filter(h => !h.hit).length;
+    const missedBeats = state.missedBeats;
+    // Final accuracy: hits / (hits + wrong + missed)
+    const total = successfulHits + wrongClicks + missedBeats;
+    const finalAccuracy = total > 0 ? Math.round((successfulHits / total) * 100) : 0;
+    return { accuracy: finalAccuracy };
+  }),
+
   setTimeLeft: (time) => set({ timeLeft: time }),
+
+  // Computed: get current accuracy (during challenge)
+  getAccuracy: () => {
+    const { hits } = get();
+    const successfulHits = hits.filter(h => h.hit).length;
+    const wrongClicks = hits.filter(h => !h.hit).length;
+    const total = successfulHits + wrongClicks;
+    if (total === 0) return 0;
+    return Math.round((successfulHits / total) * 100);
+  },
 
   // Computed: get upcoming beats based on audio time
   getUpcomingBeats: (lookaheadMs: number) => {
@@ -150,6 +208,24 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     return {
       hitmap: beatsInWindow,
       userClicks: clicksInWindow,
+    };
+  },
+
+  // Get current score breakdown
+  getScore: () => {
+    const { hits, missedBeats, totalBeats } = get();
+    const successfulHits = hits.filter(h => h.hit).length;
+    const wrongClicks = hits.filter(h => !h.hit).length;
+    // Calculate accuracy including wrong clicks and missed beats
+    const total = successfulHits + wrongClicks + missedBeats;
+    const accuracy = total > 0 ? Math.round((successfulHits / total) * 100) : 0;
+    
+    return {
+      hits: successfulHits,
+      missed: missedBeats,
+      wrong: wrongClicks,
+      total: totalBeats,
+      accuracy
     };
   }
 }));
