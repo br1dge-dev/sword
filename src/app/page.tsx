@@ -57,6 +57,7 @@ export default function HomePage() {
     accuracy: challengeScore,
     timeLeft,
     hits: challengeHits,
+    totalBeats: challengeTotalBeats,
     hitMap,
     getUpcomingBeats,
     setMode,
@@ -69,6 +70,7 @@ export default function HomePage() {
       accuracy: s.accuracy,
       timeLeft: s.timeLeft,
       hits: s.hits,
+      totalBeats: s.totalBeats,
       hitMap: s.hitMap,
       getUpcomingBeats: s.getUpcomingBeats,
       setMode: s.setMode,
@@ -295,7 +297,7 @@ export default function HomePage() {
           <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
             <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
               <div className="text-xs font-mono text-grifter-green/60 mb-1">SCORE</div>
-              <div className="text-2xl font-press-start-2p text-grifter-green">{challengeScore.toFixed(0)}%</div>
+              <div className="text-2xl font-press-start-2p text-grifter-green">{(challengeTotalBeats || 0) === 0 ? '-' : `${(challengeScore || 0).toFixed(0)}%`}</div>
             </div>
             <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
               <div className="text-xs font-mono text-grifter-green/60 mb-1">TIME</div>

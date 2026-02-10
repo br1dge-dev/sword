@@ -54,34 +54,46 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const [lastEnergy, setLastEnergy] = useState(0);
   
   // Challenge Mode State - use shared store
-  const { mode, setMode, phase, setPhase, hits: sharedHits, combo: sharedCombo, accuracy: sharedAccuracy, timeLeft: sharedTimeLeft, addHit, addUserClick, resetChallenge, setTimeLeft: setSharedTimeLeft } = useChallengeStore(
+  const { mode, setMode, phase, setPhase, hits: sharedHits, timeLeft: sharedTimeLeft, missedBeats: sharedMissedBeats, totalBeats: sharedTotalBeats, accuracy: sharedAccuracy, addHit, addUserClick, addMissedBeat, startChallenge, resetChallenge, finalizeAccuracy, setTotalBeats, setTimeLeft: setSharedTimeLeft, getAccuracy } = useChallengeStore(
     useShallow((s) => ({
       mode: s.mode,
       setMode: s.setMode,
       phase: s.phase,
       setPhase: s.setPhase,
       hits: s.hits,
-      combo: s.combo,
-      accuracy: s.accuracy,
       timeLeft: s.timeLeft,
+      missedBeats: s.missedBeats,
+      totalBeats: s.totalBeats,
+      accuracy: s.accuracy,
       addHit: s.addHit,
       addUserClick: s.addUserClick,
+      addMissedBeat: s.addMissedBeat,
+      startChallenge: s.startChallenge,
       resetChallenge: s.resetChallenge,
+      finalizeAccuracy: s.finalizeAccuracy,
+      setTotalBeats: s.setTotalBeats,
       setTimeLeft: s.setTimeLeft,
+      getAccuracy: s.getAccuracy,
     })),
   );
 
   // Local state for things that don't need to be shared
   const [countdown, setCountdown] = useState(3);
   const [hitMap, setHitMap] = useState<HitMapData | null>(null);
-  const [maxPossibleHits, setMaxPossibleHits] = useState(0);
+  const [localTotalBeats, setLocalTotalBeats] = useState(0); // Store totalBeats locally to avoid async issues
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const challengeRafRef = useRef<number | undefined>(undefined);
   const isPlayingChallengeRef = useRef(false);
 
-  // Derived values from shared hits
-  const successfulHits = sharedHits.filter(h => h.hit).length;
-  const missClicks = sharedHits.filter(h => !h.hit).length;
+  // Derived values from shared hits (with safe defaults)
+  const safeHits = sharedHits || [];
+  // Count UNIQUE successful hits (by beatIndex) - same as server
+  const hitBeatIndices = new Set(safeHits.filter(h => h?.hit).map(h => h?.beatIndex).filter((i): i is number => i !== undefined));
+  const uniqueHits = hitBeatIndices.size || 0;
+  const missClicks = safeHits.filter(h => h && !h.hit).length || 0;
+  const safeMissedBeats = sharedMissedBeats || 0;
+  // Use localTotalBeats instead of sharedTotalBeats to avoid async state issues
+  const effectiveTotalBeats = localTotalBeats > 0 ? localTotalBeats : (sharedTotalBeats || 0);
   
   const initializationAttemptedRef = useRef<boolean>(false);
 
@@ -210,11 +222,11 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
           const startTime = data.challengeConfig.startOffset;
           const endTime = startTime + data.challengeConfig.duration;
           const hitsInWindow = data.fullHitMap.filter(t => t >= startTime && t <= endTime).length;
-          setMaxPossibleHits(hitsInWindow);
+          setTotalBeats(hitsInWindow);
         })
         .catch(err => console.error('Failed to load hitmap:', err));
     }
-  }, [mode, hitMap]);
+  }, [mode, hitMap, setTotalBeats]);
 
   // Get wallet address from window.ethereum
   const getWalletAddress = useCallback(async () => {
@@ -269,11 +281,21 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const handleChallengeStart = useCallback(() => {
     if (!audioRef.current || !hitMap || isPlayingChallengeRef.current) return;
 
+    // Calculate total beats for this challenge
+    const startTime = hitMap.challengeConfig.startOffset;
+    const endTime = startTime + hitMap.challengeConfig.duration;
+    const hitsInWindow = hitMap.fullHitMap.filter(t => t >= startTime && t <= endTime).length;
+
+    // Start challenge - resets state AND sets totalBeats in ONE atomic update
+    startChallenge(hitsInWindow);
+    // Also store locally to avoid async state issues
+    setLocalTotalBeats(hitsInWindow);
+    console.log('[Challenge] Started with', hitsInWindow, 'beats');
+
     isPlayingChallengeRef.current = true;
     stopIdle();
     setMusicPlaying(true);
     clearRipples();
-    resetChallenge();
 
     const startAt = Math.max(0, hitMap.challengeConfig.startOffset - 3);
     audioRef.current.src = `/music/${hitMap.track}`;
@@ -300,7 +322,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         setSharedTimeLeft(hitMap.challengeConfig.duration);
       }
     }, 1000);
-  }, [hitMap, stopIdle, setMusicPlaying, clearRipples, resetChallenge, setPhase, setSharedTimeLeft]);
+  }, [hitMap, stopIdle, setMusicPlaying, clearRipples, startChallenge, setPhase, setSharedTimeLeft]);
 
   // Track time during active challenge
   useEffect(() => {
@@ -316,6 +338,8 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       setAudioTime(t); // Update shared audio time for HitIndicator
 
       if (remaining <= 0) {
+        // Finalize accuracy calculation (include missed beats)
+        finalizeAccuracy();
         setPhase('results');
         if (audioRef.current) {
           audioRef.current.pause();
@@ -332,13 +356,12 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     return () => {
       if (challengeRafRef.current) cancelAnimationFrame(challengeRafRef.current);
     };
-  }, [phase, hitMap, setMusicPlaying, setPhase, setSharedTimeLeft]);
+  }, [phase, hitMap, setMusicPlaying, setPhase, setSharedTimeLeft, finalizeAccuracy]);
 
   // Handle challenge click - now handled globally via window event listener
   // Keeping this for reference but not using it directly
 
   // Track missed beats (beats that passed without being hit)
-  const [missedBeats, setMissedBeats] = useState(0);
   const lastCheckedBeatRef = useRef<number>(-1);
   
   // Check for missed beats during active challenge
@@ -351,7 +374,8 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       const startTime = hitMap.challengeConfig.startOffset;
 
       // Find beats that have passed (beyond tolerance window) and weren't hit
-      const hitTimesArray = sharedHits.filter(h => h.hit).map(h => h.timestamp);
+      const hits = sharedHits || [];
+      const hitTimesArray = hits.filter(h => h?.hit).map(h => h?.timestamp).filter((t): t is number => t !== undefined);
 
       let newMissed = 0;
       for (const beatTime of hitMap.fullHitMap) {
@@ -369,27 +393,26 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       }
 
       if (newMissed > 0) {
-        setMissedBeats(prev => prev + newMissed);
+        for (let i = 0; i < newMissed; i++) {
+          addMissedBeat();
+        }
       }
     };
 
     const interval = setInterval(checkMissedBeats, 100);
     return () => clearInterval(interval);
-  }, [phase, hitMap, sharedHits]);
+  }, [phase, hitMap, sharedHits, addMissedBeat]);
   
-  // Reset missed beats when challenge resets
+  // Reset missed beats tracking when challenge resets
   useEffect(() => {
     if (phase === 'idle') {
-      setMissedBeats(0);
       lastCheckedBeatRef.current = -1;
     }
   }, [phase]);
   
-  // Calculate challenge stats - accuracy based on beats hit (same as server)
-  // Count unique beats that were hit (within tolerance)
-  const hitBeatIndices = new Set(sharedHits.filter(h => h.hit).map(h => h.beatIndex));
-  const uniqueHits = hitBeatIndices.size;
-  const accuracy = maxPossibleHits > 0 ? (uniqueHits / maxPossibleHits) * 100 : 100;
+  // Use accuracy from store (calculated as hits / (hits + wrong) during challenge,
+  // and hits / (hits + wrong + missed) at the end)
+  const accuracy = sharedAccuracy || 0;
   const passed = accuracy >= 70;
 
   // Expose challenge click handler for fullscreen click area
@@ -428,7 +451,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         hit: isHit
       });
 
-      const intensity = isHit ? 0.95 + Math.min(sharedCombo * 0.03, 0.2) : 0.7;
+      const intensity = isHit ? 0.95 : 0.7;
       addRipple(e.clientX, e.clientY, isHit, intensity);
 
       triggerBeat();
@@ -438,7 +461,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
 
     window.addEventListener('click', handleGlobalClick);
     return () => window.removeEventListener('click', handleGlobalClick);
-  }, [isChallengeActive, hitMap, sharedCombo, addUserClick, addRipple, triggerBeat, updateEnergy]);
+  }, [isChallengeActive, hitMap, addUserClick, addRipple, triggerBeat, updateEnergy]);
   
   // Nächsten Track (stabil, damit Event-Handler sauber sind)
   const nextTrack = useCallback(async (autoplay = false) => {
@@ -846,36 +869,23 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
           {/* Active: Show stats - clicks handled globally */}
           {phase === 'active' && (
             <div className="w-full flex flex-col items-center">
-              {/* Big accuracy percentage */}
+              {/* Big accuracy percentage - shows "-" until first hit */}
               <div
-                className="text-4xl font-press-start-2p mb-1 transition-all duration-150"
+                className="text-4xl font-press-start-2p mb-1"
                 style={{
-                  color: sharedAccuracy >= 70 ? '#00FCA6' : sharedAccuracy >= 50 ? '#F8E16C' : '#FF3EC8',
-                  textShadow: `0 0 ${12 + sharedCombo * 2}px currentColor`,
-                  transform: sharedCombo > 3 ? `scale(${1 + sharedCombo * 0.02})` : 'scale(1)',
+                  color: accuracy >= 70 ? '#00FCA6' : accuracy >= 50 ? '#F8E16C' : '#FF3EC8',
+                  textShadow: '0 0 12px currentColor',
                 }}
               >
-                {sharedAccuracy.toFixed(0)}%
+                {effectiveTotalBeats === 0 ? '-' : `${accuracy}%`}
               </div>
-
-              {/* Combo display */}
-              {sharedCombo > 0 && (
-                <div
-                  className="font-press-start-2p text-xs mb-2 transition-all duration-100"
-                  style={{
-                    color: sharedCombo >= 5 ? '#00FCA6' : '#3EE6FF',
-                    textShadow: `0 0 ${8 + sharedCombo}px currentColor`,
-                  }}
-                >
-                  {sharedCombo}x
-                </div>
-              )}
               
-              {/* Hit counter - shows your hits, not total possible */}
+              {/* Hit counter - shows hits, misses, and missed beats */}
               <div className="flex items-center gap-3 text-xs font-press-start-2p mb-2">
-                <span className="text-grifter-green">{successfulHits} ✓</span>
-                {missClicks > 0 && <span className="text-grifter-pink">{missClicks} ✗</span>}
-                <span className="text-grifter-blue/60">{Math.ceil(sharedTimeLeft)}s</span>
+                <span className="text-grifter-green">{uniqueHits} / {effectiveTotalBeats}</span>
+                {safeMissedBeats > 0 && <span className="text-grifter-orange">{safeMissedBeats} missed</span>}
+                {missClicks > 0 && <span className="text-grifter-pink">{missClicks} wrong</span>}
+                <span className="text-grifter-blue/60">{Math.ceil(sharedTimeLeft || 0)}s</span>
               </div>
               
               {/* Subtle tap hint */}
@@ -898,7 +908,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
                 {passed ? 'PASSED!' : 'TRY AGAIN'}
               </div>
               <div className="text-3xl font-press-start-2p text-white mb-1">
-                {sharedAccuracy.toFixed(0)}%
+                {effectiveTotalBeats === 0 ? '-' : `${accuracy}%`}
               </div>
 
               {/* Claim button for passed challenges */}
@@ -923,18 +933,29 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
                 </div>
               )}
 
+{/* Detailed stats breakdown */}
+              <div className="flex flex-col items-center gap-1 text-xs font-press-start-2p mt-2">
+                <div className="flex items-center gap-4">
+                  <span className="text-grifter-green">{uniqueHits} hits</span>
+                  <span className="text-grifter-orange">{safeMissedBeats} missed</span>
+                  <span className="text-grifter-pink">{missClicks} wrong</span>
+                </div>
+                <div className="text-grifter-blue/60">
+                  Total: {effectiveTotalBeats} beats
+                </div>
+              </div>
+
               {/* Only show RETRY if not successfully claimed */}
               {!(passed && hasClaimedSuccessfully) && (
                 <button
                   onClick={() => {
                     setPhase('idle');
                     resetChallenge();
-                    setMissedBeats(0);
                     lastCheckedBeatRef.current = -1;
                     clearRipples();
                     isPlayingChallengeRef.current = false;
                   }}
-                  className="px-3 py-1.5 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded transition-all hover:bg-grifter-blue hover:text-black"
+                  className="px-3 py-1.5 border border-grifter-blue text-grifter-blue font-press-start-2p text-xs rounded transition-all hover:bg-grifter-blue hover:text-black mt-2"
                 >
                   RETRY
                 </button>

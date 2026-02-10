@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x755f48d8130bab70dd7Fd69bba037Ea9400b6365';
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V2 || '0x5FAE341367647F8Db2448792e793e9f46F67acb4';
 
 // Multiple RPC endpoints for fallback
 const RPC_URLS = [
@@ -19,6 +19,11 @@ const RPC_URLS = [
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 // Zero address (for mints)
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000000000000000000000000000';
+
+// Maximum block range per query (RPC providers typically limit to 50000)
+const MAX_BLOCK_RANGE = 45000;
+// Contract deployment block
+const DEPLOYMENT_BLOCK = 37179766; // 0x2375206
 
 export interface LeaderboardEntry {
   address: string;
@@ -52,13 +57,64 @@ async function callRpc(method: string, params: unknown[] = []): Promise<unknown>
     }
   }
   
-  console.error('[Leaderboard RPC] All RPCs failed:', lastError);
-  throw lastError;
+  // Silently fail - leaderboard is not critical for the app
+  // console.error('[Leaderboard RPC] All RPCs failed:', lastError);
+  // throw lastError;
+  return null; // Return null instead of throwing
+}
+
+/**
+ * Fetches logs in chunks to avoid exceeding RPC block range limits
+ */
+async function fetchLogsInChunks(
+  fromBlock: number,
+  toBlock: number | 'latest',
+  maxChunkSize: number = MAX_BLOCK_RANGE
+): Promise<Array<{ topics: string[]; data: string }>> {
+  const allLogs: Array<{ topics: string[]; data: string }> = [];
+  
+  // Get current block number if 'latest' is specified
+  let endBlock: number;
+  if (toBlock === 'latest') {
+    const blockNumberHex = await callRpc('eth_blockNumber') as string | null;
+    if (!blockNumberHex) return []; // Silently return empty if RPC fails
+    endBlock = parseInt(blockNumberHex, 16);
+  } else {
+    endBlock = toBlock;
+  }
+  
+  // Calculate chunks
+  let currentFrom = fromBlock;
+  
+  while (currentFrom <= endBlock) {
+    const currentTo = Math.min(currentFrom + maxChunkSize - 1, endBlock);
+    
+    try {
+      const logs = await callRpc('eth_getLogs', [{
+        address: CONTRACT_ADDRESS,
+        fromBlock: `0x${currentFrom.toString(16)}`,
+        toBlock: `0x${currentTo.toString(16)}`,
+        topics: [TRANSFER_TOPIC]
+      }]) as Array<{ topics: string[]; data: string }> | null;
+      
+      if (logs && Array.isArray(logs)) {
+        allLogs.push(...logs);
+      }
+    } catch (err) {
+      // Silently skip failed chunks - not critical
+      // console.error(`[Leaderboard] Error fetching chunk ${currentFrom}-${currentTo}:`, err);
+      // Continue with next chunk even if one fails
+    }
+    
+    currentFrom = currentTo + 1;
+  }
+  
+  return allLogs;
 }
 
 export function useEdgeLeaderboard() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Don't auto-load
   const [error, setError] = useState<string | null>(null);
 
   const fetchLeaderboard = useCallback(async () => {
@@ -67,13 +123,8 @@ export function useEdgeLeaderboard() {
       setError(null);
 
       // Get all Transfer events (mints are from zero address)
-      // Start from contract deployment block (37179766 = 0x2375206)
-      const logs = await callRpc('eth_getLogs', [{
-        address: CONTRACT_ADDRESS,
-        fromBlock: '0x2375206',
-        toBlock: 'latest',
-        topics: [TRANSFER_TOPIC]
-      }]) as Array<{ topics: string[]; data: string }> | null;
+      // Fetch in chunks to avoid exceeding RPC block range limits
+      const logs = await fetchLogsInChunks(DEPLOYMENT_BLOCK, 'latest');
 
       // Extract unique recipient addresses (topic[2] is 'to' address)
       const holders = new Set<string>();
@@ -122,19 +173,22 @@ export function useEdgeLeaderboard() {
 
       setLeaderboard(sorted);
     } catch (err) {
-      console.error('[Leaderboard] Error:', err);
+      // Silently fail - leaderboard is not critical
+      // console.error('[Leaderboard] Error:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard');
+      setLeaderboard([]); // Show empty leaderboard on error
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchLeaderboard();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchLeaderboard, 30000);
-    return () => clearInterval(interval);
-  }, [fetchLeaderboard]);
+  // DISABLED: Auto-fetch causes too many 503 errors on public RPC
+  // Only fetch manually when needed (e.g., button click)
+  // useEffect(() => {
+  //   fetchLeaderboard();
+  //   const interval = setInterval(fetchLeaderboard, 30000);
+  //   return () => clearInterval(interval);
+  // }, [fetchLeaderboard]);
 
   return { leaderboard, isLoading, error, refetch: fetchLeaderboard };
 }
