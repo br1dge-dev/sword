@@ -420,6 +420,8 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         for (let i = 0; i < newMissed; i++) {
           addMissedBeat();
         }
+        // Trigger visual feedback for missed beats
+        (window as any).lastMissedBeatTime = Date.now();
       }
     };
 

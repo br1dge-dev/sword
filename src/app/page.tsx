@@ -196,7 +196,14 @@ export default function HomePage() {
   };
 
   // $EDGE Leaderboard from contract
-  const { leaderboard: edgeLeaderboard, isLoading: isLeaderboardLoading } = useEdgeLeaderboard();
+  const { leaderboard: edgeLeaderboard, isLoading: isLeaderboardLoading, refetch: refetchLeaderboard } = useEdgeLeaderboard();
+  
+  // Fetch leaderboard when modal opens
+  useEffect(() => {
+    if (isLeaderboardOpen) {
+      refetchLeaderboard();
+    }
+  }, [isLeaderboardOpen, refetchLeaderboard]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-0 overflow-hidden">
