@@ -1,0 +1,12 @@
+{
+  "track": "WORFSWORD.mp3",
+  "displayName": "WORFSWORD",
+  "fullHitMap": [],
+  "challengeConfig": {
+    "startOffset": 10,
+    "duration": 45,
+    "toleranceMs": 150
+  },
+  "difficulty": "medium",
+  "totalDuration": 170.0
+}

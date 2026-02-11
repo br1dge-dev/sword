@@ -1,0 +1,12 @@
+{
+  "track": "SHONENSWORD.mp3",
+  "displayName": "SHONENSWORD",
+  "fullHitMap": [],
+  "challengeConfig": {
+    "startOffset": 10,
+    "duration": 45,
+    "toleranceMs": 150
+  },
+  "difficulty": "medium",
+  "totalDuration": 185.0
+}

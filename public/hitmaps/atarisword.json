@@ -1,0 +1,12 @@
+{
+  "track": "atarisword.mp3",
+  "displayName": "ATARISWORD",
+  "fullHitMap": [],
+  "challengeConfig": {
+    "startOffset": 10,
+    "duration": 45,
+    "toleranceMs": 150
+  },
+  "difficulty": "medium",
+  "totalDuration": 150.0
+}
