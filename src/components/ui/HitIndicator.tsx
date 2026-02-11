@@ -1,13 +1,13 @@
 /**
- * HitIndicator - Optimized visual indicator for upcoming beats
+ * HitIndicator - ASCII/Unicode styled dual-lane beat indicator
  *
- * Uses direct DOM manipulation via requestAnimationFrame for 60fps performance
- * instead of React state updates which cause excessive re-renders.
- * Global click handler triggers hit effect regardless of cursor position.
+ * Two mirrored lanes where Unicode symbols fly in from both sides and meet at center.
+ * Styled to match the ASCII pixel aesthetic of the sword visualization.
+ * Uses direct DOM manipulation via requestAnimationFrame for 60fps performance.
  */
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface HitIndicatorProps {
   /** Lookahead window in ms */
@@ -20,11 +20,20 @@ interface HitIndicatorProps {
   lastHitResult?: { hit: boolean; delta: number } | null;
 }
 
+// ASCII/Unicode symbols for the indicator
+const SYMBOLS = {
+  dot: '◆',        // Diamond for approaching beats
+  dotSmall: '◇',   // Small diamond for distant beats
+  center: '◈',     // Double diamond for hit zone
+  centerHit: '✦',  // Star burst on hit
+  centerMiss: '✕', // X on miss
+  lane: '─',       // Lane track character
+  laneEnd: '┄',    // Faded lane end
+};
+
 // Visual constants
-const TRACK_HEIGHT = 300;
-const HIT_ZONE_HEIGHT = 40;
-const DOT_SIZE = 12;
-const GLOW_INTENSITY = 0.8;
+const LANE_WIDTH = 240; // Width of each lane (longer)
+const FONT_SIZE = 20;   // Larger font size for symbols
 
 export function HitIndicator({
   lookaheadMs = 2000,
@@ -33,31 +42,38 @@ export function HitIndicator({
   lastHitResult,
 }: HitIndicatorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const dotsRef = useRef<HTMLDivElement[]>([]);
-  const flashRef = useRef<HTMLDivElement>(null);
+  const leftDotsRef = useRef<HTMLSpanElement[]>([]);
+  const rightDotsRef = useRef<HTMLSpanElement[]>([]);
+  const centerRef = useRef<HTMLSpanElement>(null);
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
+  const lastMissedCheckRef = useRef<number>(0);
 
-  // Flash feedback on hit/miss
+  // Flash feedback on hit/miss from user click
   useEffect(() => {
-    if (lastHitResult && flashRef.current) {
-      const color = lastHitResult.hit ? '#00FCA6' : '#FF3EC8';
-      flashRef.current.style.background = `radial-gradient(ellipse at center, ${color}40 0%, transparent 70%)`;
-      flashRef.current.style.borderTop = `2px solid ${color}`;
-      flashRef.current.style.boxShadow = `0 0 20px ${color}80, inset 0 0 15px ${color}40`;
+    if (lastHitResult && centerRef.current) {
+      const isHit = lastHitResult.hit;
+      const color = isHit ? '#00FCA6' : '#FF3EC8';
+      const symbol = isHit ? SYMBOLS.centerHit : SYMBOLS.centerMiss;
+      
+      centerRef.current.textContent = symbol;
+      centerRef.current.style.color = color;
+      centerRef.current.style.textShadow = `0 0 8px ${color}, 0 0 16px ${color}80`;
+      centerRef.current.style.transform = 'translate(-50%, -50%) scale(1.4)';
 
       const timer = setTimeout(() => {
-        if (flashRef.current) {
-          flashRef.current.style.background = 'radial-gradient(ellipse at center, rgba(0, 252, 166, 0.2) 0%, transparent 70%)';
-          flashRef.current.style.borderTop = '2px solid rgba(0, 252, 166, 0.5)';
-          flashRef.current.style.boxShadow = '0 0 10px rgba(0, 252, 166, 0.3)';
+        if (centerRef.current) {
+          centerRef.current.textContent = SYMBOLS.center;
+          centerRef.current.style.color = '#00FCA6';
+          centerRef.current.style.textShadow = '0 0 6px #00FCA680';
+          centerRef.current.style.transform = 'translate(-50%, -50%) scale(1)';
         }
       }, 150);
       return () => clearTimeout(timer);
     }
   }, [lastHitResult]);
 
-  // Global click handler - triggers hit effect anywhere on screen
+  // Global click handler
   useEffect(() => {
     if (!isActive) return;
 
@@ -76,7 +92,7 @@ export function HitIndicator({
     };
   }, [isActive, onHit]);
 
-  // Animation loop - uses direct DOM manipulation for performance
+  // Animation loop
   useEffect(() => {
     if (!isActive || !containerRef.current) {
       if (rafRef.current) {
@@ -87,38 +103,71 @@ export function HitIndicator({
     }
 
     const animate = (timestamp: number) => {
-      // Throttle to ~60fps
       if (timestamp - lastTimeRef.current < 16) {
         rafRef.current = requestAnimationFrame(animate);
         return;
       }
       lastTimeRef.current = timestamp;
 
-      // Get upcoming beats from global store via custom event
-      const event = new CustomEvent('getUpcomingBeats');
-      const result = window.dispatchEvent(event);
-      // The result is set via a global variable for performance
-      const upcomingBeats = (window as any).upcomingBeats || [];
+      // Check for missed beat feedback
+      const lastMissedTime = (window as any).lastMissedBeatTime || 0;
+      if (lastMissedTime > lastMissedCheckRef.current && centerRef.current) {
+        lastMissedCheckRef.current = lastMissedTime;
+        const color = '#FF3EC8';
+        centerRef.current.textContent = SYMBOLS.centerMiss;
+        centerRef.current.style.color = color;
+        centerRef.current.style.textShadow = `0 0 8px ${color}`;
+        centerRef.current.style.transform = 'translate(-50%, -50%) scale(1.2)';
+        
+        setTimeout(() => {
+          if (centerRef.current) {
+            centerRef.current.textContent = SYMBOLS.center;
+            centerRef.current.style.color = '#00FCA6';
+            centerRef.current.style.textShadow = '0 0 6px #00FCA680';
+            centerRef.current.style.transform = 'translate(-50%, -50%) scale(1)';
+          }
+        }, 120);
+      }
 
-      // Update dot positions directly
-      dotsRef.current.forEach((dot, index) => {
-        if (index < upcomingBeats.length) {
+      // Get upcoming beats
+      const upcomingBeats = (window as any).upcomingBeats || [];
+      const maxDots = Math.min(upcomingBeats.length, leftDotsRef.current.length);
+      
+      for (let index = 0; index < leftDotsRef.current.length; index++) {
+        const leftDot = leftDotsRef.current[index];
+        const rightDot = rightDotsRef.current[index];
+        
+        if (index < maxDots) {
           const timeUntil = upcomingBeats[index];
           const progress = 1 - (timeUntil / lookaheadMs);
           const easedProgress = progress * progress;
-          const position = easedProgress * (TRACK_HEIGHT - HIT_ZONE_HEIGHT);
-          const opacity = 0.3 + (progress * 0.7);
-          const scale = 0.7 + (progress * 0.3);
+          
+          // Position from edge towards center
+          const position = easedProgress * LANE_WIDTH;
+          const opacity = 0.2 + (progress * 0.8);
+          const scale = 0.6 + (progress * 0.4);
+          
+          // Use filled diamond when close, outline when far
+          const symbol = progress > 0.5 ? SYMBOLS.dot : SYMBOLS.dotSmall;
 
-          dot.style.display = 'block';
-          dot.style.transform = `translateX(-50%) scale(${scale})`;
-          dot.style.top = `${position}px`;
-          dot.style.opacity = String(opacity);
-          dot.style.boxShadow = `0 0 ${8 * scale}px rgba(0, 252, 166, ${GLOW_INTENSITY * opacity})`;
+          // Left dot
+          leftDot.style.display = 'block';
+          leftDot.style.left = `${position}px`;
+          leftDot.style.opacity = String(opacity);
+          leftDot.style.transform = `translateY(-50%) scale(${scale})`;
+          leftDot.textContent = symbol;
+
+          // Right dot (mirrored)
+          rightDot.style.display = 'block';
+          rightDot.style.right = `${position}px`;
+          rightDot.style.opacity = String(opacity);
+          rightDot.style.transform = `translateY(-50%) scale(${scale})`;
+          rightDot.textContent = symbol;
         } else {
-          dot.style.display = 'none';
+          leftDot.style.display = 'none';
+          rightDot.style.display = 'none';
         }
-      });
+      }
 
       rafRef.current = requestAnimationFrame(animate);
     };
@@ -133,90 +182,144 @@ export function HitIndicator({
     };
   }, [isActive, lookaheadMs]);
 
-  // Pre-create dots (max 10 for performance)
-  const maxDots = 10;
+  const maxDots = 8;
   const dots = Array.from({ length: maxDots }, (_, i) => i);
 
   if (!isActive) return null;
 
+  const totalWidth = LANE_WIDTH * 2 + 50; // 50px for center zone
+
   return (
     <div
       ref={containerRef}
-      className="fixed right-8 top-1/2 -translate-y-1/2 z-20 select-none"
+      className="fixed left-1/2 -translate-x-1/2 z-10 select-none pointer-events-none font-mono"
       style={{
-        width: 60,
-        height: TRACK_HEIGHT,
+        width: totalWidth,
+        height: 50,
+        // Centered between top edge and sword tip (~35% from top)
+        // Using clamp to ensure minimum 60px from top, max 18% from top
+        top: 'clamp(60px, 15%, 18vh)',
       }}
     >
-      {/* Track background */}
+      {/* Left lane track - ASCII dashes */}
       <div
-        className="absolute inset-0 rounded-full"
+        className="absolute whitespace-nowrap overflow-hidden"
         style={{
-          background: 'linear-gradient(180deg, rgba(0, 252, 166, 0.05) 0%, rgba(0, 252, 166, 0.1) 100%)',
-          border: '1px solid rgba(0, 252, 166, 0.2)',
-        }}
-      />
-
-      {/* Hit zone at bottom */}
-      <div
-        ref={flashRef}
-        className="absolute bottom-0 left-0 right-0 rounded-b-full transition-all duration-100"
-        style={{
-          height: HIT_ZONE_HEIGHT,
-          background: 'radial-gradient(ellipse at center, rgba(0, 252, 166, 0.2) 0%, transparent 70%)',
-          borderTop: '2px solid rgba(0, 252, 166, 0.5)',
-          boxShadow: '0 0 10px rgba(0, 252, 166, 0.3)',
+          left: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: LANE_WIDTH,
+          color: '#00FCA620',
+          fontSize: FONT_SIZE,
+          letterSpacing: '2px',
+          textAlign: 'right',
         }}
       >
-        {/* Hit zone label */}
-        <div
-          className="absolute inset-0 flex items-center justify-center text-xs font-mono"
-          style={{
-            color: 'rgba(0, 252, 166, 0.6)',
-          }}
-        >
-          HIT
-        </div>
+        {SYMBOLS.laneEnd}{SYMBOLS.lane.repeat(24)}{SYMBOLS.lane}
       </div>
 
-      {/* Pre-rendered dots (hidden by default) - centered with transform */}
-      {dots.map((_, index) => (
-        <div
-          key={`dot-${index}`}
-          ref={(el) => {
-            if (el) dotsRef.current[index] = el;
-          }}
-          className="absolute rounded-full"
-          style={{
-            display: 'none',
-            width: DOT_SIZE,
-            height: DOT_SIZE,
-            background: 'radial-gradient(circle, #00FCA6 0%, #00FCA6 100%)',
-            left: '50%',
-            transform: 'translateX(-50%)',
-          }}
-        />
-      ))}
-
-      {/* Center line guide */}
+      {/* Right lane track - ASCII dashes */}
       <div
-        className="absolute w-px"
+        className="absolute whitespace-nowrap overflow-hidden"
+        style={{
+          right: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: LANE_WIDTH,
+          color: '#00FCA620',
+          fontSize: FONT_SIZE,
+          letterSpacing: '2px',
+          textAlign: 'left',
+        }}
+      >
+        {SYMBOLS.lane}{SYMBOLS.lane.repeat(24)}{SYMBOLS.laneEnd}
+      </div>
+
+      {/* Center hit zone - Unicode symbol */}
+      <span
+        ref={centerRef}
+        className="absolute transition-all duration-100"
         style={{
           left: '50%',
-          marginLeft: -0.5,
-          top: 0,
-          bottom: HIT_ZONE_HEIGHT,
-          background: 'linear-gradient(180deg, transparent 0%, rgba(0, 252, 166, 0.3) 100%)',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          fontSize: 32,
+          color: '#00FCA6',
+          textShadow: '0 0 8px #00FCA6, 0 0 16px #00FCA660',
         }}
-      />
-
-      {/* Tap hint */}
-      <div
-        className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs font-mono whitespace-nowrap"
-        style={{ color: 'rgba(0, 252, 166, 0.4)' }}
       >
-        TAP
-      </div>
+        {SYMBOLS.center}
+      </span>
+
+      {/* Left lane dots - Unicode diamonds */}
+      {dots.map((_, index) => (
+        <span
+          key={`left-dot-${index}`}
+          ref={(el) => {
+            if (el) leftDotsRef.current[index] = el;
+          }}
+          className="absolute"
+          style={{
+            display: 'none',
+            fontSize: FONT_SIZE,
+            color: '#00FCA6',
+            textShadow: '0 0 6px #00FCA6, 0 0 12px #00FCA660',
+            top: '50%',
+            transform: 'translateY(-50%)',
+          }}
+        >
+          {SYMBOLS.dot}
+        </span>
+      ))}
+
+      {/* Right lane dots - Unicode diamonds */}
+      {dots.map((_, index) => (
+        <span
+          key={`right-dot-${index}`}
+          ref={(el) => {
+            if (el) rightDotsRef.current[index] = el;
+          }}
+          className="absolute"
+          style={{
+            display: 'none',
+            fontSize: FONT_SIZE,
+            color: '#00FCA6',
+            textShadow: '0 0 6px #00FCA6, 0 0 12px #00FCA660',
+            top: '50%',
+            transform: 'translateY(-50%)',
+          }}
+        >
+          {SYMBOLS.dot}
+        </span>
+      ))}
+
+      {/* Bracket markers at edges */}
+      <span
+        className="absolute"
+        style={{
+          left: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          fontSize: FONT_SIZE + 4,
+          color: '#00FCA650',
+          textShadow: '0 0 4px #00FCA640',
+        }}
+      >
+        ╟
+      </span>
+      <span
+        className="absolute"
+        style={{
+          right: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          fontSize: FONT_SIZE + 4,
+          color: '#00FCA650',
+          textShadow: '0 0 4px #00FCA640',
+        }}
+      >
+        ╢
+      </span>
     </div>
   );
 }
