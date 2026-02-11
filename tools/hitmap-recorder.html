@@ -558,18 +558,36 @@
         
         // Export button
         exportBtn.addEventListener('click', () => {
-            const trackNameValue = document.getElementById('trackNameDisplay').textContent;
+            const trackFileName = document.getElementById('trackNameDisplay').textContent;
+            // Extract display name from filename (e.g., "flashword.mp3" -> "FLASHWORD")
+            const displayName = trackFileName.replace(/\.mp3$/i, '').toUpperCase();
+            
+            // Format matching gr1ftsword.json structure
             const exportData = {
-                track: trackNameValue,
-                hitMap: timestamps.map(t => parseFloat(t.toFixed(3))),
-                created: new Date().toISOString(),
-                duration: audioBuffer.duration,
-                hitCount: timestamps.length
+                track: trackFileName,
+                displayName: displayName,
+                fullHitMap: timestamps.map(t => parseFloat(t.toFixed(3))),
+                challengeConfig: {
+                    startOffset: 10,
+                    duration: 45,
+                    toleranceMs: 150
+                },
+                difficulty: "medium",
+                totalDuration: parseFloat(audioBuffer.duration.toFixed(2))
             };
             
             const json = JSON.stringify(exportData, null, 2);
             output.textContent = json;
             output.classList.add('active');
+            
+            // Also offer download
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = displayName.toLowerCase() + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
         });
         
         // Helper functions

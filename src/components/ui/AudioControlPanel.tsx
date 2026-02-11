@@ -84,6 +84,24 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const challengeRafRef = useRef<number | undefined>(undefined);
   const isPlayingChallengeRef = useRef(false);
+  
+  // DEBUG: Track override for testing different hitmaps
+  const [debugTrackOverride, setDebugTrackOverride] = useState<string | null>(null);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  
+  // Available tracks for debug selector (tracks with hitmaps)
+  const challengeTracks = [
+    { name: 'GR1FTSWORD', file: 'gr1ftsword' },
+    { name: 'FLASHWORD', file: 'flashword' },
+    { name: 'FUNKSWORD', file: 'funksword' },
+    { name: 'ATARISWORD', file: 'atarisword' },
+    { name: 'DR4GONSWORD', file: 'dr4gonsword' },
+    { name: 'PUNCHSWORD', file: 'punchsword' },
+    { name: 'NIGHTSWORD', file: 'nightsword' },
+    { name: 'DANGERSWORD', file: 'dangersword' },
+    { name: 'SHONENSWORD', file: 'shonensword' },
+    { name: 'WORFSWORD', file: 'worfsword' },
+  ];
 
   // Derived values from shared hits (with safe defaults)
   const safeHits = sharedHits || [];
@@ -211,15 +229,15 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     })),
   );
 
-  // Load hitmap when challenge mode is enabled - use contract's activeChallenge for track selection
+  // Load hitmap when challenge mode is enabled - use debug override or contract's activeChallenge
   useEffect(() => {
     if (mode === 'challenge' && !hitMap) {
-      // Get track name from contract (random daily selection) or fallback to gr1ftsword
-      const trackName = activeChallenge?.trackName?.toLowerCase() || 'gr1ftsword';
-      const contractStartOffsetMs = activeChallenge?.startOffsetMs || 0;
-      const contractEndOffsetMs = activeChallenge?.endOffsetMs || 45000;
+      // DEBUG: Use override if set, otherwise use contract data
+      const trackName = debugTrackOverride || activeChallenge?.trackName?.toLowerCase() || 'gr1ftsword';
+      const contractStartOffsetMs = debugTrackOverride ? 0 : (activeChallenge?.startOffsetMs || 0);
+      const contractEndOffsetMs = debugTrackOverride ? 45000 : (activeChallenge?.endOffsetMs || 45000);
       
-      console.log('[Challenge] Loading hitmap for track:', trackName, 'contract offset:', contractStartOffsetMs, '-', contractEndOffsetMs);
+      console.log('[Challenge] Loading hitmap for track:', trackName, debugTrackOverride ? '(DEBUG OVERRIDE)' : '', 'offset:', contractStartOffsetMs, '-', contractEndOffsetMs);
       
       fetch(`/hitmaps/${trackName}.json`)
         .then(res => {
@@ -231,14 +249,16 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         })
         .then(res => res.json())
         .then((data: HitMapData) => {
-          // Override challengeConfig with contract values if available
-          if (activeChallenge && contractStartOffsetMs > 0) {
+          // Override challengeConfig with contract values if available (not in debug mode)
+          if (!debugTrackOverride && activeChallenge && contractStartOffsetMs > 0) {
             data.challengeConfig = {
               startOffset: contractStartOffsetMs / 1000, // Convert ms to seconds
               duration: (contractEndOffsetMs - contractStartOffsetMs) / 1000,
               toleranceMs: data.challengeConfig?.toleranceMs || 150,
             };
             console.log('[Challenge] Using contract offsets:', data.challengeConfig);
+          } else {
+            console.log('[Challenge] Using hitmap default offsets:', data.challengeConfig);
           }
           
           setHitMap(data);
@@ -252,7 +272,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
         })
         .catch(err => console.error('Failed to load hitmap:', err));
     }
-  }, [mode, hitMap, activeChallenge, setTotalBeats, setSharedHitMap]);
+  }, [mode, hitMap, activeChallenge, debugTrackOverride, setTotalBeats, setSharedHitMap]);
 
   // Get wallet address from window.ethereum
   const getWalletAddress = useCallback(async () => {
@@ -865,6 +885,44 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
             {/* Idle: Show START button (disabled if already claimed) */}
           {phase === 'idle' && (
             <>
+              {/* DEBUG: Track selector toggle */}
+              <button
+                onClick={() => setShowDebugPanel(!showDebugPanel)}
+                className="absolute top-2 right-2 text-xs text-gray-500 hover:text-gray-300 font-mono"
+                title="Toggle debug track selector"
+              >
+                [DBG]
+              </button>
+              
+              {/* DEBUG: Track selector panel */}
+              {showDebugPanel && (
+                <div className="mb-4 p-3 bg-black/80 border border-gray-700 rounded text-xs">
+                  <div className="text-gray-400 mb-2 font-press-start-2p text-[8px]">DEBUG: SELECT TRACK</div>
+                  <select
+                    value={debugTrackOverride || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setDebugTrackOverride(value);
+                      setHitMap(null); // Force reload hitmap
+                    }}
+                    className="w-full bg-gray-900 border border-gray-600 text-gray-300 px-2 py-1 rounded text-xs"
+                  >
+                    <option value="">Contract Default ({activeChallenge?.trackName || 'loading...'})</option>
+                    {challengeTracks.map(t => (
+                      <option key={t.file} value={t.file}>{t.name}</option>
+                    ))}
+                  </select>
+                  {debugTrackOverride && (
+                    <div className="mt-2 text-yellow-500 text-[8px]">
+                      ⚠ Debug override active - claims disabled
+                    </div>
+                  )}
+                  <div className="mt-2 text-gray-500 text-[8px]">
+                    Contract: {activeChallenge?.trackName || 'N/A'} @ {activeChallenge?.startOffsetMs || 0}ms
+                  </div>
+                </div>
+              )}
+              
               <button
                 onClick={userState !== null && userState.canClaimToday === false ? undefined : handleChallengeStart}
                 disabled={userState !== null && userState.canClaimToday === false}
@@ -880,6 +938,13 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
               >
                 {userState !== null && userState.canClaimToday === false ? 'ALREADY CLAIMED' : 'START'}
               </button>
+              
+              {/* Show current track info */}
+              {hitMap && (
+                <div className="mt-2 text-xs text-gray-500 font-press-start-2p">
+                  {hitMap.displayName} ({hitMap.fullHitMap.length} beats)
+                </div>
+              )}
             </>
           )}
           
@@ -938,14 +1003,21 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
                 {effectiveTotalBeats === 0 ? '-' : `${accuracy}%`}
               </div>
 
-              {/* Claim button for passed challenges */}
-              {passed && !hasClaimedSuccessfully && (
+              {/* Claim button for passed challenges (disabled in debug mode) */}
+              {passed && !hasClaimedSuccessfully && !debugTrackOverride && (
                 <ClaimRewardButton 
                   onSuccess={() => {
                     setHasClaimedSuccessfully(true);
                     refetch(); // Reload aspect levels immediately
                   }} 
                 />
+              )}
+              
+              {/* Debug mode warning */}
+              {passed && debugTrackOverride && (
+                <div className="px-3 py-1 border border-yellow-500 text-yellow-500 font-press-start-2p text-[8px] rounded bg-yellow-500/10">
+                  DEBUG MODE - Claims disabled
+                </div>
               )}
 
               {/* Show success message if claimed */}
