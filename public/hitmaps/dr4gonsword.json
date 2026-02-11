@@ -1,0 +1,12 @@
+{
+  "track": "DR4GONSWORD.mp3",
+  "displayName": "DR4GONSWORD",
+  "fullHitMap": [],
+  "challengeConfig": {
+    "startOffset": 10,
+    "duration": 45,
+    "toleranceMs": 150
+  },
+  "difficulty": "medium",
+  "totalDuration": 200.0
+}

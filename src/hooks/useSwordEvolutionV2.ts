@@ -25,6 +25,7 @@ const SELECTORS = {
   getUserState: '0x416ae768',      // getUserState(address)
   getActiveAspect: '0x4c2e0246',   // getActiveAspect()
   getCurrentRound: '0xa32bf597',   // getCurrentRound()
+  getActiveChallenge: '0x4ee0c9c7', // getActiveChallenge() - returns (trackName, startOffsetMs, endOffsetMs)
   forgeLevel: '0xf2096da8',        // forgeLevel()
   chargeLevel: '0xd0d7e306',       // chargeLevel()
   glitchLevel: '0xfd80bca4',       // glitchLevel()
@@ -59,6 +60,12 @@ export interface UserState {
   totalMinted: bigint;
   canClaimToday: boolean;
   lastClaimDay: number;
+}
+
+export interface ActiveChallenge {
+  trackName: string;
+  startOffsetMs: number;
+  endOffsetMs: number;
 }
 
 async function callRpc(method: string, params: unknown[] = []): Promise<unknown> {
@@ -97,6 +104,7 @@ export function useSwordEvolutionV2() {
   const [aspectLevels, setAspectLevels] = useState<AspectLevels | null>(null);
   const [globalState, setGlobalState] = useState<GlobalState | null>(null);
   const [userState, setUserState] = useState<UserState | null>(null);
+  const [activeChallenge, setActiveChallenge] = useState<ActiveChallenge | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -218,16 +226,62 @@ export function useSwordEvolutionV2() {
     }
   }, [address]);
 
+  const fetchActiveChallenge = useCallback(async () => {
+    try {
+      const data = await callRpc('eth_call', [{ to: CONTRACT_ADDRESS, data: SELECTORS.getActiveChallenge }, 'latest']) as string | null;
+      
+      if (!data || data === '0x') { 
+        console.warn('[V2] getActiveChallenge: no data (no tracks registered?)');
+        setActiveChallenge(null); 
+        return; 
+      }
+
+      const hex = data.slice(2);
+      
+      // ABI decode: (string trackName, uint256 startOffsetMs, uint256 endOffsetMs)
+      // String is dynamic, so first 32 bytes = offset to string data
+      // Then uint256 startOffsetMs, uint256 endOffsetMs
+      // Then string data at offset
+      
+      const stringOffset = hexToNumber('0x' + hex.slice(0, 64));
+      const startOffsetMs = hexToNumber('0x' + hex.slice(64, 128));
+      const endOffsetMs = hexToNumber('0x' + hex.slice(128, 192));
+      
+      // String data starts at stringOffset * 2 (hex chars)
+      const stringDataStart = stringOffset * 2;
+      const stringLength = hexToNumber('0x' + hex.slice(stringDataStart, stringDataStart + 64));
+      const stringHex = hex.slice(stringDataStart + 64, stringDataStart + 64 + stringLength * 2);
+      
+      // Decode hex string to UTF-8
+      const trackName = stringHex
+        .match(/.{1,2}/g)
+        ?.map(byte => String.fromCharCode(parseInt(byte, 16)))
+        .join('') || '';
+      
+      console.log('[V2] Active challenge:', trackName, 'offset:', startOffsetMs, '-', endOffsetMs);
+      setActiveChallenge({ trackName, startOffsetMs, endOffsetMs });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      // NoActiveTracks error is expected when no tracks are registered
+      if (message.includes('NoActiveTracks') || message.includes('0x')) {
+        console.warn('[V2] No active tracks registered in contract');
+      } else {
+        console.error('[V2] getActiveChallenge error:', message);
+      }
+      setActiveChallenge(null);
+    }
+  }, []);
+
   useEffect(() => {
     setIsLoading(true);
     const fetchAll = async () => {
-      await Promise.all([fetchAspectLevels(), fetchGlobalState(), fetchUserState()]);
+      await Promise.all([fetchAspectLevels(), fetchGlobalState(), fetchUserState(), fetchActiveChallenge()]);
       setIsLoading(false);
     };
     fetchAll();
     const interval = setInterval(fetchAll, 10000);
     return () => clearInterval(interval);
-  }, [fetchAspectLevels, fetchGlobalState, fetchUserState]);
+  }, [fetchAspectLevels, fetchGlobalState, fetchUserState, fetchActiveChallenge]);
 
   // Sync contract data to powerUpStore
   useEffect(() => {
@@ -261,14 +315,15 @@ export function useSwordEvolutionV2() {
 
   const refetch = useCallback(async () => {
     setIsLoading(true);
-    await Promise.all([fetchAspectLevels(), fetchGlobalState(), fetchUserState()]);
+    await Promise.all([fetchAspectLevels(), fetchGlobalState(), fetchUserState(), fetchActiveChallenge()]);
     setIsLoading(false);
-  }, [fetchAspectLevels, fetchGlobalState, fetchUserState]);
+  }, [fetchAspectLevels, fetchGlobalState, fetchUserState, fetchActiveChallenge]);
 
   return { 
     aspectLevels, 
     globalState, 
     userState, 
+    activeChallenge,
     isLoading, 
     refetch,
     // Convenience accessors for new V2 fields

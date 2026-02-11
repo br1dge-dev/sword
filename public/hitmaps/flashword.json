@@ -1,0 +1,12 @@
+{
+  "track": "flashword.mp3",
+  "displayName": "FLASHWORD",
+  "fullHitMap": [],
+  "challengeConfig": {
+    "startOffset": 10,
+    "duration": 45,
+    "toleranceMs": 150
+  },
+  "difficulty": "medium",
+  "totalDuration": 120.0
+}

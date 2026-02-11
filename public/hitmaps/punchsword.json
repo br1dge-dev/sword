@@ -1,0 +1,12 @@
+{
+  "track": "PUNCHSWORD.mp3",
+  "displayName": "PUNCHSWORD",
+  "fullHitMap": [],
+  "challengeConfig": {
+    "startOffset": 10,
+    "duration": 45,
+    "toleranceMs": 150
+  },
+  "difficulty": "medium",
+  "totalDuration": 160.0
+}

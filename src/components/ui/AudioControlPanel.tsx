@@ -124,8 +124,8 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
   );
 
   
-  // Use SwordEvolution hook for claim status
-  const { userState, globalState, aspectLevels, refetch } = useSwordEvolutionV2();
+  // Use SwordEvolution hook for claim status AND active challenge
+  const { userState, globalState, aspectLevels, activeChallenge, refetch } = useSwordEvolutionV2();
   const [hasClaimedSuccessfully, setHasClaimedSuccessfully] = useState(false);
   const [showProgressUpdate, setShowProgressUpdate] = useState(false);
   const prevAspectLevelsRef = useRef(aspectLevels);
@@ -211,22 +211,48 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
     })),
   );
 
+  // Load hitmap when challenge mode is enabled - use contract's activeChallenge for track selection
   useEffect(() => {
     if (mode === 'challenge' && !hitMap) {
-      fetch('/hitmaps/gr1ftsword.json')
+      // Get track name from contract (random daily selection) or fallback to gr1ftsword
+      const trackName = activeChallenge?.trackName?.toLowerCase() || 'gr1ftsword';
+      const contractStartOffsetMs = activeChallenge?.startOffsetMs || 0;
+      const contractEndOffsetMs = activeChallenge?.endOffsetMs || 45000;
+      
+      console.log('[Challenge] Loading hitmap for track:', trackName, 'contract offset:', contractStartOffsetMs, '-', contractEndOffsetMs);
+      
+      fetch(`/hitmaps/${trackName}.json`)
+        .then(res => {
+          if (!res.ok) {
+            console.warn(`[Challenge] No hitmap for ${trackName}, falling back to gr1ftsword`);
+            return fetch('/hitmaps/gr1ftsword.json');
+          }
+          return res;
+        })
         .then(res => res.json())
         .then((data: HitMapData) => {
+          // Override challengeConfig with contract values if available
+          if (activeChallenge && contractStartOffsetMs > 0) {
+            data.challengeConfig = {
+              startOffset: contractStartOffsetMs / 1000, // Convert ms to seconds
+              duration: (contractEndOffsetMs - contractStartOffsetMs) / 1000,
+              toleranceMs: data.challengeConfig?.toleranceMs || 150,
+            };
+            console.log('[Challenge] Using contract offsets:', data.challengeConfig);
+          }
+          
           setHitMap(data);
           setSharedHitMap(data); // Also store in shared state
           // Calculate max possible hits in the challenge window
           const startTime = data.challengeConfig.startOffset;
           const endTime = startTime + data.challengeConfig.duration;
           const hitsInWindow = data.fullHitMap.filter(t => t >= startTime && t <= endTime).length;
+          console.log('[Challenge] Beats in window:', hitsInWindow);
           setTotalBeats(hitsInWindow);
         })
         .catch(err => console.error('Failed to load hitmap:', err));
     }
-  }, [mode, hitMap, setTotalBeats]);
+  }, [mode, hitMap, activeChallenge, setTotalBeats, setSharedHitMap]);
 
   // Get wallet address from window.ethereum
   const getWalletAddress = useCallback(async () => {
@@ -259,6 +285,7 @@ export default function AudioControlPanel({ className = '', onBeat, onEnergyChan
       setPhase('idle');
       resetChallenge();
       clearRipples();
+      setHitMap(null); // Reset hitmap so it reloads with new contract data next time
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;

@@ -1,0 +1,12 @@
+{
+  "track": "DANGERSWORD.mp3",
+  "displayName": "DANGERSWORD",
+  "fullHitMap": [],
+  "challengeConfig": {
+    "startOffset": 10,
+    "duration": 45,
+    "toleranceMs": 150
+  },
+  "difficulty": "medium",
+  "totalDuration": 190.0
+}
