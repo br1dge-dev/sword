@@ -54,28 +54,12 @@ export default function HomePage() {
   const {
     mode: challengeMode,
     phase: challengePhase,
-    accuracy: challengeScore,
-    timeLeft,
-    hits: challengeHits,
-    totalBeats: challengeTotalBeats,
-    hitMap,
     getUpcomingBeats,
-    setMode,
-    setPhase,
-    resetChallenge,
   } = useChallengeStore(
     useShallow((s) => ({
       mode: s.mode,
       phase: s.phase,
-      accuracy: s.accuracy,
-      timeLeft: s.timeLeft,
-      hits: s.hits,
-      totalBeats: s.totalBeats,
-      hitMap: s.hitMap,
       getUpcomingBeats: s.getUpcomingBeats,
-      setMode: s.setMode,
-      setPhase: s.setPhase,
-      resetChallenge: s.resetChallenge,
     })),
   );
 
@@ -292,28 +276,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Challenge Score Display - top right when active */}
-        {isClient && isChallengeActive && (
-          <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
-            <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
-              <div className="text-xs font-mono text-grifter-green/60 mb-1">SCORE</div>
-              <div className="text-2xl font-press-start-2p text-grifter-green">{(challengeTotalBeats || 0) === 0 ? '-' : `${(challengeScore || 0).toFixed(0)}%`}</div>
-            </div>
-            <div className="bg-black/80 border border-grifter-green rounded-lg px-4 py-2 backdrop-blur-sm">
-              <div className="text-xs font-mono text-grifter-green/60 mb-1">TIME</div>
-              <div className="text-lg font-mono text-grifter-green">{timeLeft.toFixed(0)}s</div>
-            </div>
-            <button
-              onClick={() => {
-                setMode('music');
-                resetChallenge();
-              }}
-              className="px-3 py-1 text-xs font-mono bg-black border border-grifter-pink text-grifter-pink rounded hover:bg-grifter-pink hover:text-black transition-colors"
-            >
-              STOP
-            </button>
-          </div>
-        )}
+
 
         {/* Bottom Buttons - HIDE, Config, Leaderboard */}
         {isClient && isDesktop && (
